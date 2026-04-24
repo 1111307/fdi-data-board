@@ -1,0 +1,46 @@
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 10s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 10s
+  gin:
+    addr: 0.0.0.0:8080
+    timeout: 10s
+    run_mode: ${RUN_MODE:prd}
+data:
+  mysql:
+    db_name: prd_db
+    pre_source:
+      ${MYSQL_USERNAME:root}:${MYSQL_PASSWORD:FDPProdP@ss}@tcp(${MYSQL_ADDR:10.10.2.27:3306})/?charset=utf8mb4&parseTime=True&loc=Local
+    source:
+      ${MYSQL_USERNAME:root}:${MYSQL_PASSWORD:FDPProdP@ss}@tcp(${MYSQL_ADDR:10.10.2.27:3306})/${data.mysql.db_name}?charset=utf8mb4&parseTime=True&loc=Local
+    max_idl: 10
+    max_open: 100
+    conn_max_lift: 3600s
+  redis:
+    addr: ${REDIS_ADDRS:10.10.1.182:6379,10.10.0.8:6379,10.10.1.24:6379}
+    password: ${REDIS_PASSWORD:Redis-Prod-P@ss}
+    read_timeout: 3s
+    write_timeout: 3s
+  keycloak:
+    url: ${KEYCLOAK_URL:https://keycloak-prod-cla.mmtwork.com/}
+    realm: ${KEYCLOAK_REALM:momenta-dev}
+    token_tpl: ${KEYCLOAK_URL:https://keycloak-prod-cla.mmtwork.com/}auth/realms/${KEYCLOAK_REALM:momenta-dev}/protocol/openid-connect/token
+  grpc_client:
+    timeout: 5s
+    um_endpoint: ${UM_ENDPOINT:fdi-user-manager-backend.fdi.svc.cluster.local:9000}
+    any_endpoint: 127.0.0.1:9000
+  clickhouse:
+    on: ${CLICKHOUSE_ON:false}
+    dsn: clickhouse://10.10.0.222:9000,10.10.1.8:9000,10.10.2.252:9000,10.10.2.132:9000/fdi?dial_timeout=5s&connection_open_strategy=round_robin&compress=true
+    max_idl: 10
+    max_open: 100
+    conn_max_lift: 3600s
+  kafka:
+    brokers: ${KAFKA_BROKERS:10.10.1.106:9092,10.10.3.113:9092,10.10.3.139:9092}
+    fis_probe_on: ${FIS_PROBE_ON:false}
+  runtime:
+    env: ${RUN_MODE:prd}
+    domain: ${FUNC_SCOPE:fdi_cloud}

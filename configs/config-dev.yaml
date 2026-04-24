@@ -1,0 +1,47 @@
+server:
+  http:
+    addr: 0.0.0.0:8000
+    timeout: 10s
+  grpc:
+    addr: 0.0.0.0:9000
+    timeout: 10s
+  gin:
+    addr: 0.0.0.0:8080
+    timeout: 10s
+    run_mode: ${RUN_MODE:dev}
+data:
+  mysql:
+    db_name: dev_db
+    pre_source:
+      ${MYSQL_USERNAME:root}:${MYSQL_PASSWORD:FDPProdP@ss}@tcp(${MYSQL_ADDR:10.10.2.27:3306})/?charset=utf8mb4&parseTime=True&loc=Local
+    source:
+      ${MYSQL_USERNAME:root}:${MYSQL_PASSWORD:FDPProdP@ss}@tcp(${MYSQL_ADDR:10.10.2.27:3306})/${data.mysql.db_name}?charset=utf8mb4&parseTime=True&loc=Local
+    max_idl: 10
+    max_open: 100
+    conn_max_lift: 3600s
+  redis:
+    addr: ${REDIS_ADDRS:redis-ec31640c-d352-47c7-984c-c47dd616fc7c.cn-east-3.dcs.myhuaweicloud.com:6379}
+    password: ${REDIS_PASSWORD:Redis-Prod-P@ss}
+    read_timeout: 3s
+    write_timeout: 3s
+  keycloak:
+    url: ${KEYCLOAK_URL:http://10.9.60.88:8080/}
+    realm: ${KEYCLOAK_REALM:master}
+    token_tpl: ${KEYCLOAK_URL:http://10.9.60.88:8080/}auth/realms/${KEYCLOAK_REALM:master}/protocol/openid-connect/token
+  grpc_client:
+    timeout: 5s
+    um_endpoint: ${UM_ENDPOINT:10.21.15.14:9005}
+    any_endpoint: 127.0.0.1:9000
+  clickhouse:
+    on: ${CLICKHOUSE_ON:true}
+    dsn: tcp://10.10.0.222:9000,10.10.1.8:9000,10.10.2.252:9000,10.10.2.132:9000/fdi?dial_timeout=5s&connection_open_strategy=round_robin&compress=true
+    max_idl: 10
+    max_open: 100
+    conn_max_lift: 3600s
+  kafka:
+    brokers: ${KAFKA_BROKERS:10.10.1.106:9092,10.10.3.113:9092,10.10.3.139:9092}
+    fis_probe_on: ${FIS_PROBE_ON:false}
+  runtime:
+    env: ${RUN_MODE:dev}
+    domain: ${FUNC_SCOPE:fdi_cloud}
+

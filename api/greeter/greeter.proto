@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package api.greeter;
+
+import "google/api/annotations.proto";
+
+option go_package = "server/api/greeter;greeter_api";
+option java_multiple_files = true;
+option java_package = "dev.kratos.api.greeter_api";
+option java_outer_classname = "GreeterApiProtoV1";
+
+// The request message containing the user's name.
+message HelloRequest {
+  string name = 1;  // @gotags: uri:"name"
+}
+
+// The response message containing the greetings
+message HelloReply {
+  int32 code = 1;
+  string message = 2;
+}

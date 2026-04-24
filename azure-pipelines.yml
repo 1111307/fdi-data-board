@@ -1,0 +1,61 @@
+trigger:
+  tags:
+    include:
+      - v*
+  branches:
+    include:
+      - master
+      - develop
+      - feature/*
+      - release/*
+
+variables:
+  - group: artifactory_service_account # attach existing variable group
+  - group: gitlab_service_account
+  - name: project-name
+    value: $(System.Teamproject)
+  - name: repo-name
+    value: $(Build.Repository.Name)
+  - name: repo-dirname
+    value: $(Build.Repository.Name)_$(Build.SourceBranchName)
+
+resources:
+  containers:
+    - container: ci
+      endpoint: artifactory
+      image: artifactory.momenta.works/docker-momenta/fleet/fdi-buildbase:v1.0.2-ubuntu
+      options: -i -t
+  repositories:
+    - repository: submodule_repo
+      type: git
+      name: cloud-idl
+      ref: 'master'
+stages:
+  - stage: build
+    jobs:
+      - job: build_image
+        displayName: 构建镜像
+        workspace:
+          clean: all
+        pool:
+          name: 'default'
+        container: ci
+        steps:
+          - checkout: submodule_repo
+          - checkout: self
+            clean: true
+            lfs: true
+            persistCredentials: true
+          - script: |
+              cd $(repo-name)
+              cp -r ../cloud-idl/* idl/
+              mkdir -p docs
+              FullHash=$(Build.SourceVersion)
+              APP_VERSION=$(if [[ "$(Build.SourceBranchName)" =~ ^v{1}[0-9]+.*$ ]]; then echo "$(Build.SourceBranchName)"; else echo "${FullHash:0:7}";fi)
+              DOCKER_IMAGE=artifactory.momenta.works/docker-momenta/fleet/$(repo-name):${APP_VERSION}
+              echo "docker image tag --> ${DOCKER_IMAGE} ......"
+              docker build --no-cache -t ${DOCKER_IMAGE} -f Dockerfile .
+              docker push ${DOCKER_IMAGE}
+              docker rmi -f ${DOCKER_IMAGE}
+            displayName: 'docker build'
+            failOnStderr: true

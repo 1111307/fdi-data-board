@@ -1,0 +1,3 @@
+[submodule "idl"]
+	path = idl
+	url = ssh://devops.momenta.works:22/Momenta/FDI/_git/cloud-idl
