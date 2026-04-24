@@ -31,6 +31,8 @@ message SceneItem {
     int32 sort_order = 6;
     string created_by = 7;
     int64 created_at = 8;
+    uint64 datasource_id = 9;
+    string datasource_name = 10;
 }
 
 message ListScenesResponse {
@@ -106,6 +108,7 @@ message CreateSceneRequest {
     int32 sort_order = 5;
     repeated SceneParamItem params = 6;
     repeated SceneWidgetItem widgets = 7;
+    uint64 datasource_id = 8; // 0 = 默认 Doris
 }
 
 message CreateSceneResponse {
@@ -123,6 +126,7 @@ message UpdateSceneRequest {
     optional string category = 4;
     optional int32 status = 5;
     optional int32 sort_order = 6;
+    optional uint64 datasource_id = 9; // nil=不变, 0=恢复默认Doris, >0=切换数据源
     // params/widgets 不传则保留原有数据，传空数组则清空
     repeated SceneParamItem params = 7;
     repeated SceneWidgetItem widgets = 8;
@@ -140,17 +144,34 @@ message ListParamsResponse {
     repeated SceneParamItem list = 3;
 }
 
-message SaveParamRequest {
-    uint64 param_id = 1;   // 更新时传，创建时为 0
-    uint64 scene_id = 2;   // 创建时必传
-    string key_name = 3;
-    string label = 4;
-    string param_type = 5;
-    int32 required = 6;
-    string default_val = 7;
-    string options = 8;
-    string depends_on = 9;
-    int32 sort_order = 10;
+message CreateParamRequest {
+    uint64 scene_id = 1;
+    string key_name = 2;
+    string label = 3;
+    string param_type = 4;
+    int32 required = 5;
+    string default_val = 6;
+    string options = 7;
+    string depends_on = 8;
+    int32 sort_order = 9;
+}
+
+message CreateParamResponse {
+    int32 code = 1;
+    string message = 2;
+    uint64 param_id = 3;
+}
+
+message UpdateParamRequest {
+    uint64 param_id = 1;
+    optional string key_name = 2;
+    optional string label = 3;
+    optional string param_type = 4;
+    optional int32 required = 5;
+    optional string default_val = 6;
+    optional string options = 7;
+    optional string depends_on = 8;
+    optional int32 sort_order = 9;
 }
 
 // ==================== 组件 CRU ====================
@@ -191,4 +212,92 @@ message QueryResultResponse {
     repeated string columns = 3;
     repeated string rows_json = 4;
     int32 total = 5;
+}
+
+// ==================== 数据源管理 ====================
+
+message DatasourceItem {
+    uint64 id = 1;
+    string name = 2;
+    string description = 3;
+    string ds_type = 4;
+    string host = 5;
+    string port = 6;
+    string username = 7;
+    string database_name = 8;
+    int32 max_idl = 9;
+    int32 max_open = 10;
+    int32 status = 11;
+    int64 create_time = 12;
+}
+
+message ListDatasourcesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated DatasourceItem list = 3;
+}
+
+message CreateDatasourceRequest {
+    string name = 1;
+    string description = 2;
+    string ds_type = 3;   // doris / mysql
+    string host = 4;
+    string port = 5;
+    string username = 6;
+    string password = 7;
+    string database_name = 8;
+    int32 max_idl = 9;
+    int32 max_open = 10;
+}
+
+message CreateDatasourceResponse {
+    int32 code = 1;
+    string message = 2;
+    uint64 datasource_id = 3;
+}
+
+message UpdateDatasourceRequest {
+    uint64 datasource_id = 1;
+    optional string name = 2;
+    optional string description = 3;
+    optional string host = 4;
+    optional string port = 5;
+    optional string username = 6;
+    optional string password = 7;
+    optional string database_name = 8;
+    optional int32 max_idl = 9;
+    optional int32 max_open = 10;
+    optional int32 status = 11;
+}
+
+message DatasourceIDRequest {
+    uint64 datasource_id = 1;
+}
+
+// ==================== Schema 浏览 ====================
+
+message SchemaTablesRequest {
+    uint64 datasource_id = 1;
+}
+
+message SchemaTablesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string tables = 3;
+}
+
+message SchemaColumnsRequest {
+    uint64 datasource_id = 1;
+    string table_name = 2;
+}
+
+message ColumnInfo {
+    string field = 1;
+    string type = 2;
+}
+
+message SchemaColumnsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated ColumnInfo columns = 3;
 }

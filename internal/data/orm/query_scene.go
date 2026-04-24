@@ -3,42 +3,45 @@ package orm
 import "time"
 
 type querySceneColumns struct {
-	ID          string
-	Name        string
-	Description string
-	Category    string
-	Status      string
-	SortOrder   string
-	CreatedBy   string
-	CreateTime  string
-	UpdateTime  string
-	DeleteTime  string
+	ID           string
+	Name         string
+	Description  string
+	Category     string
+	Status       string
+	SortOrder    string
+	CreatedBy    string
+	CreateTime   string
+	UpdateTime   string
+	DeleteTime   string
+	DatasourceID string
 }
 
 var QuerySceneColumns = querySceneColumns{
-	ID:          "id",
-	Name:        "name",
-	Description: "description",
-	Category:    "category",
-	Status:      "status",
-	SortOrder:   "sort_order",
-	CreatedBy:   "created_by",
-	CreateTime:  "create_time",
-	UpdateTime:  "update_time",
-	DeleteTime:  "delete_time",
+	ID:           "id",
+	Name:         "name",
+	Description:  "description",
+	Category:     "category",
+	Status:       "status",
+	SortOrder:    "sort_order",
+	CreatedBy:    "created_by",
+	CreateTime:   "create_time",
+	UpdateTime:   "update_time",
+	DeleteTime:   "delete_time",
+	DatasourceID: "datasource_id",
 }
 
 type QuerySceneDo struct {
-	ID          uint64     `gorm:"column:id;primaryKey;autoIncrement"`
-	Name        string     `gorm:"column:name;size:100;not null;comment:场景名称"`
-	Description string     `gorm:"column:description;size:500;comment:场景描述"`
-	Category    string     `gorm:"column:category;size:50;index:idx_category;comment:分类标签"`
-	Status      int8       `gorm:"column:status;default:1;index:idx_status;comment:1=启用 0=禁用"`
-	SortOrder   int        `gorm:"column:sort_order;default:0;comment:排序权重"`
-	CreatedBy   string     `gorm:"column:created_by;size:100;comment:创建人"`
-	CreateTime  time.Time  `gorm:"column:create_time;not null;comment:创建时间"`
-	UpdateTime  time.Time  `gorm:"column:update_time;not null;comment:更新时间"`
-	DeleteTime  *time.Time `gorm:"column:delete_time;comment:软删除时间"`
+	ID           uint64     `gorm:"column:id;primaryKey;autoIncrement"`
+	Name         string     `gorm:"column:name;size:100;not null;comment:场景名称"`
+	Description  string     `gorm:"column:description;size:500;comment:场景描述"`
+	Category     string     `gorm:"column:category;size:50;index:idx_category;comment:分类标签"`
+	Status       int8       `gorm:"column:status;default:1;index:idx_status;comment:1=启用 0=禁用"`
+	SortOrder    int        `gorm:"column:sort_order;default:0;comment:排序权重"`
+	CreatedBy    string     `gorm:"column:created_by;size:100;comment:创建人"`
+	DatasourceID uint64     `gorm:"column:datasource_id;default:0;comment:关联数据源ID，0=默认Doris"`
+	CreateTime   time.Time  `gorm:"column:create_time;not null;comment:创建时间"`
+	UpdateTime   time.Time  `gorm:"column:update_time;not null;comment:更新时间"`
+	DeleteTime   *time.Time `gorm:"column:delete_time;comment:软删除时间"`
 }
 
 func (QuerySceneDo) TableName() string {

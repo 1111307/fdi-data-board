@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"gorm.io/gorm"
 
 	"fdi_data_board/internal/biz"
 	"fdi_data_board/internal/data/orm"
@@ -39,7 +40,7 @@ func (r *querySceneRepo) ListScenes(ctx context.Context, category string, status
 		db = db.Where(orm.QuerySceneColumns.Status+" = ?", status)
 	}
 
-	if err := db.Order(orm.QuerySceneColumns.SortOrder + " ASC").Find(&list).Error; err != nil {
+	if err := db.Order(orm.QuerySceneColumns.ID + " ASC").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil
@@ -128,24 +129,43 @@ func (r *querySceneRepo) SaveScene(ctx context.Context, scene *orm.QuerySceneDo,
 	return scene.ID, err
 }
 
-func (r *querySceneRepo) CreateParam(ctx context.Context, param *orm.QuerySceneParamDo) error {
-	return r.mysqlDB(ctx).Create(param).Error
+func (r *querySceneRepo) CreateParam(ctx context.Context, param *orm.QuerySceneParamDo) (uint64, error) {
+	err := r.mysqlDB(ctx).Create(param).Error
+	return param.ID, err
 }
 
-func (r *querySceneRepo) UpdateParam(ctx context.Context, param *orm.QuerySceneParamDo) error {
-	return r.mysqlDB(ctx).Model(param).
+func (r *querySceneRepo) UpdateParam(ctx context.Context, param *biz.UpdateParamParam) error {
+	now := time.Now()
+	updateMap := map[string]interface{}{
+		orm.QuerySceneParamColumns.UpdateTime: now,
+	}
+	if param.KeyName != nil {
+		updateMap[orm.QuerySceneParamColumns.KeyName] = *param.KeyName
+	}
+	if param.Label != nil {
+		updateMap[orm.QuerySceneParamColumns.Label] = *param.Label
+	}
+	if param.ParamType != nil {
+		updateMap[orm.QuerySceneParamColumns.ParamType] = *param.ParamType
+	}
+	if param.Required != nil {
+		updateMap[orm.QuerySceneParamColumns.Required] = *param.Required
+	}
+	if param.DefaultVal != nil {
+		updateMap[orm.QuerySceneParamColumns.DefaultVal] = *param.DefaultVal
+	}
+	if param.Options != nil {
+		updateMap[orm.QuerySceneParamColumns.Options] = *param.Options
+	}
+	if param.DependsOn != nil {
+		updateMap[orm.QuerySceneParamColumns.DependsOn] = *param.DependsOn
+	}
+	if param.SortOrder != nil {
+		updateMap[orm.QuerySceneParamColumns.SortOrder] = *param.SortOrder
+	}
+	return r.mysqlDB(ctx).Model(&orm.QuerySceneParamDo{}).
 		Where(orm.QuerySceneParamColumns.ID+" = ?", param.ID).
-		Updates(map[string]interface{}{
-			orm.QuerySceneParamColumns.KeyName:    param.KeyName,
-			orm.QuerySceneParamColumns.Label:      param.Label,
-			orm.QuerySceneParamColumns.ParamType:  param.ParamType,
-			orm.QuerySceneParamColumns.Required:   param.Required,
-			orm.QuerySceneParamColumns.DefaultVal: param.DefaultVal,
-			orm.QuerySceneParamColumns.Options:    param.Options,
-			orm.QuerySceneParamColumns.DependsOn:  param.DependsOn,
-			orm.QuerySceneParamColumns.SortOrder:  param.SortOrder,
-			orm.QuerySceneParamColumns.UpdateTime: param.UpdateTime,
-		}).Error
+		Updates(updateMap).Error
 }
 
 func (r *querySceneRepo) CreateWidget(ctx context.Context, widget *orm.QuerySceneWidgetDo) error {
@@ -188,6 +208,9 @@ func (r *querySceneRepo) UpdateScene(ctx context.Context, param *biz.UpdateScene
 		}
 		if param.SortOrder != nil {
 			updateMap[orm.QuerySceneColumns.SortOrder] = *param.SortOrder
+		}
+		if param.DatasourceID != nil {
+			updateMap[orm.QuerySceneColumns.DatasourceID] = *param.DatasourceID
 		}
 
 		if err := r.mysqlDB(ctx).Model(&orm.QuerySceneDo{}).
@@ -297,20 +320,38 @@ func (r *querySceneRepo) DeleteScene(ctx context.Context, sceneID uint64) error 
 
 // ==================== 查询执行 ====================
 
-func (r *querySceneRepo) ExecuteWidget(ctx context.Context, widget *orm.QuerySceneWidgetDo, userParams map[string]string) (*biz.QueryResult, error) {
+func (r *querySceneRepo) ExecuteWidget(ctx context.Context, widget *orm.QuerySceneWidgetDo, userParams map[string]string, datasourceID uint64) (*biz.QueryResult, error) {
 	sql, args, err := bindParams(widget.SQLTemplate, userParams)
 	if err != nil {
 		return nil, fmt.Errorf("参数绑定失败: %w", err)
 	}
 
-	sql = fmt.Sprintf("SELECT * FROM (%s) _q LIMIT %d", sql, widget.MaxRows)
+	// 去掉末尾分号，避免子查询语法错误
+	sql = strings.TrimRight(strings.TrimSpace(sql), ";")
+
+	// 只有 SELECT 语句才做行数限制，其他语句（SHOW/DESC 等）直接执行
+	// 已有 LIMIT 则不追加，避免子查询包裹导致优化器无法下推
+	if strings.HasPrefix(strings.ToUpper(sql), "SELECT") {
+		hasLimit := regexp.MustCompile(`(?i)\bLIMIT\b\s+\d+`).MatchString(sql)
+		if !hasLimit {
+			sql = fmt.Sprintf("%s LIMIT %d", sql, widget.MaxRows)
+		}
+	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Duration(widget.TimeoutSec)*time.Second)
 	defer cancel()
 
-	db := r.dorisDB(timeoutCtx)
-	if db == nil {
-		return nil, fmt.Errorf("Doris 连接不可用")
+	var db *gorm.DB
+	if datasourceID == 0 {
+		db = r.dorisDB(timeoutCtx)
+		if db == nil {
+			return nil, fmt.Errorf("默认 Doris 连接不可用")
+		}
+	} else {
+		db, err = r.data.GetDatasourceDB(timeoutCtx, datasourceID)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	rows, err := db.Raw(sql, args...).Rows()

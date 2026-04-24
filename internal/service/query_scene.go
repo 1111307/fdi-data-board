@@ -335,37 +335,91 @@ func (s *QuerySceneService) DeleteScene(ctx *gin.Context) (api.HttpResponse, err
 //	@Param			body	body		querySceneApi.SaveParamRequest	true	"参数数据"
 //	@Success		200		{object}	querySceneApi.BaseResponse
 //	@Router			/query_scene/v1/admin/params/save [POST]
-func (s *QuerySceneService) SaveParam(ctx *gin.Context) (api.HttpResponse, error) {
-	resp := &querySceneApi.BaseResponse{
+// CreateParam godoc
+//
+//	@Summary		创建场景参数（管理端）
+//	@Tags			QueryScene Admin
+//	@Accept			json
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Param			body	body		querySceneApi.CreateParamRequest	true	"参数数据"
+//	@Success		200		{object}	querySceneApi.CreateParamResponse
+//	@Router			/query_scene/v1/admin/params/create [POST]
+func (s *QuerySceneService) CreateParam(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &querySceneApi.CreateParamResponse{
 		Code:    int32(gcode.CodeOK.Code()),
 		Message: gcode.CodeOK.Message(),
 	}
-	var req querySceneApi.SaveParamRequest
+	var req querySceneApi.CreateParamRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		resp.Code = int32(gcode.CodeInvalidParameter.Code())
 		resp.Message = err.Error()
 		return resp, nil
 	}
-	item := protoSaveParamReqToBizDTO(&req)
+	if req.SceneId == 0 {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = "scene_id 不能为空"
+		return resp, nil
+	}
+	if req.KeyName == "" || req.Label == "" || req.ParamType == "" {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = "key_name、label、param_type 不能为空"
+		return resp, nil
+	}
+	item := &biz.QuerySceneParamItem{
+		KeyName:    req.KeyName,
+		Label:      req.Label,
+		ParamType:  req.ParamType,
+		Required:   int8(req.Required),
+		DefaultVal: req.DefaultVal,
+		Options:    req.Options,
+		DependsOn:  req.DependsOn,
+		SortOrder:  int(req.SortOrder),
+	}
+	paramID, err := s.uc.CreateParam(ctx, req.SceneId, item)
+	if err != nil {
+		log.Errorf("CreateParam scene_id=%d error: %v", req.SceneId, err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	resp.ParamId = paramID
+	return resp, nil
+}
+
+// UpdateParam godoc
+//
+//	@Summary		更新场景参数（管理端）
+//	@Description	只更新传入的字段，param_id 必填
+//	@Tags			QueryScene Admin
+//	@Accept			json
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Param			body	body		querySceneApi.UpdateParamRequest	true	"参数数据"
+//	@Success		200		{object}	querySceneApi.BaseResponse
+//	@Router			/query_scene/v1/admin/params/update [POST]
+func (s *QuerySceneService) UpdateParam(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &querySceneApi.BaseResponse{
+		Code:    int32(gcode.CodeOK.Code()),
+		Message: gcode.CodeOK.Message(),
+	}
+	var req querySceneApi.UpdateParamRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
 	if req.ParamId == 0 {
-		if req.SceneId == 0 {
-			resp.Code = int32(gcode.CodeInvalidParameter.Code())
-			resp.Message = "创建参数时 scene_id 不能为空"
-			return resp, nil
-		}
-		if err := s.uc.CreateParam(ctx, req.SceneId, item); err != nil {
-			log.Errorf("CreateParam scene_id=%d error: %v", req.SceneId, err)
-			resp.Code = int32(gcode.CodeInternalError.Code())
-			resp.Message = err.Error()
-			return resp, nil
-		}
-	} else {
-		if err := s.uc.UpdateParam(ctx, req.ParamId, item); err != nil {
-			log.Errorf("UpdateParam param_id=%d error: %v", req.ParamId, err)
-			resp.Code = int32(gcode.CodeInternalError.Code())
-			resp.Message = err.Error()
-			return resp, nil
-		}
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = "param_id 不能为空"
+		return resp, nil
+	}
+	param := protoUpdateParamReqToBizParam(&req)
+	if err := s.uc.UpdateParam(ctx, param); err != nil {
+		log.Errorf("UpdateParam param_id=%d error: %v", req.ParamId, err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
 	}
 	return resp, nil
 }
@@ -458,7 +512,7 @@ func (s *QuerySceneService) PreviewWidget(ctx *gin.Context) (api.HttpResponse, e
 
 func protoCreateSceneReqToBizParam(operator string, req *querySceneApi.CreateSceneRequest) *biz.SaveSceneParam {
 	return buildSaveSceneParam(0, operator, req.Name, req.Description, req.Category,
-		int8(req.Status), int(req.SortOrder), req.Params, req.Widgets)
+		int8(req.Status), int(req.SortOrder), req.DatasourceId, req.Params, req.Widgets)
 }
 
 func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.UpdateSceneParam {
@@ -475,6 +529,9 @@ func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.U
 	if req.SortOrder != nil {
 		v := int(*req.SortOrder)
 		param.SortOrder = &v
+	}
+	if req.DatasourceId != nil {
+		param.DatasourceID = req.DatasourceId
 	}
 	// 只要请求体中包含 params/widgets 字段就做全量替换
 	if req.Params != nil {
@@ -502,7 +559,7 @@ func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.U
 }
 
 func buildSaveSceneParam(sceneID uint64, operator, name, description, category string,
-	status int8, sortOrder int,
+	status int8, sortOrder int, datasourceID uint64,
 	protoParams []*querySceneApi.SceneParamItem,
 	protoWidgets []*querySceneApi.SceneWidgetItem,
 ) *biz.SaveSceneParam {
@@ -524,29 +581,48 @@ func buildSaveSceneParam(sceneID uint64, operator, name, description, category s
 		widgets = append(widgets, protoWidgetItemToBizDTO(w))
 	}
 	return &biz.SaveSceneParam{
-		ID:          sceneID,
-		Name:        name,
-		Description: description,
-		Category:    category,
-		Status:      status,
-		SortOrder:   sortOrder,
-		CreatedBy:   operator,
-		Params:      params,
-		Widgets:     widgets,
+		ID:           sceneID,
+		Name:         name,
+		Description:  description,
+		Category:     category,
+		Status:       status,
+		SortOrder:    sortOrder,
+		CreatedBy:    operator,
+		DatasourceID: datasourceID,
+		Params:       params,
+		Widgets:      widgets,
 	}
 }
 
-func protoSaveParamReqToBizDTO(req *querySceneApi.SaveParamRequest) *biz.QuerySceneParamItem {
-	return &biz.QuerySceneParamItem{
-		KeyName:    req.KeyName,
-		Label:      req.Label,
-		ParamType:  req.ParamType,
-		Required:   int8(req.Required),
-		DefaultVal: req.DefaultVal,
-		Options:    req.Options,
-		DependsOn:  req.DependsOn,
-		SortOrder:  int(req.SortOrder),
+func protoUpdateParamReqToBizParam(req *querySceneApi.UpdateParamRequest) *biz.UpdateParamParam {
+	param := &biz.UpdateParamParam{ID: req.ParamId}
+	if req.KeyName != nil {
+		param.KeyName = req.KeyName
 	}
+	if req.Label != nil {
+		param.Label = req.Label
+	}
+	if req.ParamType != nil {
+		param.ParamType = req.ParamType
+	}
+	if req.Required != nil {
+		v := int8(*req.Required)
+		param.Required = &v
+	}
+	if req.DefaultVal != nil {
+		param.DefaultVal = req.DefaultVal
+	}
+	if req.Options != nil {
+		param.Options = req.Options
+	}
+	if req.DependsOn != nil {
+		param.DependsOn = req.DependsOn
+	}
+	if req.SortOrder != nil {
+		v := int(*req.SortOrder)
+		param.SortOrder = &v
+	}
+	return param
 }
 
 func protoSaveWidgetReqToBizDTO(req *querySceneApi.SaveWidgetRequest) *biz.QuerySceneWidgetItem {
@@ -582,14 +658,16 @@ func toProtoSceneItem(s *biz.QuerySceneItem) *querySceneApi.SceneItem {
 		return nil
 	}
 	return &querySceneApi.SceneItem{
-		Id:          s.ID,
-		Name:        s.Name,
-		Description: s.Description,
-		Category:    s.Category,
-		Status:      int32(s.Status),
-		SortOrder:   int32(s.SortOrder),
-		CreatedBy:   s.CreatedBy,
-		CreatedAt:   s.CreatedAt,
+		Id:             s.ID,
+		Name:           s.Name,
+		Description:    s.Description,
+		Category:       s.Category,
+		Status:         int32(s.Status),
+		SortOrder:      int32(s.SortOrder),
+		CreatedBy:      s.CreatedBy,
+		CreatedAt:      s.CreatedAt,
+		DatasourceId:   s.DatasourceID,
+		DatasourceName: s.DatasourceName,
 	}
 }
 
