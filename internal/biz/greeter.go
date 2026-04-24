@@ -2,8 +2,6 @@ package biz
 
 import (
 	"context"
-	"strconv"
-	"time"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -16,16 +14,13 @@ import (
 )
 
 var (
-	// ErrUserNotFound is user not found.
 	ErrUserNotFound = errors.NotFound(v1.ErrorReason_USER_NOT_FOUND.String(), "user not found")
 )
 
-// Greeter is a Greeter model.
 type Greeter struct {
 	User string
 }
 
-// GreeterRepo is a Greater repo.
 type GreeterRepo interface {
 	orm.Transaction
 	Save(context.Context, *Greeter) (*Greeter, error)
@@ -35,21 +30,14 @@ type GreeterRepo interface {
 	ListAll(context.Context) ([]*Greeter, error)
 }
 
-// GreeterUsecase is a Greeter usecase.
 type GreeterUsecase struct {
-	repo   GreeterRepo
-	wsRepo WebsocketRepo
+	repo GreeterRepo
 }
 
-// NewGreeterUsecase new a Greeter usecase.
-func NewGreeterUsecase(repo GreeterRepo, wsRepo WebsocketRepo) *GreeterUsecase {
-	return &GreeterUsecase{
-		repo:   repo,
-		wsRepo: wsRepo,
-	}
+func NewGreeterUsecase(repo GreeterRepo) *GreeterUsecase {
+	return &GreeterUsecase{repo: repo}
 }
 
-// CreateGreeter creates a Greeter, and returns the new Greeter.
 func (uc *GreeterUsecase) CreateGreeter(ctx context.Context, g *Greeter) (*Greeter, error) {
 	log.Context(ctx).Infof("CreateGreeter: %v", g.User)
 	if err := uc.repo.InTx(ctx, func(ctx context.Context) error {
@@ -58,9 +46,5 @@ func (uc *GreeterUsecase) CreateGreeter(ctx context.Context, g *Greeter) (*Greet
 	}); err != nil {
 		return nil, gerror.WrapCode(gcode.CodeInternalError, err)
 	}
-
-	// websocket demo
-	_ = uc.wsRepo.PublishWsNotifyMsg(ctx, ReporterTypeHelloWorld, strconv.Itoa(int(time.Now().Unix())))
-
 	return g, nil
 }

@@ -1,0 +1,194 @@
+syntax = "proto3";
+
+package api.query_scene;
+
+option go_package = "fdi_data_board/api/query_scene;query_scene_api";
+
+// ==================== 通用响应 ====================
+
+message BaseResponse {
+    int32 code = 1;
+    string message = 2;
+}
+
+// ==================== 场景列表 ====================
+
+message ListScenesRequest {
+    string category = 1; // @gotags: form:"category"
+    int32 status = 2;    // @gotags: form:"status"
+}
+
+message SceneIDRequest {
+    uint64 scene_id = 1; // @gotags: form:"scene_id"
+}
+
+message SceneItem {
+    uint64 id = 1;
+    string name = 2;
+    string description = 3;
+    string category = 4;
+    int32 status = 5;
+    int32 sort_order = 6;
+    string created_by = 7;
+    int64 created_at = 8;
+}
+
+message ListScenesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SceneItem list = 3;
+}
+
+// ==================== 场景详情 ====================
+
+message SceneParamItem {
+    uint64 id = 1;
+    string key_name = 2;
+    string label = 3;
+    string param_type = 4;
+    int32 required = 5;
+    string default_val = 6;
+    string options = 7;
+    string depends_on = 8;
+    int32 sort_order = 9;
+}
+
+message SceneWidgetItem {
+    uint64 id = 1;
+    string title = 2;
+    string sql_template = 3;
+    string display_type = 4;
+    string result_config = 5;
+    int32 max_rows = 6;
+    int32 timeout_sec = 7;
+    int32 sort_order = 8;
+}
+
+message GetSceneDetailResponse {
+    int32 code = 1;
+    string message = 2;
+    SceneItem scene = 3;
+    repeated SceneParamItem params = 4;
+    repeated SceneWidgetItem widgets = 5;
+}
+
+// ==================== 执行场景 ====================
+
+message ExecuteSceneRequest {
+    uint64 scene_id = 1;
+    map<string, string> params = 2;
+}
+
+message WidgetResult {
+    uint64 widget_id = 1;
+    string title = 2;
+    string display_type = 3;
+    string result_config = 4;
+    repeated string columns = 5;
+    repeated string rows_json = 6; // 每行序列化为 JSON string
+    int32 total = 7;
+    string error = 8;
+}
+
+message ExecuteSceneResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated WidgetResult widgets = 3;
+}
+
+// ==================== 创建场景 ====================
+
+message CreateSceneRequest {
+    string name = 1;
+    string description = 2;
+    string category = 3;
+    int32 status = 4;
+    int32 sort_order = 5;
+    repeated SceneParamItem params = 6;
+    repeated SceneWidgetItem widgets = 7;
+}
+
+message CreateSceneResponse {
+    int32 code = 1;
+    string message = 2;
+    uint64 scene_id = 3;
+}
+
+// ==================== 更新场景 ====================
+
+message UpdateSceneRequest {
+    uint64 scene_id = 1;
+    optional string name = 2;
+    optional string description = 3;
+    optional string category = 4;
+    optional int32 status = 5;
+    optional int32 sort_order = 6;
+    // params/widgets 不传则保留原有数据，传空数组则清空
+    repeated SceneParamItem params = 7;
+    repeated SceneWidgetItem widgets = 8;
+}
+
+// ==================== 参数 CRU ====================
+
+message ListParamsRequest {
+    uint64 scene_id = 1; // @gotags: form:"scene_id"
+}
+
+message ListParamsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SceneParamItem list = 3;
+}
+
+message SaveParamRequest {
+    uint64 param_id = 1;   // 更新时传，创建时为 0
+    uint64 scene_id = 2;   // 创建时必传
+    string key_name = 3;
+    string label = 4;
+    string param_type = 5;
+    int32 required = 6;
+    string default_val = 7;
+    string options = 8;
+    string depends_on = 9;
+    int32 sort_order = 10;
+}
+
+// ==================== 组件 CRU ====================
+
+message ListWidgetsRequest {
+    uint64 scene_id = 1; // @gotags: form:"scene_id"
+}
+
+message ListWidgetsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SceneWidgetItem list = 3;
+}
+
+message SaveWidgetRequest {
+    uint64 widget_id = 1;  // 更新时传，创建时为 0
+    uint64 scene_id = 2;   // 创建时必传
+    string title = 3;
+    string sql_template = 4;
+    string display_type = 5;
+    string result_config = 6;
+    int32 max_rows = 7;
+    int32 timeout_sec = 8;
+    int32 sort_order = 9;
+}
+
+// ==================== 预览 Widget ====================
+
+message PreviewWidgetRequest {
+    uint64 scene_id = 1;
+    SceneWidgetItem widget = 2;
+    map<string, string> params = 3;
+}
+
+message QueryResultResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string columns = 3;
+    repeated string rows_json = 4;
+    int32 total = 5;
+}

@@ -30,19 +30,16 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger) (*
 		return nil, nil, err
 	}
 	greeterRepo := data.NewGreeterRepo(dataData)
-	websocketRepo := data.NewWebsocketRepo(dataData, confData)
-	greeterUsecase := biz.NewGreeterUsecase(greeterRepo, websocketRepo)
+	greeterUsecase := biz.NewGreeterUsecase(greeterRepo)
 	greeterService := service.NewGreeterService(greeterUsecase)
 	grpcServer := server.NewGRPCServer(confServer, greeterService, logger)
 	greeterApiService := service.NewGreeterApiService(greeterUsecase)
-	backendServerGroup := biz.NewBackendServerGroup(confData, websocketRepo)
-	wsService := service.NewWsService(confData, backendServerGroup)
 	querySceneRepo := data.NewQuerySceneRepo(dataData)
 	querySceneUseCase := biz.NewQuerySceneUseCase(querySceneRepo)
 	querySceneService := service.NewQuerySceneService(querySceneUseCase)
-	v := route.RegisterHttpService(confData, greeterApiService, wsService, querySceneService)
+	v := route.RegisterHttpService(confData, greeterApiService, querySceneService)
 	v2 := server.NewAllHttpServer(confServer, confData, logger, v, greeterService)
-	simpleServer := server.NewSimpleServer(backendServerGroup)
+	simpleServer := server.NewSimpleServer()
 	app := newApp(logger, grpcServer, v2, simpleServer)
 	return app, func() {
 		cleanup()

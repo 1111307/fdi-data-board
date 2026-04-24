@@ -48,6 +48,7 @@ message Data {
         google.protobuf.Duration read_timeout = 3;
         google.protobuf.Duration write_timeout = 4;
         string password = 5;
+        string link_type = 6;
     }
 
     message Keycloak {
@@ -60,19 +61,6 @@ message Data {
         google.protobuf.Duration timeout = 1;
         string any_endpoint = 2;
         string um_endpoint = 4;
-    }
-
-    message Kafka {
-        string brokers = 1;
-        string fis_probe_on = 2;
-    }
-
-    message Clickhouse {
-        string on = 1;
-        string dsn = 2;
-        int32 max_idl = 3;
-        int32 max_open = 4;
-        google.protobuf.Duration conn_max_lift = 5;
     }
 
     message Doris {
@@ -96,8 +84,6 @@ message Data {
     Redis redis = 2;
     Keycloak keycloak = 3;
     GrpcClient grpc_client = 4;
-    Kafka kafka = 5;
-    Clickhouse clickhouse = 6;
     Runtime runtime = 7;
     Doris doris = 8;
 }

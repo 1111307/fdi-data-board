@@ -3,17 +3,13 @@ package data
 import (
 	"context"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/google/wire"
-	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
-	"gorm.io/driver/clickhouse"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
@@ -26,23 +22,14 @@ var ProviderSet = wire.NewSet(
 	NewData,
 	NewGreeterRepo,
 	NewGreeterGrpcRepo,
-	NewWebsocketRepo,
 	NewQuerySceneRepo,
 )
 
 // Data .
 type Data struct {
 	mysqlDB *gorm.DB
-	ckDB    *gorm.DB
 	dorisDB *gorm.DB
-
-	rDB *redis.ClusterClient
-
 	anyConn *grpc.ClientConn
-}
-
-func (d *Data) RedisDB(ctx context.Context) *redis.ClusterClient {
-	return d.rDB
 }
 
 func newMysqlDB(c *conf.Data) *gorm.DB {
@@ -85,47 +72,8 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 	return db
 }
 
-func newRedisDB(c *conf.Data) *redis.ClusterClient {
-	addrs := strings.Split(c.Redis.Addr, ",")
-	rdb := redis.NewClusterClient(&redis.ClusterOptions{
-		Addrs:         addrs,
-		Password:      c.Redis.Password,
-		RouteRandomly: true,
-		ReadTimeout:   c.GetRedis().ReadTimeout.AsDuration(),
-		DialTimeout:   c.GetRedis().ReadTimeout.AsDuration() * 2,
-		WriteTimeout:  c.GetRedis().WriteTimeout.AsDuration(),
-	})
-
-	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		panic(fmt.Sprintf("Redis connection failed: %v", err))
-	}
-
-	return rdb
-}
-
-func newCKDB(c *conf.Data) *gorm.DB {
-	if on, err := strconv.ParseBool(c.GetClickhouse().On); err != nil || !on {
-		return nil
-	}
-
-	db, err := gorm.Open(clickhouse.Open(c.GetClickhouse().Dsn), &gorm.Config{})
-	if err != nil {
-		panic(fmt.Sprintf("Clickhouse database init failed: %v", err))
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		panic(fmt.Sprintf("failed get sql database: %v", err))
-	}
-	sqlDB.SetMaxIdleConns(int(c.GetClickhouse().MaxIdl))
-	sqlDB.SetMaxOpenConns(int(c.GetClickhouse().MaxOpen))
-	sqlDB.SetConnMaxLifetime(c.GetClickhouse().ConnMaxLift.AsDuration())
-
-	return db
-}
-
 func newDorisDB(c *conf.Data) *gorm.DB {
-	if on, err := strconv.ParseBool(c.GetDoris().GetOn()); err != nil || !on {
+	if c.GetDoris().GetOn() != "true" {
 		return nil
 	}
 
@@ -173,24 +121,16 @@ func anyDialer(c *conf.Data, logger log.Logger) *grpc.ClientConn {
 // NewData .
 func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	mysqlDB := newMysqlDB(c)
-	redisClient := newRedisDB(c)
 	anyConn := anyDialer(c, logger)
-	ckDB := newCKDB(c)
 	dorisDB := newDorisDB(c)
 
 	cleanup := func() {
 		log.Info("closing the data resources")
 
 		_ = anyConn.Close()
-		_ = redisClient.Close()
 
 		sqlDB, _ := mysqlDB.DB()
 		_ = sqlDB.Close()
-
-		if ckDB != nil {
-			sqlDB, _ = ckDB.DB()
-			_ = sqlDB.Close()
-		}
 
 		if dorisDB != nil {
 			sqlDB, _ = dorisDB.DB()
@@ -200,9 +140,7 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 
 	return &Data{
 		mysqlDB: mysqlDB,
-		ckDB:    ckDB,
 		dorisDB: dorisDB,
-		rDB:     redisClient,
 		anyConn: anyConn,
 	}, cleanup, nil
 }

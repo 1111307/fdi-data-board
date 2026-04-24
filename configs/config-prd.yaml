@@ -32,15 +32,6 @@ data:
     timeout: 5s
     um_endpoint: ${UM_ENDPOINT:fdi-user-manager-backend.fdi.svc.cluster.local:9000}
     any_endpoint: 127.0.0.1:9000
-  clickhouse:
-    on: ${CLICKHOUSE_ON:false}
-    dsn: clickhouse://10.10.0.222:9000,10.10.1.8:9000,10.10.2.252:9000,10.10.2.132:9000/fdi?dial_timeout=5s&connection_open_strategy=round_robin&compress=true
-    max_idl: 10
-    max_open: 100
-    conn_max_lift: 3600s
-  kafka:
-    brokers: ${KAFKA_BROKERS:10.10.1.106:9092,10.10.3.113:9092,10.10.3.139:9092}
-    fis_probe_on: ${FIS_PROBE_ON:false}
   doris:
     on: ${DORIS_ON:true}
     host: ${DORIS_HOST:10.10.2.27}

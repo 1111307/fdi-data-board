@@ -16,9 +16,15 @@ type QuerySceneRepo interface {
 	GetScene(ctx context.Context, sceneID uint64) (*orm.QuerySceneDo, error)
 	GetSceneParams(ctx context.Context, sceneID uint64) ([]*orm.QuerySceneParamDo, error)
 	GetSceneWidgets(ctx context.Context, sceneID uint64) ([]*orm.QuerySceneWidgetDo, error)
-	SaveScene(ctx context.Context, scene *orm.QuerySceneDo, params []*orm.QuerySceneParamDo, widgets []*orm.QuerySceneWidgetDo) error
+	SaveScene(ctx context.Context, scene *orm.QuerySceneDo, params []*orm.QuerySceneParamDo, widgets []*orm.QuerySceneWidgetDo) (uint64, error)
 	DeleteScene(ctx context.Context, sceneID uint64) error
 	ExecuteWidget(ctx context.Context, widget *orm.QuerySceneWidgetDo, userParams map[string]string) (*QueryResult, error)
+
+	CreateParam(ctx context.Context, param *orm.QuerySceneParamDo) error
+	UpdateParam(ctx context.Context, param *orm.QuerySceneParamDo) error
+	CreateWidget(ctx context.Context, widget *orm.QuerySceneWidgetDo) error
+	UpdateWidget(ctx context.Context, widget *orm.QuerySceneWidgetDo) error
+	UpdateScene(ctx context.Context, param *UpdateSceneParam) error
 }
 
 // QueryResult 查询结果
@@ -47,7 +53,7 @@ type QuerySceneItem struct {
 	Status      int8   `json:"status"`
 	SortOrder   int    `json:"sort_order"`
 	CreatedBy   string `json:"created_by"`
-	CreatedAt   int64  `json:"created_at"`
+	CreatedAt   int64  `json:"create_time"`
 }
 
 type QuerySceneParamItem struct {
@@ -89,6 +95,21 @@ type SaveSceneParam struct {
 	CreatedBy   string
 	Params      []*QuerySceneParamItem
 	Widgets     []*QuerySceneWidgetItem
+}
+
+// UpdateSceneParam 用于部分更新，指针为 nil 表示不更新该字段
+type UpdateSceneParam struct {
+	ID          uint64
+	Name        *string
+	Description *string
+	Category    *string
+	Status      *int8
+	SortOrder   *int
+	// nil 表示不操作；non-nil（含空切片）表示全量替换
+	Params  []*QuerySceneParamItem
+	Widgets []*QuerySceneWidgetItem
+	HasParamsUpdate  bool
+	HasWidgetsUpdate bool
 }
 
 type WidgetQueryResult struct {
@@ -144,8 +165,9 @@ func (uc *QuerySceneUseCase) GetSceneDetail(ctx context.Context, sceneID uint64)
 	}, nil
 }
 
-func (uc *QuerySceneUseCase) SaveScene(ctx context.Context, param *SaveSceneParam) error {
-	now := time.Now().Unix()
+// SaveScene 创建或更新场景，返回 scene_id（创建时为新 ID，更新时为传入 ID）
+func (uc *QuerySceneUseCase) SaveScene(ctx context.Context, param *SaveSceneParam) (uint64, error) {
+	now := time.Now()
 
 	sceneDo := &orm.QuerySceneDo{
 		ID:          param.ID,
@@ -155,8 +177,8 @@ func (uc *QuerySceneUseCase) SaveScene(ctx context.Context, param *SaveScenePara
 		Status:      param.Status,
 		SortOrder:   param.SortOrder,
 		CreatedBy:   param.CreatedBy,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		CreateTime:  now,
+		UpdateTime:  now,
 	}
 
 	paramDos := make([]*orm.QuerySceneParamDo, 0, len(param.Params))
@@ -179,22 +201,32 @@ func (uc *QuerySceneUseCase) SaveScene(ctx context.Context, param *SaveScenePara
 
 	widgetDos := make([]*orm.QuerySceneWidgetDo, 0, len(param.Widgets))
 	for _, w := range param.Widgets {
+		resultConfig := w.ResultConfig
+		if resultConfig == "" {
+			resultConfig = "null"
+		}
 		widgetDos = append(widgetDos, &orm.QuerySceneWidgetDo{
 			Title:        w.Title,
 			SQLTemplate:  w.SQLTemplate,
 			DisplayType:  w.DisplayType,
-			ResultConfig: w.ResultConfig,
+			ResultConfig: resultConfig,
 			MaxRows:      w.MaxRows,
 			TimeoutSec:   w.TimeoutSec,
 			SortOrder:    w.SortOrder,
 		})
 	}
 
-	return uc.repo.SaveScene(ctx, sceneDo, paramDos, widgetDos)
+	sceneID, err := uc.repo.SaveScene(ctx, sceneDo, paramDos, widgetDos)
+	return sceneID, err
 }
 
 func (uc *QuerySceneUseCase) DeleteScene(ctx context.Context, sceneID uint64) error {
 	return uc.repo.DeleteScene(ctx, sceneID)
+}
+
+// UpdateScene 部分更新场景，nil 字段不更新
+func (uc *QuerySceneUseCase) UpdateScene(ctx context.Context, param *UpdateSceneParam) error {
+	return uc.repo.UpdateScene(ctx, param)
 }
 
 func (uc *QuerySceneUseCase) ExecuteScene(ctx context.Context, sceneID uint64, userParams map[string]string) ([]*WidgetQueryResult, error) {
@@ -266,6 +298,112 @@ func (uc *QuerySceneUseCase) PreviewWidget(ctx context.Context, sceneID uint64, 
 	return uc.repo.ExecuteWidget(ctx, targetWidget, userParams)
 }
 
+// ==================== 参数 CRU ====================
+
+func (uc *QuerySceneUseCase) ListParams(ctx context.Context, sceneID uint64) ([]*QuerySceneParamItem, error) {
+	list, err := uc.repo.GetSceneParams(ctx, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*QuerySceneParamItem, 0, len(list))
+	for _, p := range list {
+		result = append(result, toParamItem(p))
+	}
+	return result, nil
+}
+
+func (uc *QuerySceneUseCase) CreateParam(ctx context.Context, sceneID uint64, item *QuerySceneParamItem) error {
+	now := time.Now()
+	options := item.Options
+	if options == "" {
+		options = "null"
+	}
+	return uc.repo.CreateParam(ctx, &orm.QuerySceneParamDo{
+		SceneID:    sceneID,
+		KeyName:    item.KeyName,
+		Label:      item.Label,
+		ParamType:  item.ParamType,
+		Required:   item.Required,
+		DefaultVal: item.DefaultVal,
+		Options:    options,
+		DependsOn:  item.DependsOn,
+		SortOrder:  item.SortOrder,
+		CreateTime: now,
+		UpdateTime: now,
+	})
+}
+
+func (uc *QuerySceneUseCase) UpdateParam(ctx context.Context, paramID uint64, item *QuerySceneParamItem) error {
+	options := item.Options
+	if options == "" {
+		options = "null"
+	}
+	return uc.repo.UpdateParam(ctx, &orm.QuerySceneParamDo{
+		ID:         paramID,
+		KeyName:    item.KeyName,
+		Label:      item.Label,
+		ParamType:  item.ParamType,
+		Required:   item.Required,
+		DefaultVal: item.DefaultVal,
+		Options:    options,
+		DependsOn:  item.DependsOn,
+		SortOrder:  item.SortOrder,
+		UpdateTime: time.Now(),
+	})
+}
+
+// ==================== 组件 CRU ====================
+
+func (uc *QuerySceneUseCase) ListWidgets(ctx context.Context, sceneID uint64) ([]*QuerySceneWidgetItem, error) {
+	list, err := uc.repo.GetSceneWidgets(ctx, sceneID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*QuerySceneWidgetItem, 0, len(list))
+	for _, w := range list {
+		result = append(result, toWidgetItem(w))
+	}
+	return result, nil
+}
+
+func (uc *QuerySceneUseCase) CreateWidget(ctx context.Context, sceneID uint64, item *QuerySceneWidgetItem) error {
+	now := time.Now()
+	resultConfig := item.ResultConfig
+	if resultConfig == "" {
+		resultConfig = "null"
+	}
+	return uc.repo.CreateWidget(ctx, &orm.QuerySceneWidgetDo{
+		SceneID:      sceneID,
+		Title:        item.Title,
+		SQLTemplate:  item.SQLTemplate,
+		DisplayType:  item.DisplayType,
+		ResultConfig: resultConfig,
+		MaxRows:      item.MaxRows,
+		TimeoutSec:   item.TimeoutSec,
+		SortOrder:    item.SortOrder,
+		CreateTime:   now,
+		UpdateTime:   now,
+	})
+}
+
+func (uc *QuerySceneUseCase) UpdateWidget(ctx context.Context, widgetID uint64, item *QuerySceneWidgetItem) error {
+	resultConfig := item.ResultConfig
+	if resultConfig == "" {
+		resultConfig = "null"
+	}
+	return uc.repo.UpdateWidget(ctx, &orm.QuerySceneWidgetDo{
+		ID:           widgetID,
+		Title:        item.Title,
+		SQLTemplate:  item.SQLTemplate,
+		DisplayType:  item.DisplayType,
+		ResultConfig: resultConfig,
+		MaxRows:      item.MaxRows,
+		TimeoutSec:   item.TimeoutSec,
+		SortOrder:    item.SortOrder,
+		UpdateTime:   time.Now(),
+	})
+}
+
 // ==================== 内部转换函数 ====================
 
 func toSceneItem(s *orm.QuerySceneDo) *QuerySceneItem {
@@ -277,7 +415,7 @@ func toSceneItem(s *orm.QuerySceneDo) *QuerySceneItem {
 		Status:      s.Status,
 		SortOrder:   s.SortOrder,
 		CreatedBy:   s.CreatedBy,
-		CreatedAt:   s.CreatedAt,
+		CreatedAt:   s.CreateTime.Unix(),
 	}
 }
 
