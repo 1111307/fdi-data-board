@@ -75,6 +75,18 @@ message Data {
         google.protobuf.Duration conn_max_lift = 5;
     }
 
+    message Doris {
+        string on = 1;
+        string host = 2;
+        string port = 3;
+        string username = 4;
+        string password = 5;
+        string database = 6;
+        int32 max_idl = 7;
+        int32 max_open = 8;
+        google.protobuf.Duration conn_max_lift = 9;
+    }
+
     message Runtime {
         string env = 1;
         string domain = 2;
@@ -87,4 +99,5 @@ message Data {
     Kafka kafka = 5;
     Clickhouse clickhouse = 6;
     Runtime runtime = 7;
+    Doris doris = 8;
 }

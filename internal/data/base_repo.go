@@ -26,3 +26,7 @@ func (r *baseRepo) mysqlDB(ctx context.Context) *gorm.DB {
 	}
 	return r.data.mysqlDB
 }
+
+func (r *baseRepo) dorisDB(ctx context.Context) *gorm.DB {
+	return r.data.dorisDB
+}

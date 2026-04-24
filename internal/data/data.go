@@ -27,12 +27,14 @@ var ProviderSet = wire.NewSet(
 	NewGreeterRepo,
 	NewGreeterGrpcRepo,
 	NewWebsocketRepo,
+	NewQuerySceneRepo,
 )
 
 // Data .
 type Data struct {
 	mysqlDB *gorm.DB
 	ckDB    *gorm.DB
+	dorisDB *gorm.DB
 
 	rDB *redis.ClusterClient
 
@@ -44,7 +46,6 @@ func (d *Data) RedisDB(ctx context.Context) *redis.ClusterClient {
 }
 
 func newMysqlDB(c *conf.Data) *gorm.DB {
-	//建库
 	cdb, err := gorm.Open(mysql.Open(c.Mysql.PreSource), &gorm.Config{})
 	if err != nil {
 		panic(fmt.Sprintf("Mysql database init failed: %v", err))
@@ -59,13 +60,11 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 		panic(fmt.Sprintf("Mysql database create failed: %v", err))
 	}
 
-	//open db
 	db, err := gorm.Open(mysql.Open(c.Mysql.Source), &gorm.Config{})
 	if err != nil {
 		panic(fmt.Sprintf("Mysql database init failed: %v", err))
 	}
 
-	// 初始化sql连接池
 	sqlDB, err := db.DB()
 	if err != nil {
 		panic(fmt.Sprintf("failed get sql database: %v", err))
@@ -74,8 +73,12 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 	sqlDB.SetMaxOpenConns(int(c.Mysql.MaxOpen))
 	sqlDB.SetConnMaxLifetime(c.Mysql.ConnMaxLift.AsDuration())
 
-	//自动建表更新表
-	if err := db.AutoMigrate(&orm.GreeterDo{}); err != nil {
+	if err := db.AutoMigrate(
+		&orm.GreeterDo{},
+		&orm.QuerySceneDo{},
+		&orm.QuerySceneParamDo{},
+		&orm.QuerySceneWidgetDo{},
+	); err != nil {
 		panic(fmt.Sprintf("Update Table Failed: %+v", err))
 	}
 
@@ -110,7 +113,6 @@ func newCKDB(c *conf.Data) *gorm.DB {
 		panic(fmt.Sprintf("Clickhouse database init failed: %v", err))
 	}
 
-	// 初始化sql连接池
 	sqlDB, err := db.DB()
 	if err != nil {
 		panic(fmt.Sprintf("failed get sql database: %v", err))
@@ -118,6 +120,35 @@ func newCKDB(c *conf.Data) *gorm.DB {
 	sqlDB.SetMaxIdleConns(int(c.GetClickhouse().MaxIdl))
 	sqlDB.SetMaxOpenConns(int(c.GetClickhouse().MaxOpen))
 	sqlDB.SetConnMaxLifetime(c.GetClickhouse().ConnMaxLift.AsDuration())
+
+	return db
+}
+
+func newDorisDB(c *conf.Data) *gorm.DB {
+	if on, err := strconv.ParseBool(c.GetDoris().GetOn()); err != nil || !on {
+		return nil
+	}
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		c.GetDoris().GetUsername(),
+		c.GetDoris().GetPassword(),
+		c.GetDoris().GetHost(),
+		c.GetDoris().GetPort(),
+		c.GetDoris().GetDatabase(),
+	)
+
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic(fmt.Sprintf("Doris database init failed: %v", err))
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		panic(fmt.Sprintf("failed get doris sql database: %v", err))
+	}
+	sqlDB.SetMaxIdleConns(int(c.GetDoris().GetMaxIdl()))
+	sqlDB.SetMaxOpenConns(int(c.GetDoris().GetMaxOpen()))
+	sqlDB.SetConnMaxLifetime(c.GetDoris().GetConnMaxLift().AsDuration())
 
 	return db
 }
@@ -145,25 +176,33 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	redisClient := newRedisDB(c)
 	anyConn := anyDialer(c, logger)
 	ckDB := newCKDB(c)
+	dorisDB := newDorisDB(c)
 
 	cleanup := func() {
 		log.Info("closing the data resources")
 
 		_ = anyConn.Close()
-
 		_ = redisClient.Close()
 
 		sqlDB, _ := mysqlDB.DB()
 		_ = sqlDB.Close()
 
-		sqlDB, _ = ckDB.DB()
-		_ = sqlDB.Close()
+		if ckDB != nil {
+			sqlDB, _ = ckDB.DB()
+			_ = sqlDB.Close()
+		}
+
+		if dorisDB != nil {
+			sqlDB, _ = dorisDB.DB()
+			_ = sqlDB.Close()
+		}
 	}
+
 	return &Data{
 		mysqlDB: mysqlDB,
 		ckDB:    ckDB,
+		dorisDB: dorisDB,
 		rDB:     redisClient,
-
 		anyConn: anyConn,
 	}, cleanup, nil
 }

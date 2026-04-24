@@ -41,6 +41,16 @@ data:
   kafka:
     brokers: ${KAFKA_BROKERS:10.10.1.106:9092,10.10.3.113:9092,10.10.3.139:9092}
     fis_probe_on: ${FIS_PROBE_ON:false}
+  doris:
+    on: ${DORIS_ON:true}
+    host: ${DORIS_HOST:10.10.2.27}
+    port: ${DORIS_PORT:9030}
+    username: ${DORIS_USERNAME:root}
+    password: ${DORIS_PASSWORD:}
+    database: ${DORIS_DATABASE:fdi}
+    max_idl: 10
+    max_open: 50
+    conn_max_lift: 3600s
   runtime:
     env: ${RUN_MODE:prd}
     domain: ${FUNC_SCOPE:fdi_cloud}
