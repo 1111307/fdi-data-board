@@ -209,7 +209,7 @@ func (uc *QuerySceneUseCase) SaveScene(ctx context.Context, param *SaveScenePara
 			KeyName:    p.KeyName,
 			Label:      p.Label,
 			ParamType:  p.ParamType,
-			Required:   p.Required,
+			Required:   &p.Required,
 			DefaultVal: p.DefaultVal,
 			Options:    options,
 			DependsOn:  p.DependsOn,
@@ -347,7 +347,7 @@ func (uc *QuerySceneUseCase) CreateParam(ctx context.Context, sceneID uint64, it
 		KeyName:    item.KeyName,
 		Label:      item.Label,
 		ParamType:  item.ParamType,
-		Required:   item.Required,
+		Required:   &item.Required,
 		DefaultVal: item.DefaultVal,
 		Options:    options,
 		DependsOn:  item.DependsOn,
@@ -430,12 +430,16 @@ func toSceneItem(s *orm.QuerySceneDo) *QuerySceneItem {
 }
 
 func toParamItem(p *orm.QuerySceneParamDo) *QuerySceneParamItem {
+	required := int8(0)
+	if p.Required != nil {
+		required = *p.Required
+	}
 	return &QuerySceneParamItem{
 		ID:         p.ID,
 		KeyName:    p.KeyName,
 		Label:      p.Label,
 		ParamType:  p.ParamType,
-		Required:   p.Required,
+		Required:   required,
 		DefaultVal: p.DefaultVal,
 		Options:    p.Options,
 		DependsOn:  p.DependsOn,

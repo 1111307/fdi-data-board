@@ -236,7 +236,7 @@ func (r *querySceneRepo) UpdateScene(ctx context.Context, param *biz.UpdateScene
 					KeyName:    p.KeyName,
 					Label:      p.Label,
 					ParamType:  p.ParamType,
-					Required:   p.Required,
+					Required:   &p.Required,
 					DefaultVal: p.DefaultVal,
 					Options:    options,
 					DependsOn:  p.DependsOn,
@@ -398,24 +398,41 @@ func (r *querySceneRepo) ExecuteWidget(ctx context.Context, widget *orm.QuerySce
 	}, nil
 }
 
-// bindParams 将 {{key}} 替换为 ? 占位符，返回有序参数列表
+// bindParams 参数绑定：
+//   - {{!key}} 直接替换为参数值（用于表名、列名等标识符）
+//   - {{key}}  替换为 ? 占位符（用于普通值，走预编译防注入）
 func bindParams(sqlTemplate string, userParams map[string]string) (string, []interface{}, error) {
-	re := regexp.MustCompile(`\{\{(\w+)\}\}`)
-	var args []interface{}
-
-	result := re.ReplaceAllStringFunc(sqlTemplate, func(match string) string {
-		key := re.FindStringSubmatch(match)[1]
+	// 第一步：处理 {{!key}} → 直接字符串替换（标识符）
+	reIdent := regexp.MustCompile(`\{\{!(\w+)\}\}`)
+	sql := reIdent.ReplaceAllStringFunc(sqlTemplate, func(match string) string {
+		key := reIdent.FindStringSubmatch(match)[1]
 		val, ok := userParams[key]
 		if !ok {
 			return match
+		}
+		return val
+	})
+
+	// 第二步：处理 {{key}} → 纯整数直接内联，其他值走 ? 占位符防注入
+	reVal := regexp.MustCompile(`\{\{(\w+)\}\}`)
+	reInt := regexp.MustCompile(`^-?\d+$`)
+	var args []interface{}
+	sql = reVal.ReplaceAllStringFunc(sql, func(match string) string {
+		key := reVal.FindStringSubmatch(match)[1]
+		val, ok := userParams[key]
+		if !ok {
+			return match
+		}
+		if reInt.MatchString(val) {
+			return val
 		}
 		args = append(args, val)
 		return "?"
 	})
 
-	if strings.Contains(result, "{{") {
+	if strings.Contains(sql, "{{") {
 		return "", nil, fmt.Errorf("存在未提供的参数")
 	}
 
-	return result, args, nil
+	return sql, args, nil
 }

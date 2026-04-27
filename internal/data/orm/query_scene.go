@@ -84,7 +84,7 @@ type QuerySceneParamDo struct {
 	KeyName    string    `gorm:"column:key_name;size:50;not null;comment:参数key"`
 	Label      string    `gorm:"column:label;size:100;not null;comment:用户可见标签"`
 	ParamType  string    `gorm:"column:param_type;size:20;not null;comment:text/number/select/date/date_range"`
-	Required   int8      `gorm:"column:required;default:1;comment:是否必填"`
+	Required   *int8     `gorm:"column:required;default:1;comment:是否必填"`
 	DefaultVal string    `gorm:"column:default_val;size:500;comment:默认值"`
 	Options    string    `gorm:"column:options;type:json;comment:select类型选项 [{label,value}]"`
 	DependsOn  string    `gorm:"column:depends_on;size:50;comment:级联依赖的父参数key"`
