@@ -50,7 +50,11 @@ func (s *QuerySceneService) ListScenes(ctx *gin.Context) (api.HttpResponse, erro
 	} else if req.Status == 0 && ctx.Query("status") == "0" {
 		status = 0
 	}
-	list, err := s.uc.ListScenes(ctx, req.Category, status)
+	isHome := int8(-1)
+	if req.IsHome == 1 {
+		isHome = 1
+	}
+	list, err := s.uc.ListScenes(ctx, req.Category, status, isHome)
 	if err != nil {
 		log.Errorf("ListScenes error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
@@ -512,7 +516,7 @@ func (s *QuerySceneService) PreviewWidget(ctx *gin.Context) (api.HttpResponse, e
 
 func protoCreateSceneReqToBizParam(operator string, req *querySceneApi.CreateSceneRequest) *biz.SaveSceneParam {
 	return buildSaveSceneParam(0, operator, req.Name, req.Description, req.Category,
-		int8(req.Status), int(req.SortOrder), req.DatasourceId, req.Params, req.Widgets)
+		int8(req.Status), int(req.SortOrder), req.DatasourceId, int8(req.IsHome), req.Params, req.Widgets)
 }
 
 func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.UpdateSceneParam {
@@ -532,6 +536,10 @@ func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.U
 	}
 	if req.DatasourceId != nil {
 		param.DatasourceID = req.DatasourceId
+	}
+	if req.IsHome != nil {
+		v := int8(*req.IsHome)
+		param.IsHome = &v
 	}
 	// 只要请求体中包含 params/widgets 字段就做全量替换
 	if req.Params != nil {
@@ -559,7 +567,7 @@ func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.U
 }
 
 func buildSaveSceneParam(sceneID uint64, operator, name, description, category string,
-	status int8, sortOrder int, datasourceID uint64,
+	status int8, sortOrder int, datasourceID uint64, isHome int8,
 	protoParams []*querySceneApi.SceneParamItem,
 	protoWidgets []*querySceneApi.SceneWidgetItem,
 ) *biz.SaveSceneParam {
@@ -589,6 +597,7 @@ func buildSaveSceneParam(sceneID uint64, operator, name, description, category s
 		SortOrder:    sortOrder,
 		CreatedBy:    operator,
 		DatasourceID: datasourceID,
+		IsHome:       isHome,
 		Params:       params,
 		Widgets:      widgets,
 	}
@@ -668,6 +677,7 @@ func toProtoSceneItem(s *biz.QuerySceneItem) *querySceneApi.SceneItem {
 		CreatedAt:      s.CreatedAt,
 		DatasourceId:   s.DatasourceID,
 		DatasourceName: s.DatasourceName,
+		IsHome:         int32(s.IsHome),
 	}
 }
 

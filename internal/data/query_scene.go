@@ -28,7 +28,7 @@ func NewQuerySceneRepo(data *Data) biz.QuerySceneRepo {
 
 // ==================== 场景 CRUD ====================
 
-func (r *querySceneRepo) ListScenes(ctx context.Context, category string, status int8) ([]*orm.QuerySceneDo, error) {
+func (r *querySceneRepo) ListScenes(ctx context.Context, category string, status int8, isHome int8) ([]*orm.QuerySceneDo, error) {
 	var list []*orm.QuerySceneDo
 	db := r.mysqlDB(ctx).Model(&orm.QuerySceneDo{}).
 		Where(orm.QuerySceneColumns.DeleteTime + " IS NULL")
@@ -38,6 +38,9 @@ func (r *querySceneRepo) ListScenes(ctx context.Context, category string, status
 	}
 	if status >= 0 {
 		db = db.Where(orm.QuerySceneColumns.Status+" = ?", status)
+	}
+	if isHome >= 0 {
+		db = db.Where(orm.QuerySceneColumns.IsHome+" = ?", isHome)
 	}
 
 	if err := db.Order(orm.QuerySceneColumns.ID + " ASC").Find(&list).Error; err != nil {
@@ -211,6 +214,9 @@ func (r *querySceneRepo) UpdateScene(ctx context.Context, param *biz.UpdateScene
 		}
 		if param.DatasourceID != nil {
 			updateMap[orm.QuerySceneColumns.DatasourceID] = *param.DatasourceID
+		}
+		if param.IsHome != nil {
+			updateMap[orm.QuerySceneColumns.IsHome] = *param.IsHome
 		}
 
 		if err := r.mysqlDB(ctx).Model(&orm.QuerySceneDo{}).

@@ -12,7 +12,7 @@ import (
 
 // QuerySceneRepo 场景仓储接口
 type QuerySceneRepo interface {
-	ListScenes(ctx context.Context, category string, status int8) ([]*orm.QuerySceneDo, error)
+	ListScenes(ctx context.Context, category string, status int8, isHome int8) ([]*orm.QuerySceneDo, error)
 	GetScene(ctx context.Context, sceneID uint64) (*orm.QuerySceneDo, error)
 	GetSceneParams(ctx context.Context, sceneID uint64) ([]*orm.QuerySceneParamDo, error)
 	GetSceneWidgets(ctx context.Context, sceneID uint64) ([]*orm.QuerySceneWidgetDo, error)
@@ -56,6 +56,7 @@ type QuerySceneItem struct {
 	CreatedAt      int64  `json:"create_time"`
 	DatasourceID   uint64 `json:"datasource_id"`
 	DatasourceName string `json:"datasource_name"`
+	IsHome         int8   `json:"is_home"`
 }
 
 type QuerySceneParamItem struct {
@@ -96,6 +97,7 @@ type SaveSceneParam struct {
 	SortOrder    int
 	CreatedBy    string
 	DatasourceID uint64
+	IsHome       int8
 	Params       []*QuerySceneParamItem
 	Widgets      []*QuerySceneWidgetItem
 }
@@ -109,7 +111,7 @@ type UpdateSceneParam struct {
 	Status       *int8
 	SortOrder    *int
 	DatasourceID *uint64
-	// nil 表示不操作；non-nil（含空切片）表示全量替换
+	IsHome       *int8
 	Params           []*QuerySceneParamItem
 	Widgets          []*QuerySceneWidgetItem
 	HasParamsUpdate  bool
@@ -140,8 +142,8 @@ type WidgetQueryResult struct {
 
 // ==================== UseCase 方法 ====================
 
-func (uc *QuerySceneUseCase) ListScenes(ctx context.Context, category string, status int8) ([]*QuerySceneItem, error) {
-	list, err := uc.repo.ListScenes(ctx, category, status)
+func (uc *QuerySceneUseCase) ListScenes(ctx context.Context, category string, status int8, isHome int8) ([]*QuerySceneItem, error) {
+	list, err := uc.repo.ListScenes(ctx, category, status, isHome)
 	if err != nil {
 		return nil, err
 	}
@@ -195,6 +197,7 @@ func (uc *QuerySceneUseCase) SaveScene(ctx context.Context, param *SaveScenePara
 		SortOrder:    param.SortOrder,
 		CreatedBy:    param.CreatedBy,
 		DatasourceID: param.DatasourceID,
+		IsHome:       param.IsHome,
 		CreateTime:   now,
 		UpdateTime:   now,
 	}
@@ -426,6 +429,7 @@ func toSceneItem(s *orm.QuerySceneDo) *QuerySceneItem {
 		CreatedBy:    s.CreatedBy,
 		CreatedAt:    s.CreateTime.Unix(),
 		DatasourceID: s.DatasourceID,
+		IsHome:       s.IsHome,
 	}
 }
 

@@ -16,6 +16,7 @@ message BaseResponse {
 message ListScenesRequest {
     string category = 1; // @gotags: form:"category"
     int32 status = 2;    // @gotags: form:"status"
+    int32 is_home = 3;   // @gotags: form:"is_home"  // 1=只看首页场景，不传则不过滤
 }
 
 message SceneIDRequest {
@@ -33,6 +34,7 @@ message SceneItem {
     int64 created_at = 8;
     uint64 datasource_id = 9;
     string datasource_name = 10;
+    int32 is_home = 11;
 }
 
 message ListScenesResponse {
@@ -108,7 +110,8 @@ message CreateSceneRequest {
     int32 sort_order = 5;
     repeated SceneParamItem params = 6;
     repeated SceneWidgetItem widgets = 7;
-    uint64 datasource_id = 8; // 0 = 默认 Doris
+    uint64 datasource_id = 8;
+    int32 is_home = 9;
 }
 
 message CreateSceneResponse {
@@ -126,8 +129,8 @@ message UpdateSceneRequest {
     optional string category = 4;
     optional int32 status = 5;
     optional int32 sort_order = 6;
-    optional uint64 datasource_id = 9; // nil=不变, 0=恢复默认Doris, >0=切换数据源
-    // params/widgets 不传则保留原有数据，传空数组则清空
+    optional uint64 datasource_id = 9;
+    optional int32 is_home = 10;
     repeated SceneParamItem params = 7;
     repeated SceneWidgetItem widgets = 8;
 }
