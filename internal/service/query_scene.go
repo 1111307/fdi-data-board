@@ -54,7 +54,7 @@ func (s *QuerySceneService) ListScenes(ctx *gin.Context) (api.HttpResponse, erro
 	if req.IsHome == 1 {
 		isHome = 1
 	}
-	list, err := s.uc.ListScenes(ctx, req.Category, status, isHome)
+	list, err := s.uc.ListScenes(ctx, req.Category, status, isHome, req.GroupId)
 	if err != nil {
 		log.Errorf("ListScenes error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
@@ -515,8 +515,10 @@ func (s *QuerySceneService) PreviewWidget(ctx *gin.Context) (api.HttpResponse, e
 // ==================== proto <-> biz DTO 转换 ====================
 
 func protoCreateSceneReqToBizParam(operator string, req *querySceneApi.CreateSceneRequest) *biz.SaveSceneParam {
-	return buildSaveSceneParam(0, operator, req.Name, req.Description, req.Category,
+	p := buildSaveSceneParam(0, operator, req.Name, req.Description, req.Category,
 		int8(req.Status), int(req.SortOrder), req.DatasourceId, int8(req.IsHome), req.Params, req.Widgets)
+	p.GroupID = req.GroupId
+	return p
 }
 
 func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.UpdateSceneParam {
@@ -540,6 +542,9 @@ func protoUpdateSceneReqToBizParam(req *querySceneApi.UpdateSceneRequest) *biz.U
 	if req.IsHome != nil {
 		v := int8(*req.IsHome)
 		param.IsHome = &v
+	}
+	if req.GroupId != nil {
+		param.GroupID = req.GroupId
 	}
 	// 只要请求体中包含 params/widgets 字段就做全量替换
 	if req.Params != nil {
@@ -678,6 +683,7 @@ func toProtoSceneItem(s *biz.QuerySceneItem) *querySceneApi.SceneItem {
 		DatasourceId:   s.DatasourceID,
 		DatasourceName: s.DatasourceName,
 		IsHome:         int32(s.IsHome),
+		GroupId:        s.GroupID,
 	}
 }
 

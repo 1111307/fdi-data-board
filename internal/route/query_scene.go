@@ -5,7 +5,7 @@ import (
 	"fdi_data_board/internal/service"
 )
 
-func RegisterQuerySceneService(s *service.QuerySceneService, ds *service.DatasourceService, cd *conf.Data) []GroupUrl {
+func RegisterQuerySceneService(s *service.QuerySceneService, ds *service.DatasourceService, sg *service.SceneGroupService, cd *conf.Data) []GroupUrl {
 	return []GroupUrl{
 		// 用户端
 		{
@@ -17,6 +17,8 @@ func RegisterQuerySceneService(s *service.QuerySceneService, ds *service.Datasou
 				{JsonHandlerFunc: s.ListParams, Path: "params/list", Method: GET},
 				{JsonHandlerFunc: s.ListWidgets, Path: "widgets/list", Method: GET},
 				{JsonHandlerFunc: ds.ListDatasources, Path: "datasources/list", Method: GET},
+				{JsonHandlerFunc: sg.GetGroupByPageKey, Path: "scene_groups/page", Method: GET},
+				{JsonHandlerFunc: sg.GetDimensionValues, Path: "scene_groups/dimensions", Method: GET},
 			},
 		},
 		// 管理端
@@ -35,6 +37,10 @@ func RegisterQuerySceneService(s *service.QuerySceneService, ds *service.Datasou
 				{JsonHandlerFunc: ds.DeleteDatasource, Path: "datasources/delete", Method: POST},
 				{JsonHandlerFunc: ds.GetSchemaTables, Path: "datasources/schema/tables", Method: POST},
 				{JsonHandlerFunc: ds.GetSchemaColumns, Path: "datasources/schema/columns", Method: POST},
+				{JsonHandlerFunc: sg.ListGroups, Path: "scene_groups/list", Method: GET},
+				{JsonHandlerFunc: sg.CreateGroup, Path: "scene_groups/create", Method: POST},
+				{JsonHandlerFunc: sg.UpdateGroup, Path: "scene_groups/update", Method: POST},
+				{JsonHandlerFunc: sg.DeleteGroup, Path: "scene_groups/delete", Method: POST},
 			},
 		},
 	}

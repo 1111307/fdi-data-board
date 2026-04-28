@@ -25,6 +25,7 @@ var ProviderSet = wire.NewSet(
 	NewGreeterGrpcRepo,
 	NewQuerySceneRepo,
 	NewDatasourceRepo,
+	NewSceneGroupRepo,
 )
 
 // Data .
@@ -68,6 +69,7 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 	if err := db.AutoMigrate(
 		&orm.GreeterDo{},
 		&orm.QueryDatasourceDo{},
+		&orm.QuerySceneGroupDo{},
 		&orm.QuerySceneDo{},
 		&orm.QuerySceneParamDo{},
 		&orm.QuerySceneWidgetDo{},

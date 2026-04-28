@@ -16,7 +16,8 @@ message BaseResponse {
 message ListScenesRequest {
     string category = 1; // @gotags: form:"category"
     int32 status = 2;    // @gotags: form:"status"
-    int32 is_home = 3;   // @gotags: form:"is_home"  // 1=只看首页场景，不传则不过滤
+    int32 is_home = 3;   // @gotags: form:"is_home"
+    uint64 group_id = 4; // @gotags: form:"group_id"  // >0 只返回该场景集的场景
 }
 
 message SceneIDRequest {
@@ -35,6 +36,7 @@ message SceneItem {
     uint64 datasource_id = 9;
     string datasource_name = 10;
     int32 is_home = 11;
+    uint64 group_id = 12;
 }
 
 message ListScenesResponse {
@@ -112,6 +114,7 @@ message CreateSceneRequest {
     repeated SceneWidgetItem widgets = 7;
     uint64 datasource_id = 8;
     int32 is_home = 9;
+    uint64 group_id = 10;
 }
 
 message CreateSceneResponse {
@@ -131,6 +134,7 @@ message UpdateSceneRequest {
     optional int32 sort_order = 6;
     optional uint64 datasource_id = 9;
     optional int32 is_home = 10;
+    optional uint64 group_id = 11;
     repeated SceneParamItem params = 7;
     repeated SceneWidgetItem widgets = 8;
 }
@@ -303,4 +307,73 @@ message SchemaColumnsResponse {
     int32 code = 1;
     string message = 2;
     repeated ColumnInfo columns = 3;
+}
+
+// ==================== 场景集 ====================
+
+message SceneGroupItem {
+    uint64 id = 1;
+    string name = 2;
+    string description = 3;
+    string page_key = 4;
+    uint64 datasource_id = 5;
+    string source_table = 6;
+    repeated string dimension_fields = 7;
+    int32 status = 8;
+}
+
+message GetGroupByPageKeyRequest {
+    string page_key = 1; // @gotags: form:"page_key"
+}
+
+message GetGroupByPageKeyResponse {
+    int32 code = 1;
+    string message = 2;
+    SceneGroupItem group = 3;
+}
+
+message CreateGroupRequest {
+    string name = 1;
+    string description = 2;
+    string page_key = 3;
+    uint64 datasource_id = 4;
+    string source_table = 5;
+    repeated string dimension_fields = 6;
+}
+
+message CreateGroupResponse {
+    int32 code = 1;
+    string message = 2;
+    uint64 group_id = 3;
+}
+
+message UpdateGroupRequest {
+    uint64 group_id = 1;
+    optional string name = 2;
+    optional string description = 3;
+    optional string source_table = 4;
+    optional uint64 datasource_id = 5;
+    optional int32 status = 6;
+    repeated string dimension_fields = 7;
+}
+
+message GroupIDRequest {
+    uint64 group_id = 1;
+}
+
+message ListGroupsResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated SceneGroupItem list = 3;
+}
+
+message GetDimensionValuesRequest {
+    uint64 group_id = 1;   // @gotags: form:"group_id"
+    string field_name = 2; // @gotags: form:"field_name"
+}
+
+message GetDimensionValuesResponse {
+    int32 code = 1;
+    string message = 2;
+    repeated string values = 3;
 }

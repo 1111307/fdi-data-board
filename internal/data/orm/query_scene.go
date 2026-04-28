@@ -15,6 +15,7 @@ type querySceneColumns struct {
 	DeleteTime   string
 	DatasourceID string
 	IsHome       string
+	GroupID      string
 }
 
 var QuerySceneColumns = querySceneColumns{
@@ -30,6 +31,7 @@ var QuerySceneColumns = querySceneColumns{
 	DeleteTime:   "delete_time",
 	DatasourceID: "datasource_id",
 	IsHome:       "is_home",
+	GroupID:      "group_id",
 }
 
 type QuerySceneDo struct {
@@ -42,6 +44,7 @@ type QuerySceneDo struct {
 	CreatedBy    string     `gorm:"column:created_by;size:100;comment:创建人"`
 	DatasourceID uint64     `gorm:"column:datasource_id;default:0;comment:关联数据源ID，0=默认Doris"`
 	IsHome       int8       `gorm:"column:is_home;default:0;comment:1=首页展示"`
+	GroupID      uint64     `gorm:"column:group_id;default:0;comment:所属场景集ID"`
 	CreateTime   time.Time  `gorm:"column:create_time;not null;comment:创建时间"`
 	UpdateTime   time.Time  `gorm:"column:update_time;not null;comment:更新时间"`
 	DeleteTime   *time.Time `gorm:"column:delete_time;comment:软删除时间"`
