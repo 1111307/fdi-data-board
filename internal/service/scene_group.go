@@ -145,6 +145,8 @@ func (s *SceneGroupService) CreateGroup(ctx *gin.Context) (api.HttpResponse, err
 		DatasourceID:    req.DatasourceId,
 		SourceTable:     req.SourceTable,
 		DimensionFields: req.DimensionFields,
+		PartitionField:  req.PartitionField,
+		LookbackDays:    int(req.LookbackDays),
 	}
 	id, err := s.uc.Create(ctx, param)
 	if err != nil {
@@ -209,6 +211,13 @@ func (s *SceneGroupService) UpdateGroup(ctx *gin.Context) (api.HttpResponse, err
 		v := int8(*req.Status)
 		param.Status = &v
 	}
+	if req.PartitionField != nil {
+		param.PartitionField = req.PartitionField
+	}
+	if req.LookbackDays != nil {
+		v := int(*req.LookbackDays)
+		param.LookbackDays = &v
+	}
 
 	if err := s.uc.Update(ctx, param); err != nil {
 		log.Errorf("UpdateGroup id=%d error: %v", req.GroupId, err)
@@ -259,5 +268,7 @@ func toGroupProto(g *biz.SceneGroupItem) *querySceneApi.SceneGroupItem {
 		SourceTable:     g.SourceTable,
 		DimensionFields: g.DimensionFields,
 		Status:          int32(g.Status),
+		PartitionField:  g.PartitionField,
+		LookbackDays:    int32(g.LookbackDays),
 	}
 }

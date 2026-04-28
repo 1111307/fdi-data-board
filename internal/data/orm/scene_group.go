@@ -10,6 +10,8 @@ type querySceneGroupColumns struct {
 	DatasourceID    string
 	SourceTable     string
 	DimensionFields string
+	PartitionField  string
+	LookbackDays    string
 	Status          string
 	CreateTime      string
 	UpdateTime      string
@@ -24,6 +26,8 @@ var QuerySceneGroupColumns = querySceneGroupColumns{
 	DatasourceID:    "datasource_id",
 	SourceTable:     "table_name",
 	DimensionFields: "dimension_fields",
+	PartitionField:  "partition_field",
+	LookbackDays:    "lookback_days",
 	Status:          "status",
 	CreateTime:      "create_time",
 	UpdateTime:      "update_time",
@@ -38,6 +42,8 @@ type QuerySceneGroupDo struct {
 	DatasourceID    uint64     `gorm:"column:datasource_id;default:0;comment:维度数据源ID"`
 	SourceTable     string     `gorm:"column:table_name;size:200;not null;comment:维度来源表"`
 	DimensionFields string     `gorm:"column:dimension_fields;type:json;comment:左侧维度字段列表JSON"`
+	PartitionField  string     `gorm:"column:partition_field;size:64;comment:分区列名，如dt，空则不加时间过滤"`
+	LookbackDays    int        `gorm:"column:lookback_days;default:1;comment:维度查询往回取多少天，0=不限"`
 	Status          int8       `gorm:"column:status;default:1;comment:1=启用 0=禁用"`
 	CreateTime      time.Time  `gorm:"column:create_time;not null"`
 	UpdateTime      time.Time  `gorm:"column:update_time;not null"`

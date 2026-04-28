@@ -21,6 +21,17 @@ func NewSceneGroupRepo(data *Data) biz.SceneGroupRepo {
 	return &sceneGroupRepo{baseRepo: &baseRepo{data: data}}
 }
 
+// invalidateDimCache 清除该场景集所有维度字段的缓存
+func (r *sceneGroupRepo) invalidateDimCache(groupID uint64) {
+	prefix := fmt.Sprintf("%d:", groupID)
+	r.data.dimCache.Range(func(k, _ interface{}) bool {
+		if key, ok := k.(string); ok && len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+			r.data.dimCache.Delete(k)
+		}
+		return true
+	})
+}
+
 func (r *sceneGroupRepo) List(ctx context.Context) ([]*orm.QuerySceneGroupDo, error) {
 	var list []*orm.QuerySceneGroupDo
 	err := r.mysqlDB(ctx).Model(&orm.QuerySceneGroupDo{}).
@@ -69,12 +80,22 @@ func (r *sceneGroupRepo) Update(ctx context.Context, param *biz.UpdateGroupParam
 	if param.Status != nil {
 		updateMap[orm.QuerySceneGroupColumns.Status] = *param.Status
 	}
+	if param.PartitionField != nil {
+		updateMap[orm.QuerySceneGroupColumns.PartitionField] = *param.PartitionField
+	}
+	if param.LookbackDays != nil {
+		updateMap[orm.QuerySceneGroupColumns.LookbackDays] = *param.LookbackDays
+	}
 	if param.HasDimUpdate {
 		updateMap[orm.QuerySceneGroupColumns.DimensionFields] = param.DimensionFields
 	}
-	return r.mysqlDB(ctx).Model(&orm.QuerySceneGroupDo{}).
+	if err := r.mysqlDB(ctx).Model(&orm.QuerySceneGroupDo{}).
 		Where(orm.QuerySceneGroupColumns.ID+" = ? AND "+orm.QuerySceneGroupColumns.DeleteTime+" IS NULL", param.ID).
-		Updates(updateMap).Error
+		Updates(updateMap).Error; err != nil {
+		return err
+	}
+	r.invalidateDimCache(param.ID)
+	return nil
 }
 
 func (r *sceneGroupRepo) Delete(ctx context.Context, id uint64) error {
@@ -92,6 +113,14 @@ func (r *sceneGroupRepo) Delete(ctx context.Context, id uint64) error {
 }
 
 func (r *sceneGroupRepo) GetDimensionValues(ctx context.Context, group *orm.QuerySceneGroupDo, fieldName string) ([]string, error) {
+	cacheKey := fmt.Sprintf("%d:%s", group.ID, fieldName)
+	if v, ok := r.data.dimCache.Load(cacheKey); ok {
+		entry := v.(dimCacheEntry)
+		if time.Now().Before(entry.expiresAt) {
+			return entry.values, nil
+		}
+	}
+
 	var db *gorm.DB
 	if group.DatasourceID == 0 {
 		db = r.dorisDB(ctx)
@@ -106,8 +135,14 @@ func (r *sceneGroupRepo) GetDimensionValues(ctx context.Context, group *orm.Quer
 		}
 	}
 
-	sql := fmt.Sprintf("SELECT DISTINCT `%s` FROM `%s` WHERE `%s` IS NOT NULL ORDER BY `%s` LIMIT 500",
-		fieldName, group.SourceTable, fieldName, fieldName)
+	whereClause := fmt.Sprintf("`%s` IS NOT NULL", fieldName)
+	if group.PartitionField != "" && group.LookbackDays > 0 {
+		whereClause += fmt.Sprintf(" AND `%s` >= DATE_SUB(CURDATE(), INTERVAL %d DAY)",
+			group.PartitionField, group.LookbackDays)
+	}
+
+	sql := fmt.Sprintf("SELECT DISTINCT `%s` FROM `%s` WHERE %s ORDER BY `%s` LIMIT 500",
+		fieldName, group.SourceTable, whereClause, fieldName)
 
 	rows, err := db.WithContext(ctx).Raw(sql).Rows()
 	if err != nil {
@@ -123,5 +158,10 @@ func (r *sceneGroupRepo) GetDimensionValues(ctx context.Context, group *orm.Quer
 		}
 		values = append(values, v)
 	}
+
+	r.data.dimCache.Store(cacheKey, dimCacheEntry{
+		values:    values,
+		expiresAt: time.Now().Add(10 * time.Minute),
+	})
 	return values, nil
 }

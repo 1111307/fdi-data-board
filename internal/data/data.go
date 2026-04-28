@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
@@ -36,6 +37,13 @@ type Data struct {
 
 	// 动态数据源连接缓存，key: datasource_id, value: *gorm.DB
 	dsCache sync.Map
+	// 维度值缓存，key: "groupID:fieldName", value: dimCacheEntry
+	dimCache sync.Map
+}
+
+type dimCacheEntry struct {
+	values    []string
+	expiresAt time.Time
 }
 
 func newMysqlDB(c *conf.Data) *gorm.DB {

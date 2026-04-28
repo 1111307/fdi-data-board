@@ -31,6 +31,8 @@ type SceneGroupItem struct {
 	DatasourceID    uint64   `json:"datasource_id"`
 	SourceTable     string   `json:"source_table"`
 	DimensionFields []string `json:"dimension_fields"`
+	PartitionField  string   `json:"partition_field"`
+	LookbackDays    int      `json:"lookback_days"`
 	Status          int8     `json:"status"`
 }
 
@@ -41,6 +43,8 @@ type CreateGroupParam struct {
 	DatasourceID    uint64
 	SourceTable     string
 	DimensionFields []string
+	PartitionField  string
+	LookbackDays    int
 }
 
 type UpdateGroupParam struct {
@@ -50,6 +54,8 @@ type UpdateGroupParam struct {
 	SourceTable     *string
 	DatasourceID    *uint64
 	Status          *int8
+	PartitionField  *string
+	LookbackDays    *int
 	DimensionFields string // 序列化后的 JSON string，HasDimUpdate=true 时生效
 	HasDimUpdate    bool
 }
@@ -92,6 +98,10 @@ func (uc *SceneGroupUseCase) Create(ctx context.Context, param *CreateGroupParam
 	if err != nil {
 		return 0, err
 	}
+	lookbackDays := param.LookbackDays
+	if lookbackDays <= 0 && param.PartitionField != "" {
+		lookbackDays = 1
+	}
 	now := time.Now()
 	do := &orm.QuerySceneGroupDo{
 		Name:            param.Name,
@@ -100,6 +110,8 @@ func (uc *SceneGroupUseCase) Create(ctx context.Context, param *CreateGroupParam
 		DatasourceID:    param.DatasourceID,
 		SourceTable:     param.SourceTable,
 		DimensionFields: fieldsJSON,
+		PartitionField:  param.PartitionField,
+		LookbackDays:    lookbackDays,
 		Status:          1,
 		CreateTime:      now,
 		UpdateTime:      now,
@@ -167,6 +179,8 @@ func toGroupItem(g *orm.QuerySceneGroupDo) *SceneGroupItem {
 		DatasourceID:    g.DatasourceID,
 		SourceTable:     g.SourceTable,
 		DimensionFields: unmarshalFields(g.DimensionFields),
+		PartitionField:  g.PartitionField,
+		LookbackDays:    g.LookbackDays,
 		Status:          g.Status,
 	}
 }
