@@ -23,39 +23,48 @@ type SceneGroupRepo interface {
 
 // ==================== DTO ====================
 
+// DimField 维度字段配置，支持 select（分类多选）和 date_range（日期范围）两种类型
+type DimField struct {
+	Name     string `json:"name"`
+	Type     string `json:"type"`                 // "select" | "date_range"
+	StartKey string `json:"start_key,omitempty"` // date_range：SQL 参数名，如 dt_gte
+	EndKey   string `json:"end_key,omitempty"`   // date_range：SQL 参数名，如 dt_lt
+	Label    string `json:"label,omitempty"`     // 展示标签，为空时用 Name
+}
+
 type SceneGroupItem struct {
-	ID              uint64   `json:"id"`
-	Name            string   `json:"name"`
-	Description     string   `json:"description"`
-	PageKey         string   `json:"page_key"`
-	DatasourceID    uint64   `json:"datasource_id"`
-	SourceTable     string   `json:"source_table"`
-	DimensionFields []string `json:"dimension_fields"`
-	PartitionField  string   `json:"partition_field"`
-	LookbackDays    int      `json:"lookback_days"`
-	Status          int8     `json:"status"`
+	ID             uint64     `json:"id"`
+	Name           string     `json:"name"`
+	Description    string     `json:"description"`
+	PageKey        string     `json:"page_key"`
+	DatasourceID   uint64     `json:"datasource_id"`
+	SourceTable    string     `json:"source_table"`
+	DimFields      []DimField `json:"dim_fields"`
+	PartitionField string     `json:"partition_field"`
+	LookbackDays   int        `json:"lookback_days"`
+	Status         int8       `json:"status"`
 }
 
 type CreateGroupParam struct {
-	Name            string
-	Description     string
-	PageKey         string
-	DatasourceID    uint64
-	SourceTable     string
-	DimensionFields []string
-	PartitionField  string
-	LookbackDays    int
+	Name           string
+	Description    string
+	PageKey        string
+	DatasourceID   uint64
+	SourceTable    string
+	DimFields      []DimField
+	PartitionField string
+	LookbackDays   int
 }
 
 type UpdateGroupParam struct {
-	ID              uint64
-	Name            *string
-	Description     *string
-	SourceTable     *string
-	DatasourceID    *uint64
-	Status          *int8
-	PartitionField  *string
-	LookbackDays    *int
+	ID             uint64
+	Name           *string
+	Description    *string
+	SourceTable    *string
+	DatasourceID   *uint64
+	Status         *int8
+	PartitionField *string
+	LookbackDays   *int
 	DimensionFields string // 序列化后的 JSON string，HasDimUpdate=true 时生效
 	HasDimUpdate    bool
 }
@@ -94,7 +103,7 @@ func (uc *SceneGroupUseCase) GetByPageKey(ctx context.Context, pageKey string) (
 }
 
 func (uc *SceneGroupUseCase) Create(ctx context.Context, param *CreateGroupParam) (uint64, error) {
-	fieldsJSON, err := marshalFields(param.DimensionFields)
+	fieldsJSON, err := marshalDimFields(param.DimFields)
 	if err != nil {
 		return 0, err
 	}
@@ -146,12 +155,20 @@ func (uc *SceneGroupUseCase) GetDimensionValues(ctx context.Context, groupID uin
 	if group == nil {
 		return nil, fmt.Errorf("场景集不存在")
 	}
+	// 只有 select 类型字段才查枚举值
+	dimFields := unmarshalDimFields(group.DimensionFields)
+	for _, f := range dimFields {
+		if f.Name == fieldName && f.Type != "select" {
+			return nil, fmt.Errorf("字段 %s 不是 select 类型，不支持查枚举值", fieldName)
+		}
+	}
 	return uc.repo.GetDimensionValues(ctx, group, fieldName)
 }
 
 // ==================== 内部工具 ====================
 
-func marshalFields(fields []string) (string, error) {
+// marshalDimFields 序列化 []DimField 为 JSON string
+func marshalDimFields(fields []DimField) (string, error) {
 	if len(fields) == 0 {
 		return "[]", nil
 	}
@@ -159,28 +176,41 @@ func marshalFields(fields []string) (string, error) {
 	return string(b), err
 }
 
-func unmarshalFields(s string) []string {
-	if s == "" || s == "null" {
+// unmarshalDimFields 反序列化，兼容旧格式（纯字符串数组）
+func unmarshalDimFields(s string) []DimField {
+	if s == "" || s == "null" || s == "[]" {
 		return nil
 	}
-	var fields []string
-	_ = json.Unmarshal([]byte(s), &fields)
-	return fields
+	// 尝试新格式：对象数组
+	var fields []DimField
+	if err := json.Unmarshal([]byte(s), &fields); err == nil && len(fields) > 0 && fields[0].Name != "" {
+		return fields
+	}
+	// 兼容旧格式：字符串数组
+	var names []string
+	if err := json.Unmarshal([]byte(s), &names); err == nil {
+		result := make([]DimField, len(names))
+		for i, name := range names {
+			result[i] = DimField{Name: name, Type: "select"}
+		}
+		return result
+	}
+	return nil
 }
 
 func nilIfEmpty(s *string) *string { return s }
 
 func toGroupItem(g *orm.QuerySceneGroupDo) *SceneGroupItem {
 	return &SceneGroupItem{
-		ID:              g.ID,
-		Name:            g.Name,
-		Description:     g.Description,
-		PageKey:         g.PageKey,
-		DatasourceID:    g.DatasourceID,
-		SourceTable:     g.SourceTable,
-		DimensionFields: unmarshalFields(g.DimensionFields),
-		PartitionField:  g.PartitionField,
-		LookbackDays:    g.LookbackDays,
-		Status:          g.Status,
+		ID:             g.ID,
+		Name:           g.Name,
+		Description:    g.Description,
+		PageKey:        g.PageKey,
+		DatasourceID:   g.DatasourceID,
+		SourceTable:    g.SourceTable,
+		DimFields:      unmarshalDimFields(g.DimensionFields),
+		PartitionField: g.PartitionField,
+		LookbackDays:   g.LookbackDays,
+		Status:         g.Status,
 	}
 }

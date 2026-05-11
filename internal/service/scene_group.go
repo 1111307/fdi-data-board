@@ -139,14 +139,14 @@ func (s *SceneGroupService) CreateGroup(ctx *gin.Context) (api.HttpResponse, err
 		return resp, nil
 	}
 	param := &biz.CreateGroupParam{
-		Name:            req.Name,
-		Description:     req.Description,
-		PageKey:         req.PageKey,
-		DatasourceID:    req.DatasourceId,
-		SourceTable:     req.SourceTable,
-		DimensionFields: req.DimensionFields,
-		PartitionField:  req.PartitionField,
-		LookbackDays:    int(req.LookbackDays),
+		Name:           req.Name,
+		Description:    req.Description,
+		PageKey:        req.PageKey,
+		DatasourceID:   req.DatasourceId,
+		SourceTable:    req.SourceTable,
+		DimFields:      protoDimFieldsToBiz(req.DimFields),
+		PartitionField: req.PartitionField,
+		LookbackDays:   int(req.LookbackDays),
 	}
 	id, err := s.uc.Create(ctx, param)
 	if err != nil {
@@ -186,11 +186,11 @@ func (s *SceneGroupService) UpdateGroup(ctx *gin.Context) (api.HttpResponse, err
 		return resp, nil
 	}
 
-	// dimension_fields 有传则序列化
+	// dim_fields 有传则序列化
 	var dimJSON string
-	hasDim := len(req.DimensionFields) > 0
+	hasDim := len(req.DimFields) > 0
 	if hasDim {
-		b, _ := json.Marshal(req.DimensionFields)
+		b, _ := json.Marshal(protoDimFieldsToBiz(req.DimFields))
 		dimJSON = string(b)
 	}
 
@@ -260,15 +260,43 @@ func (s *SceneGroupService) DeleteGroup(ctx *gin.Context) (api.HttpResponse, err
 
 func toGroupProto(g *biz.SceneGroupItem) *querySceneApi.SceneGroupItem {
 	return &querySceneApi.SceneGroupItem{
-		Id:              g.ID,
-		Name:            g.Name,
-		Description:     g.Description,
-		PageKey:         g.PageKey,
-		DatasourceId:    g.DatasourceID,
-		SourceTable:     g.SourceTable,
-		DimensionFields: g.DimensionFields,
-		Status:          int32(g.Status),
-		PartitionField:  g.PartitionField,
-		LookbackDays:    int32(g.LookbackDays),
+		Id:             g.ID,
+		Name:           g.Name,
+		Description:    g.Description,
+		PageKey:        g.PageKey,
+		DatasourceId:   g.DatasourceID,
+		SourceTable:    g.SourceTable,
+		DimFields:      bizDimFieldsToProto(g.DimFields),
+		Status:         int32(g.Status),
+		PartitionField: g.PartitionField,
+		LookbackDays:   int32(g.LookbackDays),
 	}
+}
+
+func protoDimFieldsToBiz(fields []*querySceneApi.DimFieldConfig) []biz.DimField {
+	result := make([]biz.DimField, 0, len(fields))
+	for _, f := range fields {
+		result = append(result, biz.DimField{
+			Name:     f.Name,
+			Type:     f.Type,
+			StartKey: f.StartKey,
+			EndKey:   f.EndKey,
+			Label:    f.Label,
+		})
+	}
+	return result
+}
+
+func bizDimFieldsToProto(fields []biz.DimField) []*querySceneApi.DimFieldConfig {
+	result := make([]*querySceneApi.DimFieldConfig, 0, len(fields))
+	for _, f := range fields {
+		result = append(result, &querySceneApi.DimFieldConfig{
+			Name:     f.Name,
+			Type:     f.Type,
+			StartKey: f.StartKey,
+			EndKey:   f.EndKey,
+			Label:    f.Label,
+		})
+	}
+	return result
 }

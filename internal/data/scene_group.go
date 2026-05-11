@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/log"
 	"gorm.io/gorm"
 
 	"fdi_data_board/internal/biz"
@@ -144,6 +145,7 @@ func (r *sceneGroupRepo) GetDimensionValues(ctx context.Context, group *orm.Quer
 	sql := fmt.Sprintf("SELECT DISTINCT `%s` FROM `%s` WHERE %s ORDER BY `%s` LIMIT 500",
 		fieldName, group.SourceTable, whereClause, fieldName)
 
+	queryStart := time.Now()
 	rows, err := db.WithContext(ctx).Raw(sql).Rows()
 	if err != nil {
 		return nil, fmt.Errorf("查询维度值失败: %w", err)
@@ -163,5 +165,7 @@ func (r *sceneGroupRepo) GetDimensionValues(ctx context.Context, group *orm.Quer
 		values:    values,
 		expiresAt: time.Now().Add(10 * time.Minute),
 	})
+	log.Infof("dim cache miss: group=%d field=%s rows=%d cost=%s sql=%s",
+		group.ID, fieldName, len(values), time.Since(queryStart), sql)
 	return values, nil
 }

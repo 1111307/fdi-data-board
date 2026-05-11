@@ -411,12 +411,28 @@ func (r *querySceneRepo) ExecuteWidget(ctx context.Context, widget *orm.QuerySce
 }
 
 // bindParams 参数绑定：
+//   - {{?...}} 可选条件块：块内所有 {{!key}}/{{key}} 如有任意一个 key 未提供，整块消除
 //   - {{!key}} 直接替换为参数值（用于表名、列名等标识符）
 //   - {{key}}  替换为 ? 占位符（用于普通值，走预编译防注入）
 func bindParams(sqlTemplate string, userParams map[string]string) (string, []interface{}, error) {
-	// 第一步：处理 {{!key}} → 直接字符串替换（标识符）
+	// 第一步：处理 {{?...}} 可选条件块
+	// 块内只要有任意 key 未提供，整块（含两侧空白）消除
+	reOptional := regexp.MustCompile(`(?s)\{\{\?(.*?)\}\}`)
+	reKeyInBlock := regexp.MustCompile(`\{\{!?(\w+)\}\}`)
+	sql := reOptional.ReplaceAllStringFunc(sqlTemplate, func(block string) string {
+		inner := reOptional.FindStringSubmatch(block)[1]
+		keys := reKeyInBlock.FindAllStringSubmatch(inner, -1)
+		for _, m := range keys {
+			if _, ok := userParams[m[1]]; !ok {
+				return "" // 有 key 未提供，整块消除
+			}
+		}
+		return inner // 所有 key 都有值，保留块内容（去掉 {{? 和 }}）
+	})
+
+	// 第二步：处理 {{!key}} → 直接字符串替换（标识符）
 	reIdent := regexp.MustCompile(`\{\{!(\w+)\}\}`)
-	sql := reIdent.ReplaceAllStringFunc(sqlTemplate, func(match string) string {
+	sql = reIdent.ReplaceAllStringFunc(sql, func(match string) string {
 		key := reIdent.FindStringSubmatch(match)[1]
 		val, ok := userParams[key]
 		if !ok {
@@ -425,7 +441,7 @@ func bindParams(sqlTemplate string, userParams map[string]string) (string, []int
 		return val
 	})
 
-	// 第二步：处理 {{key}} → 纯整数直接内联，其他值走 ? 占位符防注入
+	// 第三步：处理 {{key}} → 纯整数直接内联，其他值走 ? 占位符防注入
 	reVal := regexp.MustCompile(`\{\{(\w+)\}\}`)
 	reInt := regexp.MustCompile(`^-?\d+$`)
 	var args []interface{}

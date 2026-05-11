@@ -311,6 +311,14 @@ message SchemaColumnsResponse {
 
 // ==================== 场景集 ====================
 
+message DimFieldConfig {
+    string name = 1;
+    string type = 2;       // "select" | "date_range"
+    string start_key = 3;  // date_range 专用：SQL 参数名，如 dt_gte
+    string end_key = 4;    // date_range 专用：SQL 参数名，如 dt_lt
+    string label = 5;      // 展示标签，为空时用 name
+}
+
 message SceneGroupItem {
     uint64 id = 1;
     string name = 2;
@@ -318,10 +326,10 @@ message SceneGroupItem {
     string page_key = 4;
     uint64 datasource_id = 5;
     string source_table = 6;
-    repeated string dimension_fields = 7;
+    repeated DimFieldConfig dim_fields = 7;
     int32 status = 8;
-    string partition_field = 9;  // 分区列名，如 dt，空则不加时间过滤
-    int32 lookback_days = 10;    // 维度查询往回取多少天，0=不限
+    string partition_field = 9;
+    int32 lookback_days = 10;
 }
 
 message GetGroupByPageKeyRequest {
@@ -340,9 +348,9 @@ message CreateGroupRequest {
     string page_key = 3;
     uint64 datasource_id = 4;
     string source_table = 5;
-    repeated string dimension_fields = 6;
-    string partition_field = 7;  // 分区列名，如 dt，空则不加时间过滤
-    int32 lookback_days = 8;     // 维度查询往回取多少天，0=不限，默认 30
+    repeated DimFieldConfig dim_fields = 6;
+    string partition_field = 7;
+    int32 lookback_days = 8;
 }
 
 message CreateGroupResponse {
@@ -358,7 +366,7 @@ message UpdateGroupRequest {
     optional string source_table = 4;
     optional uint64 datasource_id = 5;
     optional int32 status = 6;
-    repeated string dimension_fields = 7;
+    repeated DimFieldConfig dim_fields = 7;
     optional string partition_field = 8;
     optional int32 lookback_days = 9;
 }
