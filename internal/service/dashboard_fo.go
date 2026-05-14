@@ -1,0 +1,57 @@
+package service
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/go-kratos/kratos/v2/log"
+
+	"devops.momenta.works/Momenta/FDI/_git/gerr.git/gcode"
+
+	"fdi_data_board/api"
+	dashboard_api "fdi_data_board/api/dashboard"
+	"fdi_data_board/internal/biz"
+)
+
+type FoDashboardService struct {
+	uc *biz.FoDashboardUseCase
+}
+
+func NewFoDashboardService(uc *biz.FoDashboardUseCase) *FoDashboardService {
+	return &FoDashboardService{uc: uc}
+}
+
+// ListFffRunning godoc
+//
+//	@Summary		筛选器运行明细
+//	@Tags			FoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Param			filter_name		query	string	false	"筛选器名称"
+//	@Param			project_name	query	string	false	"项目名称"
+//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
+//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
+//	@Param			page			query	int		false	"页码，默认1"
+//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
+//	@Success		200				{object}	dashboard_api.FffRunningResponse
+//	@Router			/dashboard/v1/fo/detail/running [GET]
+func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FffRunningResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffRunningRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.ListFffRunning(ctx, &req)
+	if err != nil {
+		log.Errorf("ListFffRunning error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	return result, nil
+}
