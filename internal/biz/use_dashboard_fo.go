@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"strings"
 
 	dashboard_api "fdi_data_board/api/dashboard"
 )
@@ -18,13 +19,27 @@ type FoDashboardRepo interface {
 	ListFffClose(ctx context.Context, param *FffCloseParam) ([]*dashboard_api.FffCloseItem, int64, error)
 	ListFdrTrigger(ctx context.Context, param *FdrTriggerParam) ([]*dashboard_api.FdrTriggerItem, int64, error)
 	ListFclTrigger(ctx context.Context, param *FclTriggerParam) ([]*dashboard_api.FclTriggerItem, int64, error)
+	ListUuidDetail(ctx context.Context, param *UuidDetailParam) ([]*dashboard_api.UuidDetailItem, int64, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
+}
+
+// UuidDetailParam 全链路明细查询参数
+type UuidDetailParam struct {
+	FilterName  string
+	EventNames  []string // 多选
+	ProjectName string
+	StartDt     string
+	EndDt       string
+	OnlyFail    bool
+	StageFilter string // fff_discard/fdr_discard/fcl_discard/fcl_success
+	Page        int
+	PageSize    int
 }
 
 // FclTriggerParam FCL 上传明细查询参数
 type FclTriggerParam struct {
 	FilterName  string
-	EventName   string
+	EventNames  []string
 	ProjectName string
 	StartDt     string
 	EndDt       string
@@ -35,7 +50,7 @@ type FclTriggerParam struct {
 // FdrTriggerParam FDR 落盘明细查询参数
 type FdrTriggerParam struct {
 	FilterName  string
-	EventName   string
+	EventNames  []string
 	ProjectName string
 	StartDt     string
 	EndDt       string
@@ -56,7 +71,7 @@ type FffCloseParam struct {
 // FffTriggerParam 筛选器触发明细查询参数
 type FffTriggerParam struct {
 	FilterName  string
-	EventName   string
+	EventNames  []string
 	ProjectName string
 	StartDt     string
 	EndDt       string
@@ -105,7 +120,7 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 
 	param := &FffTriggerParam{
 		FilterName:  req.FilterName,
-		EventName:   req.EventName,
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
@@ -178,7 +193,7 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 
 	param := &FdrTriggerParam{
 		FilterName:  req.FilterName,
-		EventName:   req.EventName,
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
@@ -215,7 +230,7 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 
 	param := &FclTriggerParam{
 		FilterName:  req.FilterName,
-		EventName:   req.EventName,
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
@@ -229,6 +244,54 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 	}
 
 	return &dashboard_api.FclTriggerResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Total:        total,
+		Page:         page,
+		PageSize:     pageSize,
+		List:         list,
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard_api.UuidDetailRequest) (*dashboard_api.UuidDetailResponse, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+
+	var eventNames []string
+	if req.EventNames != "" {
+		for _, e := range strings.Split(req.EventNames, ",") {
+			if e = strings.TrimSpace(e); e != "" {
+				eventNames = append(eventNames, e)
+			}
+		}
+	}
+
+	param := &UuidDetailParam{
+		FilterName:  req.FilterName,
+		EventNames:  eventNames,
+		ProjectName: req.ProjectName,
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+		OnlyFail:    req.OnlyFail == 1,
+		StageFilter: req.StageFilter,
+		Page:        page,
+		PageSize:    pageSize,
+	}
+
+	list, total, err := uc.repo.ListUuidDetail(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dashboard_api.UuidDetailResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		Total:        total,
 		Page:         page,
@@ -284,4 +347,18 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 		PageSize:     pageSize,
 		List:         list,
 	}, nil
+}
+
+// splitEventNames 将逗号分隔的事件名字符串拆分为切片，空字符串返回 nil
+func splitEventNames(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	var result []string
+	for _, e := range strings.Split(raw, ",") {
+		if e = strings.TrimSpace(e); e != "" {
+			result = append(result, e)
+		}
+	}
+	return result
 }

@@ -267,9 +267,16 @@ func buildFffTriggerWhere(param *biz.FffTriggerParam) (string, []interface{}) {
 		conds = append(conds, "filter_name = ?")
 		args = append(args, param.FilterName)
 	}
-	if param.EventName != "" {
+	if len(param.EventNames) == 1 {
 		conds = append(conds, "event_name = ?")
-		args = append(args, param.EventName)
+		args = append(args, param.EventNames[0])
+	} else if len(param.EventNames) > 1 {
+		placeholders := strings.Repeat("?,", len(param.EventNames))
+		placeholders = placeholders[:len(placeholders)-1]
+		conds = append(conds, "event_name IN ("+placeholders+")")
+		for _, e := range param.EventNames {
+			args = append(args, e)
+		}
 	}
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
@@ -527,9 +534,16 @@ func buildFdrTriggerWhere(param *biz.FdrTriggerParam) (string, []interface{}) {
 		conds = append(conds, "filter_name = ?")
 		args = append(args, param.FilterName)
 	}
-	if param.EventName != "" {
+	if len(param.EventNames) == 1 {
 		conds = append(conds, "event_name = ?")
-		args = append(args, param.EventName)
+		args = append(args, param.EventNames[0])
+	} else if len(param.EventNames) > 1 {
+		placeholders := strings.Repeat("?,", len(param.EventNames))
+		placeholders = placeholders[:len(placeholders)-1]
+		conds = append(conds, "event_name IN ("+placeholders+")")
+		for _, e := range param.EventNames {
+			args = append(args, e)
+		}
 	}
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
@@ -663,9 +677,16 @@ func buildFclTriggerWhere(param *biz.FclTriggerParam) (string, []interface{}) {
 		conds = append(conds, "filter_name = ?")
 		args = append(args, param.FilterName)
 	}
-	if param.EventName != "" {
+	if len(param.EventNames) == 1 {
 		conds = append(conds, "event_name = ?")
-		args = append(args, param.EventName)
+		args = append(args, param.EventNames[0])
+	} else if len(param.EventNames) > 1 {
+		placeholders := strings.Repeat("?,", len(param.EventNames))
+		placeholders = placeholders[:len(placeholders)-1]
+		conds = append(conds, "event_name IN ("+placeholders+")")
+		for _, e := range param.EventNames {
+			args = append(args, e)
+		}
 	}
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
@@ -697,6 +718,185 @@ func toFclTriggerItem(row *fclTriggerRow) *dashboard_api.FclTriggerItem {
 		FdiProjectName:  row.FdiProjectName,
 		ProjectCarType:  row.ProjectCarType,
 		VehicleSourceCn: row.VehicleSourceCn,
+	}
+}
+
+// uuidDetailRow dwd_cfdi_status_monitor_analysis 扫描结构
+// timestamp_utc 可为 NULL，用 *time.Time 接收
+type uuidDetailRow struct {
+	Dt                time.Time `gorm:"column:dt"`
+	AnonymousId       string    `gorm:"column:anonymous_id"`
+	EventName         string    `gorm:"column:event_name"`
+	Uuid              string    `gorm:"column:uuid"`
+	CreateAt          time.Time `gorm:"column:create_at"`
+	FilterName        string    `gorm:"column:filter_name"`
+	FffSwVersion      string    `gorm:"column:fff_sw_version"`
+	FdrSwVersion      string    `gorm:"column:fdr_sw_version"`
+	FclSwVersion      string    `gorm:"column:fcl_sw_version"`
+	TriggerType       string    `gorm:"column:trigger_type"`
+	CollectType       string    `gorm:"column:collect_type"`
+	FffUpdatedAt      int64     `gorm:"column:fff_updated_at"`
+	FdrUpdatedAt      int64     `gorm:"column:fdr_updated_at"`
+	FclUpdatedAt      int64     `gorm:"column:fcl_updated_at"`
+	FffStatus         string    `gorm:"column:fff_status"`
+	FdrStatus         string    `gorm:"column:fdr_status"`
+	FclStatus         string    `gorm:"column:fcl_status"`
+	FffDetail         string    `gorm:"column:fff_detail"`
+	FdrDetail         string    `gorm:"column:fdr_detail"`
+	FclDetail         string    `gorm:"column:fcl_detail"`
+	BeginTimestampUts int64     `gorm:"column:begin_timestamp_uts"`
+	DumpTimestamp     int64     `gorm:"column:dump_timestamp"`
+	EndTimestampUts   int64     `gorm:"column:end_timestamp_uts"`
+	Md5               string    `gorm:"column:md5"`
+	BagName           string    `gorm:"column:bag_name"`
+	CompletePercent   int       `gorm:"column:complete_percent"`
+	ProjectName       string    `gorm:"column:project_name"`
+	CarType           string    `gorm:"column:car_type"`
+	VehicleSource     string    `gorm:"column:vehicle_source"`
+	ProjectCarType    string    `gorm:"column:project_car_type"`
+	Dse               string    `gorm:"column:dse"`
+}
+
+func (r *foDashboardRepo) ListUuidDetail(ctx context.Context, param *biz.UuidDetailParam) ([]*dashboard_api.UuidDetailItem, int64, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildUuidDetailWhere(param)
+
+	var (
+		total    int64
+		rows     []*uuidDetailRow
+		countErr error
+		dataErr  error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		countSQL := "SELECT COUNT(*) FROM dwd_cfdi_status_monitor_analysis" + where
+		countErr = db.Raw(countSQL, args...).Scan(&total).Error
+	}()
+
+	go func() {
+		defer wg.Done()
+		offset := (param.Page - 1) * param.PageSize
+		dataSQL := fmt.Sprintf(
+			`SELECT dt, anonymous_id, event_name, uuid, create_at, filter_name,
+			fff_sw_version, fdr_sw_version, fcl_sw_version, trigger_type, collect_type,
+			fff_updated_at, fdr_updated_at, fcl_updated_at,
+			fff_status, fdr_status, fcl_status, fff_detail, fdr_detail, fcl_detail,
+			begin_timestamp_uts, dump_timestamp, end_timestamp_uts,
+			md5, bag_name, complete_percent, project_name, car_type, vehicle_source,
+			project_car_type, dse
+			FROM dwd_cfdi_status_monitor_analysis%s LIMIT %d OFFSET %d`,
+			where, param.PageSize, offset,
+		)
+		dataErr = db.Raw(dataSQL, args...).Scan(&rows).Error
+	}()
+
+	wg.Wait()
+
+	if countErr != nil {
+		return nil, 0, countErr
+	}
+	if dataErr != nil {
+		return nil, 0, dataErr
+	}
+
+	list := make([]*dashboard_api.UuidDetailItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, toUuidDetailItem(row))
+	}
+	return list, total, nil
+}
+
+func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else if param.StartDt != "" {
+		conds = append(conds, "dt >= ?")
+		args = append(args, param.StartDt)
+	} else if param.EndDt != "" {
+		conds = append(conds, "dt <= ?")
+		args = append(args, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+
+	if param.FilterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, param.FilterName)
+	}
+	if len(param.EventNames) == 1 {
+		conds = append(conds, "event_name = ?")
+		args = append(args, param.EventNames[0])
+	} else if len(param.EventNames) > 1 {
+		placeholders := strings.Repeat("?,", len(param.EventNames))
+		placeholders = placeholders[:len(placeholders)-1]
+		conds = append(conds, "event_name IN ("+placeholders+")")
+		for _, e := range param.EventNames {
+			args = append(args, e)
+		}
+	}
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	if param.OnlyFail {
+		conds = append(conds, "fcl_status != 'success'")
+	}
+	switch param.StageFilter {
+	case "fff_discard":
+		conds = append(conds, "fff_status = 'discard'")
+	case "fdr_discard":
+		conds = append(conds, "fff_status = 'success'", "fdr_status = 'discard'")
+	case "fcl_discard":
+		conds = append(conds, "fdr_status = 'success'", "fcl_status != 'success'", "fcl_status != ''")
+	case "fcl_success":
+		conds = append(conds, "fcl_status = 'success'")
+	}
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func toUuidDetailItem(row *uuidDetailRow) *dashboard_api.UuidDetailItem {
+
+	return &dashboard_api.UuidDetailItem{
+		Dt:                row.Dt.Format("2006-01-02"),
+		AnonymousId:       row.AnonymousId,
+		EventName:         row.EventName,
+		Uuid:              row.Uuid,
+		CreateAt:          row.CreateAt.Format("2006-01-02"),
+		FilterName:        row.FilterName,
+		FffSwVersion:      row.FffSwVersion,
+		FdrSwVersion:      row.FdrSwVersion,
+		FclSwVersion:      row.FclSwVersion,
+		TriggerType:       row.TriggerType,
+		CollectType:       row.CollectType,
+		FffUpdatedAt:      row.FffUpdatedAt,
+		FdrUpdatedAt:      row.FdrUpdatedAt,
+		FclUpdatedAt:      row.FclUpdatedAt,
+		FffStatus:         row.FffStatus,
+		FdrStatus:         row.FdrStatus,
+		FclStatus:         row.FclStatus,
+		FffDetail:         row.FffDetail,
+		FdrDetail:         row.FdrDetail,
+		FclDetail:         row.FclDetail,
+		BeginTimestampUts: row.BeginTimestampUts,
+		DumpTimestamp:     row.DumpTimestamp,
+		EndTimestampUts:   row.EndTimestampUts,
+		Md5:               row.Md5,
+		BagName:           row.BagName,
+		CompletePercent:   row.CompletePercent,
+		ProjectName:       row.ProjectName,
+		CarType:           row.CarType,
+		VehicleSource:     row.VehicleSource,
+		ProjectCarType:    row.ProjectCarType,
+		Dse:               row.Dse,
 	}
 }
 

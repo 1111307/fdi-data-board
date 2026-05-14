@@ -168,6 +168,46 @@ func (s *FoDashboardService) ListFclTrigger(ctx *gin.Context) (api.HttpResponse,
 	return result, nil
 }
 
+// ListUuidDetail godoc
+//
+//	@Summary		全链路明细
+//	@Tags			FoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Param			filter_name		query	string	false	"筛选器名称"
+//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
+//	@Param			project_name	query	string	false	"项目名称"
+//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
+//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
+//	@Param			only_fail		query	int		false	"1=仅看失败记录"
+//	@Param			stage_filter	query	string	false	"阶段过滤: fff_discard/fdr_discard/fcl_discard/fcl_success"
+//	@Param			page			query	int		false	"页码，默认1"
+//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
+//	@Success		200				{object}	dashboard_api.UuidDetailResponse
+//	@Router			/dashboard/v1/fo/detail/uuid [GET]
+func (s *FoDashboardService) ListUuidDetail(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.UuidDetailResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.UuidDetailRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.ListUuidDetail(ctx, &req)
+	if err != nil {
+		log.Errorf("ListUuidDetail error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	return result, nil
+}
+
 // GetDimensions godoc
 //
 //	@Summary		FO Dashboard 下拉维度（近7天活跃数据，30分钟缓存）

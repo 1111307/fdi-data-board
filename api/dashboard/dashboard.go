@@ -85,7 +85,7 @@ type FffTriggerItem struct {
 // FffTriggerRequest 筛选器触发明细查询请求
 type FffTriggerRequest struct {
 	FilterName  string `form:"filter_name"`
-	EventName   string `form:"event_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
@@ -170,7 +170,7 @@ type FdrTriggerItem struct {
 // FdrTriggerRequest FDR 落盘明细查询请求
 type FdrTriggerRequest struct {
 	FilterName  string `form:"filter_name"`
-	EventName   string `form:"event_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
@@ -214,7 +214,7 @@ type FclTriggerItem struct {
 // FclTriggerRequest FCL 上传明细查询请求
 type FclTriggerRequest struct {
 	FilterName  string `form:"filter_name"`
-	EventName   string `form:"event_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
@@ -229,6 +229,67 @@ type FclTriggerResponse struct {
 	Page     int               `json:"page"`
 	PageSize int               `json:"page_size"`
 	List     []*FclTriggerItem `json:"list"`
+}
+
+// UuidDetailItem 全链路明细单条记录，字段与 dwd_cfdi_status_monitor_analysis 列对齐
+type UuidDetailItem struct {
+	Dt                string `json:"dt"`
+	AnonymousId       string `json:"anonymous_id"`
+	EventName         string `json:"event_name"`
+	Uuid              string `json:"uuid"`
+	CreateAt          string `json:"create_at"`
+	FilterName        string `json:"filter_name"`
+	FffSwVersion      string `json:"fff_sw_version"`
+	FdrSwVersion      string `json:"fdr_sw_version"`
+	FclSwVersion      string `json:"fcl_sw_version"`
+	TriggerType       string `json:"trigger_type"`
+	CollectType       string `json:"collect_type"`
+	FffUpdatedAt      int64  `json:"fff_updated_at"`
+	FdrUpdatedAt      int64  `json:"fdr_updated_at"`
+	FclUpdatedAt      int64  `json:"fcl_updated_at"`
+	FffStatus         string `json:"fff_status"`
+	FdrStatus         string `json:"fdr_status"`
+	FclStatus         string `json:"fcl_status"`
+	FffDetail         string `json:"fff_detail"`
+	FdrDetail         string `json:"fdr_detail"`
+	FclDetail         string `json:"fcl_detail"`
+	BeginTimestampUts int64  `json:"begin_timestamp_uts"`
+	DumpTimestamp     int64  `json:"dump_timestamp"`
+	EndTimestampUts   int64  `json:"end_timestamp_uts"`
+	Md5               string `json:"md5"`
+	BagName           string `json:"bag_name"`
+	CompletePercent   int    `json:"complete_percent"`
+	ProjectName       string `json:"project_name"`
+	CarType           string `json:"car_type"`
+	VehicleSource     string `json:"vehicle_source"`
+	TimestampUtc      string `json:"timestamp_utc"`
+	FdiProjectName    string `json:"fdi_project_name"`
+	ProjectCarType    string `json:"project_car_type"`
+	VehicleSourceCn   string `json:"vehicle_source_cn"`
+	Dse               string `json:"dse"`
+}
+
+// UuidDetailRequest 全链路明细查询请求
+// 筛选参数来自「筛选器诊断」filter bar（diag*），而非「明细分析」filter bar（daily*）
+type UuidDetailRequest struct {
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"`   // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	OnlyFail     int    `form:"only_fail"`     // 1=仅看失败
+	StageFilter  string `form:"stage_filter"`  // fff_discard/fdr_discard/fcl_discard/fcl_success
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
+}
+
+// UuidDetailResponse 全链路明细响应
+type UuidDetailResponse struct {
+	BaseResponse
+	Total    int64             `json:"total"`
+	Page     int               `json:"page"`
+	PageSize int               `json:"page_size"`
+	List     []*UuidDetailItem `json:"list"`
 }
 
 // FoDimensionsResponse FO Dashboard 下拉维度响应
