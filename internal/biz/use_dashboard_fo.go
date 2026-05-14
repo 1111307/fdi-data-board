@@ -14,7 +14,19 @@ const (
 // FoDashboardRepo FO Dashboard 数据仓储接口
 type FoDashboardRepo interface {
 	ListFffRunning(ctx context.Context, param *FffRunningParam) ([]*dashboard_api.FffRunningItem, int64, error)
+	ListFffTrigger(ctx context.Context, param *FffTriggerParam) ([]*dashboard_api.FffTriggerItem, int64, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
+}
+
+// FffTriggerParam 筛选器触发明细查询参数
+type FffTriggerParam struct {
+	FilterName  string
+	EventName   string
+	ProjectName string
+	StartDt     string
+	EndDt       string
+	Page        int
+	PageSize    int
 }
 
 // FoDimensions 维度枚举数据
@@ -41,6 +53,43 @@ type FoDashboardUseCase struct {
 
 func NewFoDashboardUseCase(repo FoDashboardRepo) *FoDashboardUseCase {
 	return &FoDashboardUseCase{repo: repo}
+}
+
+func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FffTriggerResponse, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+
+	param := &FffTriggerParam{
+		FilterName:  req.FilterName,
+		EventName:   req.EventName,
+		ProjectName: req.ProjectName,
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+		Page:        page,
+		PageSize:    pageSize,
+	}
+
+	list, total, err := uc.repo.ListFffTrigger(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dashboard_api.FffTriggerResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Total:        total,
+		Page:         page,
+		PageSize:     pageSize,
+		List:         list,
+	}, nil
 }
 
 func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context) (*dashboard_api.FoDimensionsResponse, error) {

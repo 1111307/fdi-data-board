@@ -162,6 +162,156 @@ func toFffRunningItem(row *fffRunningRow) *dashboard_api.FffRunningItem {
 	}
 }
 
+// fffTriggerRow dwd_cfdi_basic_fff_trigger 扫描结构
+// before/after 是 SQL 保留字，SELECT 时需要反引号，GORM column tag 保持原名
+type fffTriggerRow struct {
+	Dt              time.Time `gorm:"column:dt"`
+	Uuid            string    `gorm:"column:uuid"`
+	EventName       string    `gorm:"column:event_name"`
+	AnonymousId     string    `gorm:"column:anonymous_id"`
+	TimestampUtc    time.Time `gorm:"column:timestamp_utc"`
+	CreateAt        time.Time `gorm:"column:create_at"`
+	TriggerTime     int64     `gorm:"column:trigger_time"`
+	UtcDiffUs       int64     `gorm:"column:utc_diff_us"`
+	Before          int       `gorm:"column:before"`
+	After           int       `gorm:"column:after"`
+	FilterName      string    `gorm:"column:filter_name"`
+	TriggerType     string    `gorm:"column:trigger_type"`
+	CollectType     string    `gorm:"column:collect_type"`
+	Status          string    `gorm:"column:status"`
+	OnAutopilot     string    `gorm:"column:on_autopilot"`
+	FunctionMode    string    `gorm:"column:function_mode"`
+	SwVersion       string    `gorm:"column:sw_version"`
+	ProjectName     string    `gorm:"column:project_name"`
+	CarType         string    `gorm:"column:car_type"`
+	VehicleSource   string    `gorm:"column:vehicle_source"`
+	Bj02Lat         string    `gorm:"column:bj02_lat"`
+	Bj02Lon         string    `gorm:"column:bj02_lon"`
+	RoadType        string    `gorm:"column:road_type"`
+	FdiProjectName  string    `gorm:"column:fdi_project_name"`
+	ProjectCarType  string    `gorm:"column:project_car_type"`
+	VehicleSourceCn string    `gorm:"column:vehicle_source_cn"`
+	Tags            string    `gorm:"column:tags"`
+	Detail          string    `gorm:"column:detail"`
+}
+
+func (r *foDashboardRepo) ListFffTrigger(ctx context.Context, param *biz.FffTriggerParam) ([]*dashboard_api.FffTriggerItem, int64, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildFffTriggerWhere(param)
+
+	var (
+		total    int64
+		rows     []*fffTriggerRow
+		countErr error
+		dataErr  error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		countSQL := "SELECT COUNT(*) FROM dwd_cfdi_basic_fff_trigger" + where
+		countErr = db.Raw(countSQL, args...).Scan(&total).Error
+	}()
+
+	go func() {
+		defer wg.Done()
+		offset := (param.Page - 1) * param.PageSize
+		// before/after 是 SQL 保留字，使用反引号转义
+		dataSQL := fmt.Sprintf(
+			"SELECT dt, uuid, event_name, anonymous_id, timestamp_utc, create_at, trigger_time, utc_diff_us,"+
+				" `before`, `after`, filter_name, trigger_type, collect_type, status, on_autopilot, function_mode,"+
+				" sw_version, project_name, car_type, vehicle_source, bj02_lat, bj02_lon, road_type,"+
+				" fdi_project_name, project_car_type, vehicle_source_cn, tags, detail"+
+				" FROM dwd_cfdi_basic_fff_trigger%s LIMIT %d OFFSET %d",
+			where, param.PageSize, offset,
+		)
+		dataErr = db.Raw(dataSQL, args...).Scan(&rows).Error
+	}()
+
+	wg.Wait()
+
+	if countErr != nil {
+		return nil, 0, countErr
+	}
+	if dataErr != nil {
+		return nil, 0, dataErr
+	}
+
+	list := make([]*dashboard_api.FffTriggerItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, toFffTriggerItem(row))
+	}
+	return list, total, nil
+}
+
+func buildFffTriggerWhere(param *biz.FffTriggerParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else if param.StartDt != "" {
+		conds = append(conds, "dt >= ?")
+		args = append(args, param.StartDt)
+	} else if param.EndDt != "" {
+		conds = append(conds, "dt <= ?")
+		args = append(args, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+
+	if param.FilterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, param.FilterName)
+	}
+	if param.EventName != "" {
+		conds = append(conds, "event_name = ?")
+		args = append(args, param.EventName)
+	}
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func toFffTriggerItem(row *fffTriggerRow) *dashboard_api.FffTriggerItem {
+	return &dashboard_api.FffTriggerItem{
+		Dt:              row.Dt.Format("2006-01-02"),
+		Uuid:            row.Uuid,
+		EventName:       row.EventName,
+		AnonymousId:     row.AnonymousId,
+		TimestampUtc:    row.TimestampUtc.Format("2006-01-02 15:04:05.999999"),
+		CreateAt:        row.CreateAt.Format("2006-01-02"),
+		TriggerTime:     row.TriggerTime,
+		UtcDiffUs:       row.UtcDiffUs,
+		Before:          row.Before,
+		After:           row.After,
+		FilterName:      row.FilterName,
+		TriggerType:     row.TriggerType,
+		CollectType:     row.CollectType,
+		Status:          row.Status,
+		OnAutopilot:     row.OnAutopilot == "true" || row.OnAutopilot == "1",
+		FunctionMode:    row.FunctionMode,
+		SwVersion:       row.SwVersion,
+		ProjectName:     row.ProjectName,
+		CarType:         row.CarType,
+		VehicleSource:   row.VehicleSource,
+		Bj02Lat:         row.Bj02Lat,
+		Bj02Lon:         row.Bj02Lon,
+		RoadType:        row.RoadType,
+		FdiProjectName:  row.FdiProjectName,
+		ProjectCarType:  row.ProjectCarType,
+		VehicleSourceCn: row.VehicleSourceCn,
+		Tags:            row.Tags,
+		Detail:          row.Detail,
+	}
+}
+
 // GetDimensions 查询 FO Dashboard 下拉维度（近 7 天），带 30 分钟内存缓存
 func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions, error) {
 	// 命中缓存直接返回

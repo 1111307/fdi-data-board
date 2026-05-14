@@ -11,6 +11,7 @@ func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
 			Urls: []Url{
 				{JsonHandlerFunc: s.GetDimensions, Path: "dimensions", Method: GET},
 				{JsonHandlerFunc: s.ListFffRunning, Path: "detail/running", Method: GET},
+				{JsonHandlerFunc: s.ListFffTrigger, Path: "detail/trigger", Method: GET},
 			},
 		},
 	}
