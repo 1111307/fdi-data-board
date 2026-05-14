@@ -9,6 +9,7 @@ func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
 		{
 			GroupAddr: "/dashboard/v1/fo/",
 			Urls: []Url{
+				{JsonHandlerFunc: s.GetDimensions, Path: "dimensions", Method: GET},
 				{JsonHandlerFunc: s.ListFffRunning, Path: "detail/running", Method: GET},
 			},
 		},

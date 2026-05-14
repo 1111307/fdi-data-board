@@ -19,6 +19,30 @@ func NewFoDashboardService(uc *biz.FoDashboardUseCase) *FoDashboardService {
 	return &FoDashboardService{uc: uc}
 }
 
+// GetDimensions godoc
+//
+//	@Summary		FO Dashboard 下拉维度（近7天活跃数据，30分钟缓存）
+//	@Tags			FoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.FoDimensionsResponse
+//	@Router			/dashboard/v1/fo/dimensions [GET]
+func (s *FoDashboardService) GetDimensions(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FoDimensionsResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	result, err := s.uc.GetDimensions(ctx)
+	if err != nil {
+		log.Errorf("GetDimensions error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	return result, nil
+}
+
 // ListFffRunning godoc
 //
 //	@Summary		筛选器运行明细

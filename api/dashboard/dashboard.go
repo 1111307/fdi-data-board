@@ -49,3 +49,11 @@ type FffRunningResponse struct {
 	PageSize int               `json:"page_size"`
 	List     []*FffRunningItem `json:"list"`
 }
+
+// FoDimensionsResponse FO Dashboard 下拉维度响应
+type FoDimensionsResponse struct {
+	BaseResponse
+	FilterNames  []string `json:"filter_names"`
+	EventNames   []string `json:"event_names"`
+	ProjectNames []string `json:"project_names"`
+}

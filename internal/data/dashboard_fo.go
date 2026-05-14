@@ -21,6 +21,15 @@ type foDashboardRepo struct {
 	*baseRepo
 }
 
+// foDimsCache 维度枚举缓存条目
+type foDimsCache struct {
+	dims      *biz.FoDimensions
+	expiresAt time.Time
+}
+
+const foDimsCacheKey = "fo_dashboard:dims"
+const foDimsCacheTTL = 30 * time.Minute
+
 func NewFoDashboardRepo(data *Data) biz.FoDashboardRepo {
 	return &foDashboardRepo{baseRepo: &baseRepo{data: data}}
 }
@@ -151,4 +160,92 @@ func toFffRunningItem(row *fffRunningRow) *dashboard_api.FffRunningItem {
 		ProjectCarType:  row.ProjectCarType,
 		VehicleSourceCn: row.VehicleSourceCn,
 	}
+}
+
+// GetDimensions 查询 FO Dashboard 下拉维度（近 7 天），带 30 分钟内存缓存
+func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions, error) {
+	// 命中缓存直接返回
+	if v, ok := r.data.dimCache.Load(foDimsCacheKey); ok {
+		entry := v.(*foDimsCache)
+		if time.Now().Before(entry.expiresAt) {
+			return entry.dims, nil
+		}
+	}
+
+	db := r.dorisDB(ctx)
+
+	var (
+		filterNames  []string
+		projectNames []string
+		eventNames   []string
+		errFilter    error
+		errProject   error
+		errEvent     error
+	)
+
+	type strRow struct{ Val string }
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+
+	go func() {
+		defer wg.Done()
+		var rows []strRow
+		errFilter = db.Raw(`SELECT DISTINCT filter_name AS val
+			FROM dwd_cfdi_basic_fff_running
+			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+			ORDER BY val`).Scan(&rows).Error
+		for _, r := range rows {
+			filterNames = append(filterNames, r.Val)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		var rows []strRow
+		errProject = db.Raw(`SELECT DISTINCT project_name AS val
+			FROM dwd_cfdi_basic_fff_running
+			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+			ORDER BY val`).Scan(&rows).Error
+		for _, r := range rows {
+			projectNames = append(projectNames, r.Val)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		var rows []strRow
+		errEvent = db.Raw(`SELECT DISTINCT event_name AS val
+			FROM dwd_cfdi_basic_fff_trigger
+			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+			ORDER BY val`).Scan(&rows).Error
+		for _, r := range rows {
+			eventNames = append(eventNames, r.Val)
+		}
+	}()
+
+	wg.Wait()
+
+	if errFilter != nil {
+		return nil, errFilter
+	}
+	if errProject != nil {
+		return nil, errProject
+	}
+	if errEvent != nil {
+		return nil, errEvent
+	}
+
+	dims := &biz.FoDimensions{
+		FilterNames:  filterNames,
+		EventNames:   eventNames,
+		ProjectNames: projectNames,
+	}
+
+	r.data.dimCache.Store(foDimsCacheKey, &foDimsCache{
+		dims:      dims,
+		expiresAt: time.Now().Add(foDimsCacheTTL),
+	})
+
+	return dims, nil
 }
