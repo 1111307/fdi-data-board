@@ -312,6 +312,394 @@ func toFffTriggerItem(row *fffTriggerRow) *dashboard_api.FffTriggerItem {
 	}
 }
 
+// fffCloseRow dwd_cfdi_basic_fff_close 扫描结构
+type fffCloseRow struct {
+	Dt              time.Time `gorm:"column:dt"`
+	FilterName      string    `gorm:"column:filter_name"`
+	Version         string    `gorm:"column:version"`
+	Reason          string    `gorm:"column:reason"`
+	AnonymousId     string    `gorm:"column:anonymous_id"`
+	CreateAt        time.Time `gorm:"column:create_at"`
+	SwVersion       string    `gorm:"column:sw_version"`
+	TimestampUtc    time.Time `gorm:"column:timestamp_utc"`
+	ProjectName     string    `gorm:"column:project_name"`
+	CarType         string    `gorm:"column:car_type"`
+	VehicleSource   string    `gorm:"column:vehicle_source"`
+	FdiProjectName  string    `gorm:"column:fdi_project_name"`
+	ProjectCarType  string    `gorm:"column:project_car_type"`
+	VehicleSourceCn string    `gorm:"column:vehicle_source_cn"`
+}
+
+func (r *foDashboardRepo) ListFffClose(ctx context.Context, param *biz.FffCloseParam) ([]*dashboard_api.FffCloseItem, int64, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildFffCloseWhere(param)
+
+	var (
+		total    int64
+		rows     []*fffCloseRow
+		countErr error
+		dataErr  error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		countSQL := "SELECT COUNT(*) FROM dwd_cfdi_basic_fff_close" + where
+		countErr = db.Raw(countSQL, args...).Scan(&total).Error
+	}()
+
+	go func() {
+		defer wg.Done()
+		offset := (param.Page - 1) * param.PageSize
+		dataSQL := fmt.Sprintf(
+			`SELECT dt, filter_name, version, reason, anonymous_id, create_at,
+			sw_version, timestamp_utc, project_name, car_type, vehicle_source,
+			fdi_project_name, project_car_type, vehicle_source_cn
+			FROM dwd_cfdi_basic_fff_close%s LIMIT %d OFFSET %d`,
+			where, param.PageSize, offset,
+		)
+		dataErr = db.Raw(dataSQL, args...).Scan(&rows).Error
+	}()
+
+	wg.Wait()
+
+	if countErr != nil {
+		return nil, 0, countErr
+	}
+	if dataErr != nil {
+		return nil, 0, dataErr
+	}
+
+	list := make([]*dashboard_api.FffCloseItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, toFffCloseItem(row))
+	}
+	return list, total, nil
+}
+
+func buildFffCloseWhere(param *biz.FffCloseParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else if param.StartDt != "" {
+		conds = append(conds, "dt >= ?")
+		args = append(args, param.StartDt)
+	} else if param.EndDt != "" {
+		conds = append(conds, "dt <= ?")
+		args = append(args, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+
+	if param.FilterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, param.FilterName)
+	}
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func toFffCloseItem(row *fffCloseRow) *dashboard_api.FffCloseItem {
+	return &dashboard_api.FffCloseItem{
+		Dt:              row.Dt.Format("2006-01-02"),
+		FilterName:      row.FilterName,
+		Version:         row.Version,
+		Reason:          row.Reason,
+		AnonymousId:     row.AnonymousId,
+		CreateAt:        row.CreateAt.Format("2006-01-02"),
+		SwVersion:       row.SwVersion,
+		TimestampUtc:    row.TimestampUtc.Format("2006-01-02 15:04:05"),
+		ProjectName:     row.ProjectName,
+		CarType:         row.CarType,
+		VehicleSource:   row.VehicleSource,
+		FdiProjectName:  row.FdiProjectName,
+		ProjectCarType:  row.ProjectCarType,
+		VehicleSourceCn: row.VehicleSourceCn,
+	}
+}
+
+// fdrTriggerRow dwd_basic_fdr_trigger 扫描结构
+// type 是 Go 关键字，用 RecordType 接收
+type fdrTriggerRow struct {
+	Dt                time.Time `gorm:"column:dt"`
+	Uuid              string    `gorm:"column:uuid"`
+	EventName         string    `gorm:"column:event_name"`
+	AnonymousId       string    `gorm:"column:anonymous_id"`
+	TimestampUtc      time.Time `gorm:"column:timestamp_utc"`
+	CreateAt          time.Time `gorm:"column:create_at"`
+	SwVersion         string    `gorm:"column:sw_version"`
+	Dse               string    `gorm:"column:dse"`
+	TdMb              string    `gorm:"column:td_mb"`
+	TmMb              string    `gorm:"column:tm_mb"`
+	TriggerTimestamp  int64     `gorm:"column:trigger_timestamp"`
+	BeginTimestampUts int64     `gorm:"column:begin_timestamp_uts"`
+	EndTimestampUts   int64     `gorm:"column:end_timestamp_uts"`
+	DumpTimestamp     int64     `gorm:"column:dump_timestamp"`
+	Status            string    `gorm:"column:status"`
+	Detail            string    `gorm:"column:detail"`
+	TimeCostMs        string    `gorm:"column:time_cost_ms"`
+	RecordType        string    `gorm:"column:type"`
+	ProjectName       string    `gorm:"column:project_name"`
+	CarType           string    `gorm:"column:car_type"`
+	VehicleSource     string    `gorm:"column:vehicle_source"`
+	FdiProjectName    string    `gorm:"column:fdi_project_name"`
+	ProjectCarType    string    `gorm:"column:project_car_type"`
+	VehicleSourceCn   string    `gorm:"column:vehicle_source_cn"`
+}
+
+func (r *foDashboardRepo) ListFdrTrigger(ctx context.Context, param *biz.FdrTriggerParam) ([]*dashboard_api.FdrTriggerItem, int64, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildFdrTriggerWhere(param)
+
+	var (
+		total    int64
+		rows     []*fdrTriggerRow
+		countErr error
+		dataErr  error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		countSQL := "SELECT COUNT(*) FROM dwd_basic_fdr_trigger" + where
+		countErr = db.Raw(countSQL, args...).Scan(&total).Error
+	}()
+
+	go func() {
+		defer wg.Done()
+		offset := (param.Page - 1) * param.PageSize
+		dataSQL := fmt.Sprintf(
+			`SELECT dt, uuid, event_name, anonymous_id, timestamp_utc, create_at, sw_version, dse,
+			td_mb, tm_mb, trigger_timestamp, begin_timestamp_uts, end_timestamp_uts, dump_timestamp,
+			status, detail, time_cost_ms, type, project_name, car_type, vehicle_source,
+			fdi_project_name, project_car_type, vehicle_source_cn
+			FROM dwd_basic_fdr_trigger%s LIMIT %d OFFSET %d`,
+			where, param.PageSize, offset,
+		)
+		dataErr = db.Raw(dataSQL, args...).Scan(&rows).Error
+	}()
+
+	wg.Wait()
+
+	if countErr != nil {
+		return nil, 0, countErr
+	}
+	if dataErr != nil {
+		return nil, 0, dataErr
+	}
+
+	list := make([]*dashboard_api.FdrTriggerItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, toFdrTriggerItem(row))
+	}
+	return list, total, nil
+}
+
+func buildFdrTriggerWhere(param *biz.FdrTriggerParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else if param.StartDt != "" {
+		conds = append(conds, "dt >= ?")
+		args = append(args, param.StartDt)
+	} else if param.EndDt != "" {
+		conds = append(conds, "dt <= ?")
+		args = append(args, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+
+	if param.FilterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, param.FilterName)
+	}
+	if param.EventName != "" {
+		conds = append(conds, "event_name = ?")
+		args = append(args, param.EventName)
+	}
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func toFdrTriggerItem(row *fdrTriggerRow) *dashboard_api.FdrTriggerItem {
+	return &dashboard_api.FdrTriggerItem{
+		Dt:                row.Dt.Format("2006-01-02"),
+		Uuid:              row.Uuid,
+		EventName:         row.EventName,
+		AnonymousId:       row.AnonymousId,
+		TimestampUtc:      row.TimestampUtc.Format("2006-01-02 15:04:05"),
+		CreateAt:          row.CreateAt.Format("2006-01-02"),
+		SwVersion:         row.SwVersion,
+		Dse:               row.Dse,
+		TdMb:              row.TdMb,
+		TmMb:              row.TmMb,
+		TriggerTimestamp:  row.TriggerTimestamp,
+		BeginTimestampUts: row.BeginTimestampUts,
+		EndTimestampUts:   row.EndTimestampUts,
+		DumpTimestamp:     row.DumpTimestamp,
+		Status:            row.Status,
+		Detail:            row.Detail,
+		TimeCostMs:        row.TimeCostMs,
+		RecordType:        row.RecordType,
+		ProjectName:       row.ProjectName,
+		CarType:           row.CarType,
+		VehicleSource:     row.VehicleSource,
+		FdiProjectName:    row.FdiProjectName,
+		ProjectCarType:    row.ProjectCarType,
+		VehicleSourceCn:   row.VehicleSourceCn,
+	}
+}
+
+// fclTriggerRow dwd_cfdi_basic_fcl_trigger 扫描结构
+type fclTriggerRow struct {
+	Dt              time.Time `gorm:"column:dt"`
+	Uuid            string    `gorm:"column:uuid"`
+	EventName       string    `gorm:"column:event_name"`
+	AnonymousId     string    `gorm:"column:anonymous_id"`
+	TimestampUtc    time.Time `gorm:"column:timestamp_utc"`
+	CreateAt        time.Time `gorm:"column:create_at"`
+	Status          string    `gorm:"column:status"`
+	Detail          string    `gorm:"column:detail"`
+	CompletePercent int       `gorm:"column:complete_percent"`
+	LocalFile       string    `gorm:"column:local_file"`
+	UploadFailTimes int       `gorm:"column:upload_fail_times"`
+	PrefixStitch    string    `gorm:"column:prefix_stitch"`
+	TriggerSource   string    `gorm:"column:trigger_source"`
+	SwVersion       string    `gorm:"column:sw_version"`
+	ProjectName     string    `gorm:"column:project_name"`
+	CarType         string    `gorm:"column:car_type"`
+	VehicleSource   string    `gorm:"column:vehicle_source"`
+	FdiProjectName  string    `gorm:"column:fdi_project_name"`
+	ProjectCarType  string    `gorm:"column:project_car_type"`
+	VehicleSourceCn string    `gorm:"column:vehicle_source_cn"`
+}
+
+func (r *foDashboardRepo) ListFclTrigger(ctx context.Context, param *biz.FclTriggerParam) ([]*dashboard_api.FclTriggerItem, int64, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildFclTriggerWhere(param)
+
+	var (
+		total    int64
+		rows     []*fclTriggerRow
+		countErr error
+		dataErr  error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		countSQL := "SELECT COUNT(*) FROM dwd_cfdi_basic_fcl_trigger" + where
+		countErr = db.Raw(countSQL, args...).Scan(&total).Error
+	}()
+
+	go func() {
+		defer wg.Done()
+		offset := (param.Page - 1) * param.PageSize
+		dataSQL := fmt.Sprintf(
+			`SELECT dt, uuid, event_name, anonymous_id, timestamp_utc, create_at,
+			status, detail, complete_percent, local_file, upload_fail_times, prefix_stitch,
+			trigger_source, sw_version, project_name, car_type, vehicle_source,
+			fdi_project_name, project_car_type, vehicle_source_cn
+			FROM dwd_cfdi_basic_fcl_trigger%s LIMIT %d OFFSET %d`,
+			where, param.PageSize, offset,
+		)
+		dataErr = db.Raw(dataSQL, args...).Scan(&rows).Error
+	}()
+
+	wg.Wait()
+
+	if countErr != nil {
+		return nil, 0, countErr
+	}
+	if dataErr != nil {
+		return nil, 0, dataErr
+	}
+
+	list := make([]*dashboard_api.FclTriggerItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, toFclTriggerItem(row))
+	}
+	return list, total, nil
+}
+
+func buildFclTriggerWhere(param *biz.FclTriggerParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else if param.StartDt != "" {
+		conds = append(conds, "dt >= ?")
+		args = append(args, param.StartDt)
+	} else if param.EndDt != "" {
+		conds = append(conds, "dt <= ?")
+		args = append(args, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+
+	if param.FilterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, param.FilterName)
+	}
+	if param.EventName != "" {
+		conds = append(conds, "event_name = ?")
+		args = append(args, param.EventName)
+	}
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func toFclTriggerItem(row *fclTriggerRow) *dashboard_api.FclTriggerItem {
+	return &dashboard_api.FclTriggerItem{
+		Dt:              row.Dt.Format("2006-01-02"),
+		Uuid:            row.Uuid,
+		EventName:       row.EventName,
+		AnonymousId:     row.AnonymousId,
+		TimestampUtc:    row.TimestampUtc.Format("2006-01-02 15:04:05"),
+		CreateAt:        row.CreateAt.Format("2006-01-02"),
+		Status:          row.Status,
+		Detail:          row.Detail,
+		CompletePercent: row.CompletePercent,
+		LocalFile:       row.LocalFile,
+		UploadFailTimes: row.UploadFailTimes,
+		PrefixStitch:    row.PrefixStitch,
+		TriggerSource:   row.TriggerSource,
+		SwVersion:       row.SwVersion,
+		ProjectName:     row.ProjectName,
+		CarType:         row.CarType,
+		VehicleSource:   row.VehicleSource,
+		FdiProjectName:  row.FdiProjectName,
+		ProjectCarType:  row.ProjectCarType,
+		VehicleSourceCn: row.VehicleSourceCn,
+	}
+}
+
 // GetDimensions 查询 FO Dashboard 下拉维度（近 7 天），带 30 分钟内存缓存
 func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions, error) {
 	// 命中缓存直接返回
