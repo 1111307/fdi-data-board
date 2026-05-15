@@ -20,7 +20,16 @@ type FoDashboardRepo interface {
 	ListFdrTrigger(ctx context.Context, param *FdrTriggerParam) ([]*dashboard_api.FdrTriggerItem, int64, error)
 	ListFclTrigger(ctx context.Context, param *FclTriggerParam) ([]*dashboard_api.FclTriggerItem, int64, error)
 	ListUuidDetail(ctx context.Context, param *UuidDetailParam) ([]*dashboard_api.UuidDetailItem, int64, error)
+	GetCloseReason(ctx context.Context, param *CloseReasonParam) ([]*dashboard_api.CloseReasonItem, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
+}
+
+// CloseReasonParam 算子关闭原因分布查询参数
+type CloseReasonParam struct {
+	FilterName  string
+	ProjectName string
+	StartDt     string
+	EndDt       string
 }
 
 // UuidDetailParam 全链路明细查询参数
@@ -296,6 +305,23 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 		Total:        total,
 		Page:         page,
 		PageSize:     pageSize,
+		List:         list,
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard_api.CloseReasonRequest) (*dashboard_api.CloseReasonResponse, error) {
+	param := &CloseReasonParam{
+		FilterName:  req.FilterName,
+		ProjectName: req.ProjectName,
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	list, err := uc.repo.GetCloseReason(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.CloseReasonResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		List:         list,
 	}, nil
 }

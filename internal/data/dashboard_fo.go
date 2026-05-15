@@ -900,6 +900,74 @@ func toUuidDetailItem(row *uuidDetailRow) *dashboard_api.UuidDetailItem {
 	}
 }
 
+// closeReasonRow 算子关闭原因聚合结果扫描结构
+type closeReasonRow struct {
+	Category string `gorm:"column:category"`
+	Cnt      int64  `gorm:"column:cnt"`
+}
+
+func (r *foDashboardRepo) GetCloseReason(ctx context.Context, param *biz.CloseReasonParam) ([]*dashboard_api.CloseReasonItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildCloseReasonWhere(param)
+
+	sql := fmt.Sprintf(`
+		SELECT
+		  CASE
+		    WHEN INSTR(reason, 'out of memory')  > 0 THEN 'out of memory'
+			WHEN INSTR(reason, 'not enough memory')  > 0 THEN 'not enough memory'
+		    WHEN INSTR(reason, 'close operator')      > 0 THEN 'close operator for crash'
+		    WHEN INSTR(reason, 'with error')     > 0 THEN 'with error'
+		    ELSE '其他'
+		  END AS category,
+		  COUNT(*) AS cnt
+		FROM dwd_cfdi_basic_fff_close%s
+		GROUP BY category
+		ORDER BY cnt DESC`, where)
+
+	var rows []*closeReasonRow
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	list := make([]*dashboard_api.CloseReasonItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, &dashboard_api.CloseReasonItem{
+			Name:  row.Category,
+			Value: row.Cnt,
+		})
+	}
+	return list, nil
+}
+
+func buildCloseReasonWhere(param *biz.CloseReasonParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else if param.StartDt != "" {
+		conds = append(conds, "dt >= ?")
+		args = append(args, param.StartDt)
+	} else if param.EndDt != "" {
+		conds = append(conds, "dt <= ?")
+		args = append(args, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+
+	if param.FilterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, param.FilterName)
+	}
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
 // GetDimensions 查询 FO Dashboard 下拉维度（近 7 天），带 30 分钟内存缓存
 func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions, error) {
 	// 命中缓存直接返回

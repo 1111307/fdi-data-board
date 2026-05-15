@@ -208,6 +208,41 @@ func (s *FoDashboardService) ListUuidDetail(ctx *gin.Context) (api.HttpResponse,
 	return result, nil
 }
 
+// GetCloseReason godoc
+//
+//	@Summary		算子关闭原因分布
+//	@Tags			FoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Param			filter_name		query	string	false	"筛选器名称"
+//	@Param			project_name	query	string	false	"项目名称"
+//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
+//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
+//	@Success		200				{object}	dashboard_api.CloseReasonResponse
+//	@Router			/dashboard/v1/fo/diag/close_reason [GET]
+func (s *FoDashboardService) GetCloseReason(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.CloseReasonResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.CloseReasonRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetCloseReason(ctx, &req)
+	if err != nil {
+		log.Errorf("GetCloseReason error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	return result, nil
+}
+
 // GetDimensions godoc
 //
 //	@Summary		FO Dashboard 下拉维度（近7天活跃数据，30分钟缓存）

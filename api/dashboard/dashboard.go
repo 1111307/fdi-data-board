@@ -292,6 +292,26 @@ type UuidDetailResponse struct {
 	List     []*UuidDetailItem `json:"list"`
 }
 
+// CloseReasonItem 算子关闭原因分布单项
+type CloseReasonItem struct {
+	Name  string `json:"name"`
+	Value int64  `json:"value"`
+}
+
+// CloseReasonRequest 算子关闭原因分布请求
+type CloseReasonRequest struct {
+	FilterName  string `form:"filter_name"`
+	ProjectName string `form:"project_name"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// CloseReasonResponse 算子关闭原因分布响应
+type CloseReasonResponse struct {
+	BaseResponse
+	List []*CloseReasonItem `json:"list"`
+}
+
 // FoDimensionsResponse FO Dashboard 下拉维度响应
 type FoDimensionsResponse struct {
 	BaseResponse
