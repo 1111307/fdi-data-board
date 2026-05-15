@@ -1348,6 +1348,7 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 		errProject = db.Raw(`SELECT DISTINCT project_name AS val
 			FROM dwd_cfdi_basic_fff_running
 			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+			AND project_name IS NOT NULL
 			ORDER BY val`).Scan(&rows).Error
 		for _, r := range rows {
 			projectNames = append(projectNames, r.Val)
