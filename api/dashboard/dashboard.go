@@ -292,6 +292,41 @@ type UuidDetailResponse struct {
 	List     []*UuidDetailItem `json:"list"`
 }
 
+// FunnelStat 数采全链路统计数字
+type FunnelStat struct {
+	FffTotal   int64   `json:"fff_total"`
+	FffAllow   int64   `json:"fff_allow"`
+	FdrSuccess int64   `json:"fdr_success"`
+	FdrFail    int64   `json:"fdr_fail"` // 直接从 FDR 表统计，避免跨表日期错位
+	FclSuccess int64   `json:"fcl_success"`
+	FclFail    int64   `json:"fcl_fail"` // 直接从 FCL 表统计
+	CfdiRate   float64 `json:"cfdi_rate"`
+}
+
+// FunnelFailReason 单条失败原因
+type FunnelFailReason struct {
+	Name  string `json:"name"`
+	Count int64  `json:"count"`
+}
+
+// FunnelRequest 数采全链路分析请求
+type FunnelRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"`
+	ProjectName string `form:"project_name"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// FunnelResponse 数采全链路分析响应
+type FunnelResponse struct {
+	BaseResponse
+	Stat    *FunnelStat         `json:"stat"`
+	FffFail []*FunnelFailReason `json:"fff_fail"`
+	FdrFail []*FunnelFailReason `json:"fdr_fail"`
+	FclFail []*FunnelFailReason `json:"fcl_fail"`
+}
+
 // StageTrendSeries 单条时序数据
 type StageTrendSeries struct {
 	Name string  `json:"name"`

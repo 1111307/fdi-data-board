@@ -14,6 +14,7 @@ const (
 
 // FoDashboardRepo FO Dashboard 数据仓储接口
 type FoDashboardRepo interface {
+	GetFunnel(ctx context.Context, param *FunnelParam) (*FunnelData, error)
 	ListFffRunning(ctx context.Context, param *FffRunningParam) ([]*dashboard_api.FffRunningItem, int64, error)
 	ListFffTrigger(ctx context.Context, param *FffTriggerParam) ([]*dashboard_api.FffTriggerItem, int64, error)
 	ListFffClose(ctx context.Context, param *FffCloseParam) ([]*dashboard_api.FffCloseItem, int64, error)
@@ -23,6 +24,23 @@ type FoDashboardRepo interface {
 	GetCloseReason(ctx context.Context, param *CloseReasonParam) ([]*dashboard_api.CloseReasonItem, error)
 	GetStageTrend(ctx context.Context, param *StageTrendParam) (*StageTrendData, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
+}
+
+// FunnelParam 数采全链路分析查询参数
+type FunnelParam struct {
+	FilterName  string
+	EventNames  []string
+	ProjectName string
+	StartDt     string
+	EndDt       string
+}
+
+// FunnelData biz 层聚合结果
+type FunnelData struct {
+	Stat    *dashboard_api.FunnelStat
+	FffFail []*dashboard_api.FunnelFailReason
+	FdrFail []*dashboard_api.FunnelFailReason
+	FclFail []*dashboard_api.FunnelFailReason
 }
 
 // StageTrendParam 三阶段触发趋势查询参数
@@ -341,6 +359,27 @@ func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard
 	return &dashboard_api.CloseReasonResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		List:         list,
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) GetFunnel(ctx context.Context, req *dashboard_api.FunnelRequest) (*dashboard_api.FunnelResponse, error) {
+	param := &FunnelParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	data, err := uc.repo.GetFunnel(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.FunnelResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Stat:         data.Stat,
+		FffFail:      data.FffFail,
+		FdrFail:      data.FdrFail,
+		FclFail:      data.FclFail,
 	}, nil
 }
 

@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"sync"
@@ -980,6 +981,146 @@ type stageTrendRow struct {
 	CatOther int64     `gorm:"column:cat_other"`
 }
 
+// funnelFffRow FFF trigger 单行聚合结果
+type funnelFffRow struct {
+	Total int64 `gorm:"column:total"`
+	Allow int64 `gorm:"column:allow"`
+	R1    int64 `gorm:"column:r1"` // 冷却丢弃
+	R2    int64 `gorm:"column:r2"` // DRM Quota
+	R3    int64 `gorm:"column:r3"` // 触发上限
+	R4    int64 `gorm:"column:r4"` // 数采限制
+	R5    int64 `gorm:"column:r5"` // 其他丢弃
+}
+
+// funnelStageRow FDR/FCL 单行聚合结果
+type funnelStageRow struct {
+	StageSuccess int64 `gorm:"column:stage_success"`
+	R1           int64 `gorm:"column:r1"`
+	R2           int64 `gorm:"column:r2"`
+	R3           int64 `gorm:"column:r3"`
+	R4           int64 `gorm:"column:r4"`
+	R5           int64 `gorm:"column:r5"`
+}
+
+func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam) (*biz.FunnelData, error) {
+	db := r.dorisDB(ctx)
+
+	// 复用 stage_trend 的 WHERE 构建函数，FunnelParam 和 StageTrendParam 字段相同
+	stageParam := &biz.StageTrendParam{
+		FilterName:  param.FilterName,
+		EventNames:  param.EventNames,
+		ProjectName: param.ProjectName,
+		StartDt:     param.StartDt,
+		EndDt:       param.EndDt,
+	}
+	fffWhere, fffArgs := buildStageFffWhere(stageParam)
+	comWhere, comArgs := buildStageCommonWhere(stageParam)
+
+	fffSQL := `SELECT
+		COUNT(*) AS total,
+		SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS allow,
+		SUM(CASE WHEN status='discard' AND detail='check_is_no_need_cooldown' THEN 1 ELSE 0 END) AS r1,
+		SUM(CASE WHEN status='discard' AND detail IN ('check_drm_quota','check_drm_quota_weight') THEN 1 ELSE 0 END) AS r2,
+		SUM(CASE WHEN status='discard' AND detail='check_not_reach_trigger_maximum' THEN 1 ELSE 0 END) AS r3,
+		SUM(CASE WHEN status='discard' AND detail='check_need_acquire_data' THEN 1 ELSE 0 END) AS r4,
+		SUM(CASE WHEN status='discard'
+			AND detail NOT IN ('check_is_no_need_cooldown','check_drm_quota','check_drm_quota_weight',
+			                   'check_not_reach_trigger_maximum','check_need_acquire_data')
+			THEN 1 ELSE 0 END) AS r5
+		FROM dwd_cfdi_basic_fff_trigger` + fffWhere
+
+	fdrSQL := `SELECT
+		SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS stage_success,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'because of full gc')>0 THEN 1 ELSE 0 END) AS r1,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'do not recognized')>0 THEN 1 ELSE 0 END) AS r2,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'mem pool water line')>0 THEN 1 ELSE 0 END) AS r3,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'Bag invalid')>0 THEN 1 ELSE 0 END) AS r4,
+		SUM(CASE WHEN status='discard'
+			AND INSTR(detail,'because of full gc')=0 AND INSTR(detail,'do not recognized')=0
+			AND INSTR(detail,'mem pool water line')=0 AND INSTR(detail,'Bag invalid')=0
+			THEN 1 ELSE 0 END) AS r5
+		FROM dwd_basic_fdr_trigger` + comWhere
+
+	fclSQL := `SELECT
+		COUNT(DISTINCT CASE WHEN status='success' THEN concat_ws('|', anonymous_id, local_file) end) AS stage_success,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'geofence forbidden')>0 THEN 1 ELSE 0 END) AS r1,
+		SUM(CASE WHEN status='discard' AND (INSTR(detail,'bag not exist')>0 OR INSTR(detail,'meta file lost')>0) THEN 1 ELSE 0 END) AS r2,
+		SUM(CASE WHEN status='discard' AND (INSTR(detail,'reach upload limit')>0 OR INSTR(detail,'Filter quota exceeded')>0) THEN 1 ELSE 0 END) AS r3,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'EventName is in blacklist')>0 THEN 1 ELSE 0 END) AS r4,
+		SUM(CASE WHEN status='discard'
+			AND INSTR(detail,'geofence forbidden')=0 AND INSTR(detail,'bag not exist')=0
+			AND INSTR(detail,'meta file lost')=0 AND INSTR(detail,'reach upload limit')=0
+			AND INSTR(detail,'Filter quota exceeded')=0 AND INSTR(detail,'EventName is in blacklist')=0
+			THEN 1 ELSE 0 END) AS r5
+		FROM dwd_cfdi_basic_fcl_trigger` + comWhere + ` AND trigger_source != 'Forever_log'`
+
+	var (
+		fffRow funnelFffRow
+		fdrRow funnelStageRow
+		fclRow funnelStageRow
+		fffErr error
+		fdrErr error
+		fclErr error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() { defer wg.Done(); fffErr = db.Raw(fffSQL, fffArgs...).Scan(&fffRow).Error }()
+	go func() { defer wg.Done(); fdrErr = db.Raw(fdrSQL, comArgs...).Scan(&fdrRow).Error }()
+	go func() { defer wg.Done(); fclErr = db.Raw(fclSQL, comArgs...).Scan(&fclRow).Error }()
+	wg.Wait()
+
+	if fffErr != nil {
+		return nil, fffErr
+	}
+	if fdrErr != nil {
+		return nil, fdrErr
+	}
+	if fclErr != nil {
+		return nil, fclErr
+	}
+
+	cfdiRate := 0.0
+	if fffRow.Total > 0 {
+		cfdiRate = math.Round(float64(fclRow.StageSuccess)/float64(fffRow.Total)*1000) / 10
+	}
+
+	mkReasons := func(names []string, counts []int64) []*dashboard_api.FunnelFailReason {
+		list := make([]*dashboard_api.FunnelFailReason, 0, len(names))
+		for i, name := range names {
+			if i < len(counts) && counts[i] > 0 {
+				list = append(list, &dashboard_api.FunnelFailReason{Name: name, Count: counts[i]})
+			}
+		}
+		sort.Slice(list, func(i, j int) bool { return list[i].Count > list[j].Count })
+		return list
+	}
+
+	return &biz.FunnelData{
+		Stat: &dashboard_api.FunnelStat{
+			FffTotal:   fffRow.Total,
+			FffAllow:   fffRow.Allow,
+			FdrSuccess: fdrRow.StageSuccess,
+			FdrFail:    fdrRow.R1 + fdrRow.R2 + fdrRow.R3 + fdrRow.R4 + fdrRow.R5,
+			FclSuccess: fclRow.StageSuccess,
+			FclFail:    fclRow.R1 + fclRow.R2 + fclRow.R3 + fclRow.R4 + fclRow.R5,
+			CfdiRate:   cfdiRate,
+		},
+		FffFail: mkReasons(
+			[]string{"冷却丢弃", "DRM Quota", "触发上限", "数采限制", "其他丢弃"},
+			[]int64{fffRow.R1, fffRow.R2, fffRow.R3, fffRow.R4, fffRow.R5},
+		),
+		FdrFail: mkReasons(
+			[]string{"Full GC", "事件不识别", "内存限制", "Bag Invalid", "其他丢弃"},
+			[]int64{fdrRow.R1, fdrRow.R2, fdrRow.R3, fdrRow.R4, fdrRow.R5},
+		),
+		FclFail: mkReasons(
+			[]string{"Geofence限制", "bag/meta丢失", "上传Quota", "事件黑名单", "其他丢弃"},
+			[]int64{fclRow.R1, fclRow.R2, fclRow.R3, fclRow.R4, fclRow.R5},
+		),
+	}, nil
+}
+
 func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
 	db := r.dorisDB(ctx)
 
@@ -1011,7 +1152,7 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		FROM dwd_basic_fdr_trigger` + comWhere + ` GROUP BY dt ORDER BY dt ASC`
 
 	fclSQL := `SELECT dt,
-		SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS success,
+		COUNT(DISTINCT CASE WHEN status='success' THEN concat_ws('|', anonymous_id, local_file) end) AS stage_success,
 		SUM(CASE WHEN status='discard' AND INSTR(detail,'geofence forbidden')>0 THEN 1 ELSE 0 END) AS cat2,
 		SUM(CASE WHEN status='discard' AND (INSTR(detail,'bag not exist')>0 OR INSTR(detail,'meta file lost')>0) THEN 1 ELSE 0 END) AS cat3,
 		SUM(CASE WHEN status='discard' AND (INSTR(detail,'reach upload limit')>0 OR INSTR(detail,'Filter quota exceeded')>0) THEN 1 ELSE 0 END) AS cat4,

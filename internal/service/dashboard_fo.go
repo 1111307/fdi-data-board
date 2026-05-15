@@ -208,6 +208,42 @@ func (s *FoDashboardService) ListUuidDetail(ctx *gin.Context) (api.HttpResponse,
 	return result, nil
 }
 
+// GetFunnel godoc
+//
+//	@Summary		数采全链路分析（节点统计 + 失败原因）
+//	@Tags			FoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Param			filter_name		query	string	false	"筛选器名称"
+//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
+//	@Param			project_name	query	string	false	"项目名称"
+//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD，不传默认当天"
+//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
+//	@Success		200				{object}	dashboard_api.FunnelResponse
+//	@Router			/dashboard/v1/fo/diag/funnel [GET]
+func (s *FoDashboardService) GetFunnel(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FunnelResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FunnelRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetFunnel(ctx, &req)
+	if err != nil {
+		log.Errorf("GetFunnel error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	return result, nil
+}
+
 // GetStageTrend godoc
 //
 //	@Summary		三阶段触发趋势（FFF/FDR/FCL 按日期聚合，堆叠柱图）
