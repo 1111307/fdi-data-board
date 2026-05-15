@@ -7,10 +7,11 @@ import (
 func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
 	return []GroupUrl{
 		{
-			// 公共维度接口，FO 和 DO 共用
+			// 公共接口，FO 和 DO 共用
 			GroupAddr: "/dashboard/v1/",
 			Urls: []Url{
 				{JsonHandlerFunc: s.GetDimensions, Path: "dimensions", Method: GET},
+				{JsonHandlerFunc: s.GetFunnel, Path: "diag/funnel", Method: GET},
 			},
 		},
 		{
@@ -22,7 +23,6 @@ func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
 				{JsonHandlerFunc: s.ListFdrTrigger, Path: "detail/fdr", Method: GET},
 				{JsonHandlerFunc: s.ListFclTrigger, Path: "detail/fcl", Method: GET},
 				{JsonHandlerFunc: s.ListUuidDetail, Path: "detail/uuid", Method: GET},
-				{JsonHandlerFunc: s.GetFunnel, Path: "diag/funnel", Method: GET},
 				{JsonHandlerFunc: s.GetStageTrend, Path: "diag/stage_trend", Method: GET},
 				{JsonHandlerFunc: s.GetCloseReason, Path: "diag/close_reason", Method: GET},
 			},
