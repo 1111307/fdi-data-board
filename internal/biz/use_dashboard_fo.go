@@ -124,11 +124,12 @@ type FffTriggerParam struct {
 	PageSize    int
 }
 
-// FoDimensions 维度枚举数据
+// FoDimensions 维度枚举数据（FO/DO 公共）
 type FoDimensions struct {
 	FilterNames  []string
 	EventNames   []string
 	ProjectNames []string
+	CarTypes     []string
 }
 
 // FffRunningParam 筛选器运行明细查询参数
@@ -414,6 +415,7 @@ func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context) (*dashboard_api
 		FilterNames:  dims.FilterNames,
 		EventNames:   dims.EventNames,
 		ProjectNames: dims.ProjectNames,
+		CarTypes:     dims.CarTypes,
 	}, nil
 }
 

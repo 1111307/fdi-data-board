@@ -371,10 +371,14 @@ type CloseReasonResponse struct {
 	List []*CloseReasonItem `json:"list"`
 }
 
-// FoDimensionsResponse FO Dashboard 下拉维度响应
-type FoDimensionsResponse struct {
+// DimensionsResponse FO/DO Dashboard 公共下拉维度响应
+type DimensionsResponse struct {
 	BaseResponse
 	FilterNames  []string `json:"filter_names"`
 	EventNames   []string `json:"event_names"`
 	ProjectNames []string `json:"project_names"`
+	CarTypes     []string `json:"car_types"`
 }
+
+// FoDimensionsResponse 兼容别名，防止旧引用编译报错
+type FoDimensionsResponse = DimensionsResponse

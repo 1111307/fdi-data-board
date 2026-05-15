@@ -7,9 +7,15 @@ import (
 func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
 	return []GroupUrl{
 		{
-			GroupAddr: "/dashboard/v1/fo/",
+			// 公共维度接口，FO 和 DO 共用
+			GroupAddr: "/dashboard/v1/",
 			Urls: []Url{
 				{JsonHandlerFunc: s.GetDimensions, Path: "dimensions", Method: GET},
+			},
+		},
+		{
+			GroupAddr: "/dashboard/v1/fo/",
+			Urls: []Url{
 				{JsonHandlerFunc: s.ListFffRunning, Path: "detail/running", Method: GET},
 				{JsonHandlerFunc: s.ListFffTrigger, Path: "detail/trigger", Method: GET},
 				{JsonHandlerFunc: s.ListFffClose, Path: "detail/close", Method: GET},

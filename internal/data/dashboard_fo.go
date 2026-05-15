@@ -1320,15 +1320,17 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 		filterNames  []string
 		projectNames []string
 		eventNames   []string
+		carTypes     []string
 		errFilter    error
 		errProject   error
 		errEvent     error
+		errCarType   error
 	)
 
 	type strRow struct{ Val string }
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(4)
 
 	go func() {
 		defer wg.Done()
@@ -1367,6 +1369,19 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 		}
 	}()
 
+	go func() {
+		defer wg.Done()
+		var rows []strRow
+		errCarType = db.Raw(`SELECT DISTINCT car_type AS val
+			FROM dwd_cfdi_basic_fff_running
+			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+			AND car_type IS NOT NULL
+			ORDER BY val`).Scan(&rows).Error
+		for _, r := range rows {
+			carTypes = append(carTypes, r.Val)
+		}
+	}()
+
 	wg.Wait()
 
 	if errFilter != nil {
@@ -1378,11 +1393,15 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 	if errEvent != nil {
 		return nil, errEvent
 	}
+	if errCarType != nil {
+		return nil, errCarType
+	}
 
 	dims := &biz.FoDimensions{
 		FilterNames:  filterNames,
 		EventNames:   eventNames,
 		ProjectNames: projectNames,
+		CarTypes:     carTypes,
 	}
 
 	r.data.dimCache.Store(foDimsCacheKey, &foDimsCache{
