@@ -292,6 +292,30 @@ type UuidDetailResponse struct {
 	List     []*UuidDetailItem `json:"list"`
 }
 
+// StageTrendSeries 单条时序数据
+type StageTrendSeries struct {
+	Name string  `json:"name"`
+	Data []int64 `json:"data"`
+}
+
+// StageTrendRequest 三阶段触发趋势请求
+type StageTrendRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
+	ProjectName string `form:"project_name"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// StageTrendResponse 三阶段触发趋势响应
+type StageTrendResponse struct {
+	BaseResponse
+	Dates []string           `json:"dates"`
+	Fff   []*StageTrendSeries `json:"fff"`
+	Fdr   []*StageTrendSeries `json:"fdr"`
+	Fcl   []*StageTrendSeries `json:"fcl"`
+}
+
 // CloseReasonItem 算子关闭原因分布单项
 type CloseReasonItem struct {
 	Name  string `json:"name"`

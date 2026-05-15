@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -966,6 +967,200 @@ func buildCloseReasonWhere(param *biz.CloseReasonParam) (string, []interface{}) 
 	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+// stageTrendRow 三阶段趋势聚合结果（三张表共用同一扫描结构）
+type stageTrendRow struct {
+	Dt       time.Time `gorm:"column:dt"`
+	Success  int64     `gorm:"column:success"`
+	Cat2     int64     `gorm:"column:cat2"`
+	Cat3     int64     `gorm:"column:cat3"`
+	Cat4     int64     `gorm:"column:cat4"`
+	Cat5     int64     `gorm:"column:cat5"`
+	CatOther int64     `gorm:"column:cat_other"`
+}
+
+func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
+	db := r.dorisDB(ctx)
+
+	fffWhere, fffArgs := buildStageFffWhere(param)
+	comWhere, comArgs := buildStageCommonWhere(param) // FDR/FCL 无 filter_name 列
+
+	fffSQL := `SELECT dt,
+		SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS success,
+		SUM(CASE WHEN status='discard' AND detail='check_is_no_need_cooldown' THEN 1 ELSE 0 END) AS cat2,
+		SUM(CASE WHEN status='discard' AND detail IN ('check_drm_quota','check_drm_quota_weight') THEN 1 ELSE 0 END) AS cat3,
+		SUM(CASE WHEN status='discard' AND detail='check_not_reach_trigger_maximum' THEN 1 ELSE 0 END) AS cat4,
+		SUM(CASE WHEN status='discard' AND detail='check_need_acquire_data' THEN 1 ELSE 0 END) AS cat5,
+		SUM(CASE WHEN status='discard'
+			AND detail NOT IN ('check_is_no_need_cooldown','check_drm_quota','check_drm_quota_weight',
+			                   'check_not_reach_trigger_maximum','check_need_acquire_data')
+			THEN 1 ELSE 0 END) AS cat_other
+		FROM dwd_cfdi_basic_fff_trigger` + fffWhere + ` GROUP BY dt ORDER BY dt ASC`
+
+	fdrSQL := `SELECT dt,
+		SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS success,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'because of full gc')>0 THEN 1 ELSE 0 END) AS cat2,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'do not recognized')>0 THEN 1 ELSE 0 END) AS cat3,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'mem pool water line')>0 THEN 1 ELSE 0 END) AS cat4,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'Bag invalid')>0 THEN 1 ELSE 0 END) AS cat5,
+		SUM(CASE WHEN status='discard'
+			AND INSTR(detail,'because of full gc')=0 AND INSTR(detail,'do not recognized')=0
+			AND INSTR(detail,'mem pool water line')=0 AND INSTR(detail,'Bag invalid')=0
+			THEN 1 ELSE 0 END) AS cat_other
+		FROM dwd_basic_fdr_trigger` + comWhere + ` GROUP BY dt ORDER BY dt ASC`
+
+	fclSQL := `SELECT dt,
+		SUM(CASE WHEN status='success' THEN 1 ELSE 0 END) AS success,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'geofence forbidden')>0 THEN 1 ELSE 0 END) AS cat2,
+		SUM(CASE WHEN status='discard' AND (INSTR(detail,'bag not exist')>0 OR INSTR(detail,'meta file lost')>0) THEN 1 ELSE 0 END) AS cat3,
+		SUM(CASE WHEN status='discard' AND (INSTR(detail,'reach upload limit')>0 OR INSTR(detail,'Filter quota exceeded')>0) THEN 1 ELSE 0 END) AS cat4,
+		SUM(CASE WHEN status='discard' AND INSTR(detail,'EventName is in blacklist')>0 THEN 1 ELSE 0 END) AS cat5,
+		SUM(CASE WHEN status='discard'
+			AND INSTR(detail,'geofence forbidden')=0 AND INSTR(detail,'bag not exist')=0
+			AND INSTR(detail,'meta file lost')=0 AND INSTR(detail,'reach upload limit')=0
+			AND INSTR(detail,'Filter quota exceeded')=0 AND INSTR(detail,'EventName is in blacklist')=0
+			THEN 1 ELSE 0 END) AS cat_other
+		FROM dwd_cfdi_basic_fcl_trigger` + comWhere + ` GROUP BY dt ORDER BY dt ASC`
+
+	var (
+		fffRows []*stageTrendRow
+		fdrRows []*stageTrendRow
+		fclRows []*stageTrendRow
+		fffErr  error
+		fdrErr  error
+		fclErr  error
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() { defer wg.Done(); fffErr = db.Raw(fffSQL, fffArgs...).Scan(&fffRows).Error }()
+	go func() { defer wg.Done(); fdrErr = db.Raw(fdrSQL, comArgs...).Scan(&fdrRows).Error }()
+	go func() { defer wg.Done(); fclErr = db.Raw(fclSQL, comArgs...).Scan(&fclRows).Error }()
+	wg.Wait()
+
+	if fffErr != nil {
+		return nil, fffErr
+	}
+	if fdrErr != nil {
+		return nil, fdrErr
+	}
+	if fclErr != nil {
+		return nil, fclErr
+	}
+
+	dates, fffMap, fdrMap, fclMap := alignStageDates(fffRows, fdrRows, fclRows)
+
+	return &biz.StageTrendData{
+		Dates: dates,
+		Fff:   buildStageSeries(dates, fffMap, []string{"FFF 成功", "冷却丢弃", "DRM Quota", "触发上限", "数采限制", "其他丢弃"}),
+		Fdr:   buildStageSeries(dates, fdrMap, []string{"FDR 成功", "Full GC", "事件不识别", "内存水位", "Bag Invalid", "其他丢弃"}),
+		Fcl:   buildStageSeries(dates, fclMap, []string{"FCL 成功", "Geofence限制", "bag/meta丢失", "上传Quota", "事件黑名单", "其他丢弃"}),
+	}, nil
+}
+
+func alignStageDates(fffRows, fdrRows, fclRows []*stageTrendRow) (
+	dates []string,
+	fffMap, fdrMap, fclMap map[string]*stageTrendRow,
+) {
+	dateSet := map[string]bool{}
+	fffMap = map[string]*stageTrendRow{}
+	fdrMap = map[string]*stageTrendRow{}
+	fclMap = map[string]*stageTrendRow{}
+
+	for _, row := range fffRows {
+		dt := row.Dt.Format("2006-01-02")
+		dateSet[dt] = true
+		fffMap[dt] = row
+	}
+	for _, row := range fdrRows {
+		dt := row.Dt.Format("2006-01-02")
+		dateSet[dt] = true
+		fdrMap[dt] = row
+	}
+	for _, row := range fclRows {
+		dt := row.Dt.Format("2006-01-02")
+		dateSet[dt] = true
+		fclMap[dt] = row
+	}
+	for d := range dateSet {
+		dates = append(dates, d)
+	}
+	sort.Strings(dates)
+	return
+}
+
+func buildStageSeries(dates []string, rowMap map[string]*stageTrendRow, names []string) []*dashboard_api.StageTrendSeries {
+	series := make([]*dashboard_api.StageTrendSeries, len(names))
+	for i, name := range names {
+		series[i] = &dashboard_api.StageTrendSeries{Name: name, Data: make([]int64, len(dates))}
+	}
+	for i, dt := range dates {
+		row, ok := rowMap[dt]
+		if !ok {
+			continue
+		}
+		vals := []int64{row.Success, row.Cat2, row.Cat3, row.Cat4, row.Cat5, row.CatOther}
+		for j, v := range vals {
+			if j < len(series) {
+				series[j].Data[i] = v
+			}
+		}
+	}
+	return series
+}
+
+func buildStageFffWhere(param *biz.StageTrendParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+	conds, args = appendStageDateCond(conds, args, param.StartDt, param.EndDt)
+	if param.FilterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, param.FilterName)
+	}
+	conds, args = appendStageEventCond(conds, args, param.EventNames)
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func buildStageCommonWhere(param *biz.StageTrendParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+	conds, args = appendStageDateCond(conds, args, param.StartDt, param.EndDt)
+	conds, args = appendStageEventCond(conds, args, param.EventNames)
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func appendStageDateCond(conds []string, args []interface{}, startDt, endDt string) ([]string, []interface{}) {
+	if startDt != "" && endDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, startDt, endDt)
+	} else {
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
+	}
+	return conds, args
+}
+
+func appendStageEventCond(conds []string, args []interface{}, eventNames []string) ([]string, []interface{}) {
+	if len(eventNames) == 1 {
+		conds = append(conds, "event_name = ?")
+		args = append(args, eventNames[0])
+	} else if len(eventNames) > 1 {
+		placeholders := strings.Repeat("?,", len(eventNames))
+		placeholders = placeholders[:len(placeholders)-1]
+		conds = append(conds, "event_name IN ("+placeholders+")")
+		for _, e := range eventNames {
+			args = append(args, e)
+		}
+	}
+	return conds, args
 }
 
 // GetDimensions 查询 FO Dashboard 下拉维度（近 7 天），带 30 分钟内存缓存

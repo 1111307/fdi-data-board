@@ -16,6 +16,7 @@ func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
 				{JsonHandlerFunc: s.ListFdrTrigger, Path: "detail/fdr", Method: GET},
 				{JsonHandlerFunc: s.ListFclTrigger, Path: "detail/fcl", Method: GET},
 				{JsonHandlerFunc: s.ListUuidDetail, Path: "detail/uuid", Method: GET},
+				{JsonHandlerFunc: s.GetStageTrend, Path: "diag/stage_trend", Method: GET},
 				{JsonHandlerFunc: s.GetCloseReason, Path: "diag/close_reason", Method: GET},
 			},
 		},

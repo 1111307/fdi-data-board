@@ -21,7 +21,25 @@ type FoDashboardRepo interface {
 	ListFclTrigger(ctx context.Context, param *FclTriggerParam) ([]*dashboard_api.FclTriggerItem, int64, error)
 	ListUuidDetail(ctx context.Context, param *UuidDetailParam) ([]*dashboard_api.UuidDetailItem, int64, error)
 	GetCloseReason(ctx context.Context, param *CloseReasonParam) ([]*dashboard_api.CloseReasonItem, error)
+	GetStageTrend(ctx context.Context, param *StageTrendParam) (*StageTrendData, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
+}
+
+// StageTrendParam 三阶段触发趋势查询参数
+type StageTrendParam struct {
+	FilterName  string
+	EventNames  []string
+	ProjectName string
+	StartDt     string
+	EndDt       string
+}
+
+// StageTrendData biz 层聚合结果
+type StageTrendData struct {
+	Dates []string
+	Fff   []*dashboard_api.StageTrendSeries
+	Fdr   []*dashboard_api.StageTrendSeries
+	Fcl   []*dashboard_api.StageTrendSeries
 }
 
 // CloseReasonParam 算子关闭原因分布查询参数
@@ -323,6 +341,27 @@ func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard
 	return &dashboard_api.CloseReasonResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		List:         list,
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) GetStageTrend(ctx context.Context, req *dashboard_api.StageTrendRequest) (*dashboard_api.StageTrendResponse, error) {
+	param := &StageTrendParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	data, err := uc.repo.GetStageTrend(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.StageTrendResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Dates:        data.Dates,
+		Fff:          data.Fff,
+		Fdr:          data.Fdr,
+		Fcl:          data.Fcl,
 	}, nil
 }
 
