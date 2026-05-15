@@ -1152,7 +1152,7 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		FROM dwd_basic_fdr_trigger` + comWhere + ` GROUP BY dt ORDER BY dt ASC`
 
 	fclSQL := `SELECT dt,
-		COUNT(DISTINCT CASE WHEN status='success' THEN concat_ws('|', anonymous_id, local_file) end) AS stage_success,
+		COUNT(DISTINCT CASE WHEN status='success' THEN concat_ws('|', anonymous_id, local_file) end) AS Success,
 		SUM(CASE WHEN status='discard' AND INSTR(detail,'geofence forbidden')>0 THEN 1 ELSE 0 END) AS cat2,
 		SUM(CASE WHEN status='discard' AND (INSTR(detail,'bag not exist')>0 OR INSTR(detail,'meta file lost')>0) THEN 1 ELSE 0 END) AS cat3,
 		SUM(CASE WHEN status='discard' AND (INSTR(detail,'reach upload limit')>0 OR INSTR(detail,'Filter quota exceeded')>0) THEN 1 ELSE 0 END) AS cat4,
@@ -1162,7 +1162,7 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 			AND INSTR(detail,'meta file lost')=0 AND INSTR(detail,'reach upload limit')=0
 			AND INSTR(detail,'Filter quota exceeded')=0 AND INSTR(detail,'EventName is in blacklist')=0
 			THEN 1 ELSE 0 END) AS cat_other
-		FROM dwd_cfdi_basic_fcl_trigger` + comWhere + ` GROUP BY dt ORDER BY dt ASC`
+		FROM dwd_cfdi_basic_fcl_trigger` + comWhere + ` AND trigger_source != 'Forever_log' GROUP BY dt ORDER BY dt ASC`
 
 	var (
 		fffRows []*stageTrendRow
@@ -1195,7 +1195,7 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 	return &biz.StageTrendData{
 		Dates: dates,
 		Fff:   buildStageSeries(dates, fffMap, []string{"FFF 成功", "冷却丢弃", "DRM Quota", "触发上限", "数采限制", "其他丢弃"}),
-		Fdr:   buildStageSeries(dates, fdrMap, []string{"FDR 成功", "Full GC", "事件不识别", "内存水位", "Bag Invalid", "其他丢弃"}),
+		Fdr:   buildStageSeries(dates, fdrMap, []string{"FDR 成功", "Full GC", "事件不识别", "内存限制", "Bag Invalid", "其他丢弃"}),
 		Fcl:   buildStageSeries(dates, fclMap, []string{"FCL 成功", "Geofence限制", "bag/meta丢失", "上传Quota", "事件黑名单", "其他丢弃"}),
 	}, nil
 }
