@@ -431,6 +431,28 @@ type DimensionsResponse struct {
 // FoDimensionsResponse 兼容别名，防止旧引用编译报错
 type FoDimensionsResponse = DimensionsResponse
 
+// DoCoolTopItem 冷却 Top 筛选器单条
+type DoCoolTopItem struct {
+	FilterName string `json:"filter_name"`
+	Count      int64  `json:"count"`
+}
+
+// DoCoolTopRequest 冷却 Top 筛选器请求
+type DoCoolTopRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"`
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// DoCoolTopResponse 冷却 Top 筛选器响应
+type DoCoolTopResponse struct {
+	BaseResponse
+	List []*DoCoolTopItem `json:"list"`
+}
+
 // DoFailReasonItem 失败原因分析单条
 type DoFailReasonItem struct {
 	Name  string `json:"name"`

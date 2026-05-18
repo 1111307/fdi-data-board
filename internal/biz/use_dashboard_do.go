@@ -12,6 +12,17 @@ type DoDashboardRepo interface {
 	GetOverview(ctx context.Context, param *DoOverviewParam) ([]*dashboard_api.DoOverviewItem, error)
 	GetTrend(ctx context.Context, param *DoTrendParam) (*DoTrendData, error)
 	GetFailReason(ctx context.Context, param *DoFailReasonParam) ([]*dashboard_api.DoFailReasonItem, error)
+	GetCoolTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
+}
+
+// DoCommonParam 通用查询参数（无特殊字段的 Top 类接口复用）
+type DoCommonParam struct {
+	FilterName  string
+	EventNames  []string
+	ProjectName string
+	CarTypes    []string
+	StartDt     string
+	EndDt       string
 }
 
 // DoFailReasonParam 失败原因分析查询参数
@@ -97,6 +108,25 @@ func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.D
 		Dates:         data.Dates,
 		SuccessCounts: data.SuccessCounts,
 		SuccessRates:  data.SuccessRates,
+	}, nil
+}
+
+func (uc *DoDashboardUseCase) GetCoolTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoCoolTopResponse, error) {
+	param := &DoCommonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitNames(req.CarTypes),
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	list, err := uc.repo.GetCoolTop(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoCoolTopResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         list,
 	}, nil
 }
 

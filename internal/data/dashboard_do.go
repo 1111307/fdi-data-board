@@ -143,7 +143,7 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 		GROUP BY fdr_detail
 		UNION ALL
 		SELECT 'FCL' AS stage, fcl_detail AS detail, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fdr_status = 'success' AND fcl_status != 'success AND fcl_detail IS NOT NULL
+		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fdr_status = 'success' AND fcl_status != 'success' AND fcl_detail IS NOT NULL
 		GROUP BY fcl_detail
 		ORDER BY stage, cnt DESC`
 
@@ -159,6 +159,32 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 			Name:  name,
 			Value: row.Cnt,
 		})
+	}
+	return list, nil
+}
+
+func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT filter_name, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status != 'success' AND fff_detail = 'check_is_no_need_cooldown' AND filter_name IS NOT NULL
+		GROUP BY filter_name
+		ORDER BY cnt DESC
+		LIMIT 20`
+
+	type row struct {
+		FilterName string `gorm:"column:filter_name"`
+		Cnt        int64  `gorm:"column:cnt"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	list := make([]*dashboard_api.DoCoolTopItem, 0, len(rows))
+	for _, r := range rows {
+		list = append(list, &dashboard_api.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
 	}
 	return list, nil
 }
