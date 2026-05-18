@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -535,6 +536,193 @@ func (r *doDashboardRepo) GetFclBw(ctx context.Context, param *biz.DoCommonParam
 	resp.Dates = dates
 	resp.Values = values
 	return resp, nil
+}
+
+// vehicleStatsRow 车辆统计聚合行
+type vehicleStatsRow struct {
+	AnonymousId  string  `gorm:"column:anonymous_id"`
+	CarType      string  `gorm:"column:car_type"`
+	ProjectName  string  `gorm:"column:project_name"`
+	TriggerCount int64   `gorm:"column:trigger_count"`
+	SuccessCount int64   `gorm:"column:success_count"`
+	CfdiRate     float64 `gorm:"column:cfdi_rate"`
+}
+
+// vehicleFailRow 车辆失败原因聚合行
+type vehicleFailRow struct {
+	AnonymousId string `gorm:"column:anonymous_id"`
+	FailReason  string `gorm:"column:fail_reason"`
+	Cnt         int64  `gorm:"column:cnt"`
+}
+
+func (r *doDashboardRepo) vehicleFailReasons(ctx context.Context, ids []string, where string, args []interface{}) map[string]string {
+	if len(ids) == 0 {
+		return nil
+	}
+	db := r.dorisDB(ctx)
+	idArgs := make([]interface{}, 0, len(args)+len(ids))
+	idArgs = append(idArgs, args...)
+	for _, id := range ids {
+		idArgs = append(idArgs, id)
+	}
+	placeholders := strings.Repeat("?,", len(ids))
+	placeholders = placeholders[:len(placeholders)-1]
+
+	sql := `SELECT anonymous_id,
+		CASE
+			WHEN fcl_status != 'success' AND fdr_status = 'success' AND fff_status = 'success'
+				THEN CONCAT('FCL-', COALESCE(fcl_detail,''))
+			WHEN fdr_status != 'success' AND fff_status = 'success'
+				THEN CONCAT('FDR-', COALESCE(fdr_detail,''))
+			ELSE CONCAT('FFF-', COALESCE(fff_detail,''))
+		END AS fail_reason,
+		COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND (fcl_status != 'success' OR fdr_status != 'success' OR fff_status != 'success')
+		AND anonymous_id IN (` + placeholders + `)
+		GROUP BY anonymous_id, fail_reason
+		ORDER BY anonymous_id, cnt DESC`
+
+	var rows []*vehicleFailRow
+	if err := db.Raw(sql, idArgs...).Scan(&rows).Error; err != nil {
+		return nil
+	}
+	// 取每辆车 cnt 最大的 fail_reason（SQL 已 ORDER BY cnt DESC，取第一条即可）
+	result := make(map[string]string, len(ids))
+	for _, row := range rows {
+		if _, exists := result[row.AnonymousId]; !exists {
+			result[row.AnonymousId] = row.FailReason
+		}
+	}
+	return result
+}
+
+func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehicleParam) ([]*dashboard_api.DoVehicleItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildVehicleWhere(param.EventName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT anonymous_id, car_type, project_name,
+		COUNT(*) AS trigger_count,
+		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS success_count,
+		ROUND(SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END)*100.0/COUNT(*), 1) AS cfdi_rate
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND anonymous_id IS NOT NULL AND anonymous_id != ''
+		GROUP BY anonymous_id, car_type, project_name
+		ORDER BY trigger_count DESC
+		LIMIT 20`
+
+	var rows []*vehicleStatsRow
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.AnonymousId)
+	}
+	reasons := r.vehicleFailReasons(ctx, ids, where, args)
+
+	list := make([]*dashboard_api.DoVehicleItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, &dashboard_api.DoVehicleItem{
+			AnonymousId: row.AnonymousId, CarType: row.CarType, ProjectName: row.ProjectName,
+			TriggerCount: row.TriggerCount, SuccessCount: row.SuccessCount, CfdiRate: row.CfdiRate,
+			MainReason: reasons[row.AnonymousId],
+		})
+	}
+	return list, nil
+}
+
+func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoAnomalyParam) ([]*dashboard_api.DoVehicleItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildVehicleWhere(param.EventName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := fmt.Sprintf(`SELECT anonymous_id, car_type, project_name,
+		COUNT(*) AS trigger_count,
+		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS success_count,
+		ROUND(SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END)*100.0/COUNT(*), 1) AS cfdi_rate
+		FROM dwd_cfdi_status_monitor_analysis`+where+`
+		AND anonymous_id IS NOT NULL AND anonymous_id != ''
+		GROUP BY anonymous_id, car_type, project_name
+		HAVING cfdi_rate < %d
+		ORDER BY cfdi_rate ASC
+		LIMIT 100`, param.MaxRate)
+
+	var rows []*vehicleStatsRow
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	ids := make([]string, 0, len(rows))
+	for _, r := range rows {
+		ids = append(ids, r.AnonymousId)
+	}
+	reasons := r.vehicleFailReasons(ctx, ids, where, args)
+
+	list := make([]*dashboard_api.DoVehicleItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, &dashboard_api.DoVehicleItem{
+			AnonymousId: row.AnonymousId, CarType: row.CarType, ProjectName: row.ProjectName,
+			TriggerCount: row.TriggerCount, SuccessCount: row.SuccessCount, CfdiRate: row.CfdiRate,
+			MainReason: reasons[row.AnonymousId],
+		})
+	}
+	return list, nil
+}
+
+func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehicleParam) (*dashboard_api.DoActiveTrendResponse, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildVehicleWhere(param.EventName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT dt, COUNT(DISTINCT anonymous_id) AS active_count
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		GROUP BY dt ORDER BY dt`
+
+	type row struct {
+		Dt          string `gorm:"column:dt"`
+		ActiveCount int64  `gorm:"column:active_count"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	dates := make([]string, 0, len(rows))
+	counts := make([]int64, 0, len(rows))
+	for _, r := range rows {
+		dates = append(dates, r.Dt)
+		counts = append(counts, r.ActiveCount)
+	}
+
+	resp := &dashboard_api.DoActiveTrendResponse{}
+	resp.Code = 0
+	resp.Message = "OK"
+	resp.Dates = dates
+	resp.Counts = counts
+	return resp, nil
+}
+
+// buildVehicleWhere 构建车辆维度分析 WHERE 子句
+func buildVehicleWhere(eventName, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if startDt != "" && endDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, startDt, endDt)
+	} else {
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
+	}
+	if eventName != "" {
+		conds = append(conds, "event_name = ?")
+		args = append(args, eventName)
+	}
+	if projectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, projectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", carTypes)
+	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
 // buildFclUploadWhere 构建 dwd_cfdi_basic_fcl_uploadinfo 的 WHERE 子句

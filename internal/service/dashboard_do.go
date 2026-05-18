@@ -255,6 +255,78 @@ func (s *DoDashboardService) GetFailReason(ctx *gin.Context) (api.HttpResponse, 
 //	@Param			end_dt			query	string	false	"结束日期"
 //	@Success		200				{object}	dashboard_api.DoTrendResponse
 //	@Router			/dashboard/v1/do/trend [GET]
+// GetTopVehicles godoc
+//
+//	@Summary		DO Top20活跃车辆
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoTopVehicleResponse
+//	@Router			/dashboard/v1/do/top_vehicles [GET]
+func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoTopVehicleResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+	var req dashboard_api.DoTopVehicleRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
+	}
+	result, err := s.uc.GetTopVehicles(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetTopVehicles error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = err.Error(); return resp, nil
+	}
+	return result, nil
+}
+
+// GetAnomalyVehicles godoc
+//
+//	@Summary		DO 异常车辆
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoAnomalyResponse
+//	@Router			/dashboard/v1/do/anomaly_vehicles [GET]
+func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoAnomalyResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+	var req dashboard_api.DoAnomalyRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
+	}
+	result, err := s.uc.GetAnomalyVehicles(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetAnomalyVehicles error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = err.Error(); return resp, nil
+	}
+	return result, nil
+}
+
+// GetActiveTrend godoc
+//
+//	@Summary		DO 活跃车辆趋势
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoActiveTrendResponse
+//	@Router			/dashboard/v1/do/active_trend [GET]
+func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoActiveTrendResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+	var req dashboard_api.DoTopVehicleRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
+	}
+	result, err := s.uc.GetActiveTrend(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetActiveTrend error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = err.Error(); return resp, nil
+	}
+	return result, nil
+}
+
 // GetNetSpeed godoc
 //
 //	@Summary		DO 各车型平均上传带宽（按天）

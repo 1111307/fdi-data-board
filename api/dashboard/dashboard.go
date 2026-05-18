@@ -522,6 +522,55 @@ type DoSwVersionResponse struct {
 	List []*DoSwVersionItem `json:"list"`
 }
 
+// DoVehicleItem 车辆维度分析单条（Top活跃/异常车辆共用）
+type DoVehicleItem struct {
+	AnonymousId  string  `json:"anonymous_id"`
+	CarType      string  `json:"car_type"`
+	ProjectName  string  `json:"project_name"`
+	TriggerCount int64   `json:"trigger_count"`
+	SuccessCount int64   `json:"success_count"`
+	CfdiRate     float64 `json:"cfdi_rate"`
+	MainReason   string  `json:"main_reason"`
+}
+
+// DoTopVehicleRequest Top活跃车辆请求
+type DoTopVehicleRequest struct {
+	EventName   string `form:"event_name"`
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// DoTopVehicleResponse Top活跃车辆响应
+type DoTopVehicleResponse struct {
+	BaseResponse
+	List []*DoVehicleItem `json:"list"`
+}
+
+// DoAnomalyRequest 异常车辆请求
+type DoAnomalyRequest struct {
+	EventName   string `form:"event_name"`
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+	MaxRate     int    `form:"max_rate"` // 成功率上限（整数百分比）
+}
+
+// DoAnomalyResponse 异常车辆响应
+type DoAnomalyResponse struct {
+	BaseResponse
+	List []*DoVehicleItem `json:"list"`
+}
+
+// DoActiveTrendResponse 活跃车辆趋势响应
+type DoActiveTrendResponse struct {
+	BaseResponse
+	Dates  []string `json:"dates"`
+	Counts []int64  `json:"counts"`
+}
+
 // DoNetSpeedSeries 网速统计单条时序（按车型）
 type DoNetSpeedSeries struct {
 	CarType string    `json:"car_type"`

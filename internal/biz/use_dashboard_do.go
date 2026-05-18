@@ -23,6 +23,24 @@ type DoDashboardRepo interface {
 	GetProjectEvent(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoProjectEventItem, error)
 	GetNetSpeed(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoNetSpeedResponse, error)
 	GetFclBw(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoFclBwResponse, error)
+	GetTopVehicles(ctx context.Context, param *DoVehicleParam) ([]*dashboard_api.DoVehicleItem, error)
+	GetAnomalyVehicles(ctx context.Context, param *DoAnomalyParam) ([]*dashboard_api.DoVehicleItem, error)
+	GetActiveTrend(ctx context.Context, param *DoVehicleParam) (*dashboard_api.DoActiveTrendResponse, error)
+}
+
+// DoVehicleParam 车辆维度分析通用查询参数
+type DoVehicleParam struct {
+	EventName   string
+	ProjectName string
+	CarTypes    []string
+	StartDt     string
+	EndDt       string
+}
+
+// DoAnomalyParam 异常车辆查询参数
+type DoAnomalyParam struct {
+	DoVehicleParam
+	MaxRate int
 }
 
 // DoCommonParam 通用查询参数（无特殊字段的 Top 类接口复用）
@@ -268,6 +286,45 @@ func (uc *DoDashboardUseCase) GetFclBw(ctx context.Context, req *dashboard_api.D
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	return uc.repo.GetFclBw(ctx, param)
+}
+
+func (uc *DoDashboardUseCase) GetTopVehicles(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoTopVehicleResponse, error) {
+	param := &DoVehicleParam{
+		EventName: req.EventName, ProjectName: req.ProjectName,
+		CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	list, err := uc.repo.GetTopVehicles(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoTopVehicleResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+}
+
+func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashboard_api.DoAnomalyRequest) (*dashboard_api.DoAnomalyResponse, error) {
+	maxRate := req.MaxRate
+	if maxRate == 0 {
+		maxRate = 80
+	}
+	param := &DoAnomalyParam{
+		DoVehicleParam: DoVehicleParam{
+			EventName: req.EventName, ProjectName: req.ProjectName,
+			CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
+		},
+		MaxRate: maxRate,
+	}
+	list, err := uc.repo.GetAnomalyVehicles(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoAnomalyResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+}
+
+func (uc *DoDashboardUseCase) GetActiveTrend(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoActiveTrendResponse, error) {
+	param := &DoVehicleParam{
+		EventName: req.EventName, ProjectName: req.ProjectName,
+		CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	return uc.repo.GetActiveTrend(ctx, param)
 }
 
 func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_api.DoFailReasonRequest) (*dashboard_api.DoFailReasonResponse, error) {
