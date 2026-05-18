@@ -28,6 +28,7 @@ var ProviderSet = wire.NewSet(
 	NewDatasourceRepo,
 	NewSceneGroupRepo,
 	NewFoDashboardRepo,
+	NewDoDashboardRepo,
 )
 
 // Data .

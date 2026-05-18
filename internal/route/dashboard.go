@@ -4,6 +4,17 @@ import (
 	"fdi_data_board/internal/service"
 )
 
+func RegisterDoDashboardService(s *service.DoDashboardService) []GroupUrl {
+	return []GroupUrl{
+		{
+			GroupAddr: "/dashboard/v1/do/",
+			Urls: []Url{
+				{JsonHandlerFunc: s.GetTrend, Path: "trend", Method: GET},
+			},
+		},
+	}
+}
+
 func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
 	return []GroupUrl{
 		{

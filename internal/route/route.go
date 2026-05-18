@@ -16,12 +16,14 @@ func RegisterHttpService(
 	datasourceService *service.DatasourceService,
 	sceneGroupService *service.SceneGroupService,
 	foDashboardService *service.FoDashboardService,
+	doDashboardService *service.DoDashboardService,
 ) []GroupUrl {
 
 	var routes []GroupUrl
 	routes = append(routes, RegisterGreeterService(vehicleService, cd))
 	routes = append(routes, RegisterQuerySceneService(querySceneService, datasourceService, sceneGroupService, cd)...)
 	routes = append(routes, RegisterFoDashboardService(foDashboardService)...)
+	routes = append(routes, RegisterDoDashboardService(doDashboardService)...)
 
 	return routes
 }

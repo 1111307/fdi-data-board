@@ -371,6 +371,24 @@ type CloseReasonResponse struct {
 	List []*CloseReasonItem `json:"list"`
 }
 
+// DoTrendRequest DO 数据总览趋势请求
+type DoTrendRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`   // 多选，逗号分隔
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// DoTrendResponse DO 数据总览趋势响应
+type DoTrendResponse struct {
+	BaseResponse
+	Dates         []string  `json:"dates"`
+	SuccessCounts []int64   `json:"success_counts"`
+	SuccessRates  []float64 `json:"success_rates"`
+}
+
 // DimensionsResponse FO/DO Dashboard 公共下拉维度响应
 type DimensionsResponse struct {
 	BaseResponse
