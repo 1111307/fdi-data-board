@@ -9,6 +9,7 @@ func RegisterDoDashboardService(s *service.DoDashboardService) []GroupUrl {
 		{
 			GroupAddr: "/dashboard/v1/do/",
 			Urls: []Url{
+				{JsonHandlerFunc: s.GetOverview, Path: "overview", Method: GET},
 				{JsonHandlerFunc: s.GetTrend, Path: "trend", Method: GET},
 			},
 		},

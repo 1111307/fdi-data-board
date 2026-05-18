@@ -9,7 +9,18 @@ import (
 
 // DoDashboardRepo DO Dashboard 数据仓储接口
 type DoDashboardRepo interface {
+	GetOverview(ctx context.Context, param *DoOverviewParam) ([]*dashboard_api.DoOverviewItem, error)
 	GetTrend(ctx context.Context, param *DoTrendParam) (*DoTrendData, error)
+}
+
+// DoOverviewParam 事件横向对比查询参数
+type DoOverviewParam struct {
+	FilterName  string
+	EventNames  []string
+	ProjectName string
+	CarTypes    []string
+	StartDt     string
+	EndDt       string
 }
 
 // DoTrendParam 趋势查询参数
@@ -36,6 +47,25 @@ type DoDashboardUseCase struct {
 
 func NewDoDashboardUseCase(repo DoDashboardRepo) *DoDashboardUseCase {
 	return &DoDashboardUseCase{repo: repo}
+}
+
+func (uc *DoDashboardUseCase) GetOverview(ctx context.Context, req *dashboard_api.DoOverviewRequest) (*dashboard_api.DoOverviewResponse, error) {
+	param := &DoOverviewParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitNames(req.CarTypes),
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	list, err := uc.repo.GetOverview(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoOverviewResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         list,
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.DoTrendRequest) (*dashboard_api.DoTrendResponse, error) {

@@ -371,6 +371,36 @@ type CloseReasonResponse struct {
 	List []*CloseReasonItem `json:"list"`
 }
 
+// DoOverviewItem 事件横向对比单行
+type DoOverviewItem struct {
+	EventName    string  `json:"event_name"`
+	VehicleCount int64   `json:"vehicle_count"`
+	TriggerCount int64   `json:"trigger_count"`
+	CfdiRate     float64 `json:"cfdi_rate"`
+	FffCount     int64   `json:"fff_count"`
+	FffRate      float64 `json:"fff_rate"`
+	FdrCount     int64   `json:"fdr_count"`
+	FdrRate      float64 `json:"fdr_rate"`
+	FclCount     int64   `json:"fcl_count"`
+	FclRate      float64 `json:"fcl_rate"`
+}
+
+// DoOverviewRequest 事件横向对比请求
+type DoOverviewRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"`
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// DoOverviewResponse 事件横向对比响应
+type DoOverviewResponse struct {
+	BaseResponse
+	List []*DoOverviewItem `json:"list"`
+}
+
 // DoTrendRequest DO 数据总览趋势请求
 type DoTrendRequest struct {
 	FilterName  string `form:"filter_name"`
