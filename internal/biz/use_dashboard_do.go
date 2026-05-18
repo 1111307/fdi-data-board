@@ -11,6 +11,17 @@ import (
 type DoDashboardRepo interface {
 	GetOverview(ctx context.Context, param *DoOverviewParam) ([]*dashboard_api.DoOverviewItem, error)
 	GetTrend(ctx context.Context, param *DoTrendParam) (*DoTrendData, error)
+	GetFailReason(ctx context.Context, param *DoFailReasonParam) ([]*dashboard_api.DoFailReasonItem, error)
+}
+
+// DoFailReasonParam 失败原因分析查询参数
+type DoFailReasonParam struct {
+	FilterName  string
+	EventNames  []string
+	ProjectName string
+	CarTypes    []string
+	StartDt     string
+	EndDt       string
 }
 
 // DoOverviewParam 事件横向对比查询参数
@@ -86,6 +97,25 @@ func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.D
 		Dates:         data.Dates,
 		SuccessCounts: data.SuccessCounts,
 		SuccessRates:  data.SuccessRates,
+	}, nil
+}
+
+func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_api.DoFailReasonRequest) (*dashboard_api.DoFailReasonResponse, error) {
+	param := &DoFailReasonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitNames(req.CarTypes),
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	list, err := uc.repo.GetFailReason(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoFailReasonResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         list,
 	}, nil
 }
 

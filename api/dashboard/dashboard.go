@@ -430,3 +430,25 @@ type DimensionsResponse struct {
 
 // FoDimensionsResponse 兼容别名，防止旧引用编译报错
 type FoDimensionsResponse = DimensionsResponse
+
+// DoFailReasonItem 失败原因分析单条
+type DoFailReasonItem struct {
+	Name  string `json:"name"`
+	Value int64  `json:"value"`
+}
+
+// DoFailReasonRequest 失败原因分析请求
+type DoFailReasonRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"` // 多选，逗号分隔
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// DoFailReasonResponse 失败原因分析响应
+type DoFailReasonResponse struct {
+	BaseResponse
+	List []*DoFailReasonItem `json:"list"`
+}

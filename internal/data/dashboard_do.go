@@ -120,6 +120,49 @@ func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam)
 	}, nil
 }
 
+// failReasonRow UNION ALL 聚合行
+type failReasonRow struct {
+	Stage  string `gorm:"column:stage"`
+	Detail string `gorm:"column:detail"`
+	Cnt    int64  `gorm:"column:cnt"`
+}
+
+func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailReasonParam) ([]*dashboard_api.DoFailReasonItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	// UNION ALL 三段，每段有相同的 WHERE 参数，args 需要重复三份
+	tripleArgs := append(append(append([]interface{}{}, args...), args...), args...)
+
+	sql := `SELECT 'FFF' AS stage, fff_detail AS detail, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status != 'success' AND fff_detail IS NOT NULL
+		GROUP BY fff_detail
+		UNION ALL
+		SELECT 'FDR' AS stage, fdr_detail AS detail, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status = 'success' AND fdr_status != 'success' AND fdr_detail IS NOT NULL
+		GROUP BY fdr_detail
+		UNION ALL
+		SELECT 'FCL' AS stage, fcl_detail AS detail, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fdr_status = 'success' AND fcl_status != 'success AND fcl_detail IS NOT NULL
+		GROUP BY fcl_detail
+		ORDER BY stage, cnt DESC`
+
+	var rows []*failReasonRow
+	if err := db.Raw(sql, tripleArgs...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	list := make([]*dashboard_api.DoFailReasonItem, 0, len(rows))
+	for _, row := range rows {
+		name := row.Stage + "-" + row.Detail
+		list = append(list, &dashboard_api.DoFailReasonItem{
+			Name:  name,
+			Value: row.Cnt,
+		})
+	}
+	return list, nil
+}
+
 // buildDoCommonWhere 构建 DO dashboard 公共 WHERE 子句（dwd_cfdi_status_monitor_analysis）
 func buildDoCommonWhere(filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
 	var conds []string
