@@ -189,6 +189,32 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 	return list, nil
 }
 
+func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoSwVersionItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT fff_sw_version AS sw_version, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_sw_version IS NOT NULL AND fff_sw_version != ''
+		GROUP BY fff_sw_version
+		ORDER BY cnt DESC
+		LIMIT 20`
+
+	type row struct {
+		SwVersion string `gorm:"column:sw_version"`
+		Cnt       int64  `gorm:"column:cnt"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	list := make([]*dashboard_api.DoSwVersionItem, 0, len(rows))
+	for _, r := range rows {
+		list = append(list, &dashboard_api.DoSwVersionItem{SwVersion: r.SwVersion, Count: r.Cnt})
+	}
+	return list, nil
+}
+
 // buildDoCommonWhere 构建 DO dashboard 公共 WHERE 子句（dwd_cfdi_status_monitor_analysis）
 func buildDoCommonWhere(filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
 	var conds []string

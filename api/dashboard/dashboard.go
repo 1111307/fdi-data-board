@@ -453,6 +453,18 @@ type DoCoolTopResponse struct {
 	List []*DoCoolTopItem `json:"list"`
 }
 
+// DoSwVersionItem 软件版本分布单条
+type DoSwVersionItem struct {
+	SwVersion string `json:"sw_version"`
+	Count     int64  `json:"count"`
+}
+
+// DoSwVersionResponse 软件版本分布响应
+type DoSwVersionResponse struct {
+	BaseResponse
+	List []*DoSwVersionItem `json:"list"`
+}
+
 // DoFailReasonItem 失败原因分析单条
 type DoFailReasonItem struct {
 	Name  string `json:"name"`

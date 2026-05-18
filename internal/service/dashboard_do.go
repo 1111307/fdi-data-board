@@ -56,6 +56,43 @@ func (s *DoDashboardService) GetOverview(ctx *gin.Context) (api.HttpResponse, er
 	return result, nil
 }
 
+// GetSwVersion godoc
+//
+//	@Summary		DO 触发记录软件版本分布
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Param			filter_name		query	string	false	"筛选器名称"
+//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
+//	@Param			project_name	query	string	false	"项目名称"
+//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
+//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
+//	@Param			end_dt			query	string	false	"结束日期"
+//	@Success		200				{object}	dashboard_api.DoSwVersionResponse
+//	@Router			/dashboard/v1/do/sw_version [GET]
+func (s *DoDashboardService) GetSwVersion(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoSwVersionResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetSwVersion(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetSwVersion error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	return result, nil
+}
+
 // GetCoolTop godoc
 //
 //	@Summary		DO 冷却 Top20 筛选器
