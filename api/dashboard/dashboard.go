@@ -453,6 +453,15 @@ type DoCoolTopResponse struct {
 	List []*DoCoolTopItem `json:"list"`
 }
 
+// DoProjectCarResponse 项目×车型分布响应
+type DoProjectCarResponse struct {
+	BaseResponse
+	Projects      []string           `json:"projects"`       // Y轴项目名，按触发量降序
+	CarTypes      []string           `json:"car_types"`      // 动态车型列表
+	Matrix        map[string][]int64 `json:"matrix"`         // car_type -> 各项目触发次数
+	ProjectTotals []int64            `json:"project_totals"` // 各项目触发总量
+}
+
 // DoTriggerRankResponse 触发频次排行响应
 type DoTriggerRankResponse struct {
 	BaseResponse

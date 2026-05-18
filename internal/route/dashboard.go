@@ -15,6 +15,7 @@ func RegisterDoDashboardService(s *service.DoDashboardService) []GroupUrl {
 				{JsonHandlerFunc: s.GetCoolTop, Path: "cool_top", Method: GET},
 				{JsonHandlerFunc: s.GetSwVersion, Path: "sw_version", Method: GET},
 				{JsonHandlerFunc: s.GetTriggerRank, Path: "trigger_rank", Method: GET},
+				{JsonHandlerFunc: s.GetProjectCar, Path: "project_car", Method: GET},
 			},
 		},
 	}

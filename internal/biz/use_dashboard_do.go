@@ -15,6 +15,7 @@ type DoDashboardRepo interface {
 	GetCoolTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
 	GetSwVersion(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoSwVersionItem, error)
 	GetTriggerRank(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
+	GetProjectCar(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoProjectCarResponse, error)
 }
 
 // DoCommonParam 通用查询参数（无特殊字段的 Top 类接口复用）
@@ -168,6 +169,18 @@ func (uc *DoDashboardUseCase) GetSwVersion(ctx context.Context, req *dashboard_a
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		List:         list,
 	}, nil
+}
+
+func (uc *DoDashboardUseCase) GetProjectCar(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoProjectCarResponse, error) {
+	param := &DoCommonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitNames(req.CarTypes),
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	return uc.repo.GetProjectCar(ctx, param)
 }
 
 func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_api.DoFailReasonRequest) (*dashboard_api.DoFailReasonResponse, error) {

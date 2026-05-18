@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -239,6 +240,82 @@ func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonP
 		list = append(list, &dashboard_api.DoSwVersionItem{SwVersion: r.SwVersion, Count: r.Cnt})
 	}
 	return list, nil
+}
+
+func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.DoProjectCarResponse, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT project_name, car_type, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND project_name IS NOT NULL AND project_name != ''
+		AND car_type IS NOT NULL AND car_type != ''
+		GROUP BY project_name, car_type
+		ORDER BY project_name, car_type`
+
+	type pcRow struct {
+		ProjectName string `gorm:"column:project_name"`
+		CarType     string `gorm:"column:car_type"`
+		Cnt         int64  `gorm:"column:cnt"`
+	}
+	var rows []*pcRow
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	// 聚合各项目总量
+	projTotal := map[string]int64{}
+	carTypeSet := map[string]struct{}{}
+	for _, row := range rows {
+		projTotal[row.ProjectName] += row.Cnt
+		carTypeSet[row.CarType] = struct{}{}
+	}
+
+	// 项目按总量降序排列
+	projects := make([]string, 0, len(projTotal))
+	for p := range projTotal {
+		projects = append(projects, p)
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		return projTotal[projects[i]] > projTotal[projects[j]]
+	})
+
+	// 车型排序
+	carTypes := make([]string, 0, len(carTypeSet))
+	for ct := range carTypeSet {
+		carTypes = append(carTypes, ct)
+	}
+	sort.Strings(carTypes)
+
+	// 建索引
+	projIdx := make(map[string]int, len(projects))
+	for i, p := range projects {
+		projIdx[p] = i
+	}
+
+	// 填充 matrix
+	matrix := make(map[string][]int64, len(carTypes))
+	for _, ct := range carTypes {
+		matrix[ct] = make([]int64, len(projects))
+	}
+	for _, row := range rows {
+		matrix[row.CarType][projIdx[row.ProjectName]] = row.Cnt
+	}
+
+	// 各项目总量数组（与 projects 顺序一致）
+	totals := make([]int64, len(projects))
+	for i, p := range projects {
+		totals[i] = projTotal[p]
+	}
+
+	resp := &dashboard_api.DoProjectCarResponse{}
+	resp.Code = 0
+	resp.Message = "OK"
+	resp.Projects = projects
+	resp.CarTypes = carTypes
+	resp.Matrix = matrix
+	resp.ProjectTotals = totals
+	return resp, nil
 }
 
 // buildDoCommonWhere 构建 DO dashboard 公共 WHERE 子句（dwd_cfdi_status_monitor_analysis）
