@@ -453,6 +453,12 @@ type DoCoolTopResponse struct {
 	List []*DoCoolTopItem `json:"list"`
 }
 
+// DoTriggerRankResponse 触发频次排行响应
+type DoTriggerRankResponse struct {
+	BaseResponse
+	List []*DoCoolTopItem `json:"list"`
+}
+
 // DoSwVersionItem 软件版本分布单条
 type DoSwVersionItem struct {
 	SwVersion string `json:"sw_version"`
