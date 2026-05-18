@@ -394,6 +394,179 @@ func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonPa
 	return list, nil
 }
 
+func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT event_name, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND fdr_status = 'success' AND fcl_status != 'success'
+		AND fcl_detail = 'query cloud DISCARD, detail:Filter quota exceeded'
+		AND event_name IS NOT NULL AND event_name != ''
+		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
+
+	type row struct {
+		EventName string `gorm:"column:event_name"`
+		Cnt       int64  `gorm:"column:cnt"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	list := make([]*dashboard_api.DoEventTopItem, 0, len(rows))
+	for _, r := range rows {
+		list = append(list, &dashboard_api.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
+	}
+	return list, nil
+}
+
+func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoProjectEventItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT project_name, COUNT(DISTINCT event_name) AS event_count
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND fcl_status = 'success'
+		AND project_name IS NOT NULL AND project_name != ''
+		GROUP BY project_name ORDER BY event_count DESC`
+
+	type row struct {
+		ProjectName string `gorm:"column:project_name"`
+		EventCount  int64  `gorm:"column:event_count"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	list := make([]*dashboard_api.DoProjectEventItem, 0, len(rows))
+	for _, r := range rows {
+		list = append(list, &dashboard_api.DoProjectEventItem{ProjectName: r.ProjectName, EventCount: r.EventCount})
+	}
+	return list, nil
+}
+
+func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.DoNetSpeedResponse, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildFclUploadWhere(param)
+
+	sql := `SELECT DATE(create_at) AS dt, car_type,
+		ROUND(AVG((package_size / 1024.0 / 1024.0) / (total_cost / 1000.0)), 2) AS avg_bw
+		FROM dwd_cfdi_basic_fcl_uploadinfo` + where + `
+		AND package_size > 10485760 AND total_cost > 0
+		AND car_type IS NOT NULL AND car_type != ''
+		GROUP BY DATE(create_at), car_type ORDER BY dt, car_type`
+
+	type row struct {
+		Dt      string  `gorm:"column:dt"`
+		CarType string  `gorm:"column:car_type"`
+		AvgBw   float64 `gorm:"column:avg_bw"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	// 收集有序日期和车型
+	dateSet := map[string]struct{}{}
+	carSet := map[string]struct{}{}
+	for _, r := range rows {
+		dateSet[r.Dt] = struct{}{}
+		carSet[r.CarType] = struct{}{}
+	}
+	dates := sortedKeys(dateSet)
+	carTypes := sortedKeys(carSet)
+
+	dateIdx := make(map[string]int, len(dates))
+	for i, d := range dates {
+		dateIdx[d] = i
+	}
+
+	// 填充矩阵
+	matrix := make(map[string][]float64, len(carTypes))
+	for _, ct := range carTypes {
+		matrix[ct] = make([]float64, len(dates))
+	}
+	for _, r := range rows {
+		matrix[r.CarType][dateIdx[r.Dt]] = r.AvgBw
+	}
+
+	series := make([]*dashboard_api.DoNetSpeedSeries, 0, len(carTypes))
+	for _, ct := range carTypes {
+		series = append(series, &dashboard_api.DoNetSpeedSeries{CarType: ct, Data: matrix[ct]})
+	}
+
+	resp := &dashboard_api.DoNetSpeedResponse{}
+	resp.Code = 0
+	resp.Message = "OK"
+	resp.Dates = dates
+	resp.Series = series
+	return resp, nil
+}
+
+func (r *doDashboardRepo) GetFclBw(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.DoFclBwResponse, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildFclUploadWhere(param)
+
+	sql := `SELECT DATE(create_at) AS dt,
+		ROUND(AVG((package_size / 1024.0 / 1024.0) / (total_cost / 1000.0)), 2) AS avg_bw
+		FROM dwd_cfdi_basic_fcl_uploadinfo` + where + `
+		AND package_size > 10485760 AND total_cost > 0
+		GROUP BY DATE(create_at) ORDER BY dt`
+
+	type row struct {
+		Dt    string  `gorm:"column:dt"`
+		AvgBw float64 `gorm:"column:avg_bw"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	dates := make([]string, 0, len(rows))
+	values := make([]float64, 0, len(rows))
+	for _, r := range rows {
+		dates = append(dates, r.Dt)
+		values = append(values, r.AvgBw)
+	}
+
+	resp := &dashboard_api.DoFclBwResponse{}
+	resp.Code = 0
+	resp.Message = "OK"
+	resp.Dates = dates
+	resp.Values = values
+	return resp, nil
+}
+
+// buildFclUploadWhere 构建 dwd_cfdi_basic_fcl_uploadinfo 的 WHERE 子句
+func buildFclUploadWhere(param *biz.DoCommonParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else {
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
+	}
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+// sortedKeys 返回 map 的 key 按字母升序排列
+func sortedKeys(m map[string]struct{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
 // buildDoCommonWhere 构建 DO dashboard 公共 WHERE 子句（dwd_cfdi_status_monitor_analysis）
 func buildDoCommonWhere(filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
 	var conds []string

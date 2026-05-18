@@ -255,6 +255,122 @@ func (s *DoDashboardService) GetFailReason(ctx *gin.Context) (api.HttpResponse, 
 //	@Param			end_dt			query	string	false	"结束日期"
 //	@Success		200				{object}	dashboard_api.DoTrendResponse
 //	@Router			/dashboard/v1/do/trend [GET]
+// GetNetSpeed godoc
+//
+//	@Summary		DO 各车型平均上传带宽（按天）
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoNetSpeedResponse
+//	@Router			/dashboard/v1/do/net_speed [GET]
+func (s *DoDashboardService) GetNetSpeed(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoNetSpeedResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetNetSpeed(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetNetSpeed error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetFclBw godoc
+//
+//	@Summary		DO FCL 整体平均上传带宽（按天）
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoFclBwResponse
+//	@Router			/dashboard/v1/do/fcl_bw [GET]
+func (s *DoDashboardService) GetFclBw(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoFclBwResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFclBw(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetFclBw error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetQuotaTop godoc
+//
+//	@Summary		DO FCL Quota 超限 Top20
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoQuotaTopResponse
+//	@Router			/dashboard/v1/do/quota_top [GET]
+func (s *DoDashboardService) GetQuotaTop(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoQuotaTopResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetQuotaTop(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetQuotaTop error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetProjectEvent godoc
+//
+//	@Summary		DO 项目触发回流事件总数
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoProjectEventResponse
+//	@Router			/dashboard/v1/do/project_event [GET]
+func (s *DoDashboardService) GetProjectEvent(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoProjectEventResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetProjectEvent(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetProjectEvent error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	return result, nil
+}
+
 // GetMemTop godoc
 //
 //	@Summary		DO FDR 内存不足 Top20

@@ -453,6 +453,24 @@ type DoCoolTopResponse struct {
 	List []*DoCoolTopItem `json:"list"`
 }
 
+// DoProjectEventItem 项目触发回流事件总数单条
+type DoProjectEventItem struct {
+	ProjectName string `json:"project_name"`
+	EventCount  int64  `json:"event_count"`
+}
+
+// DoProjectEventResponse 项目触发回流事件总数响应
+type DoProjectEventResponse struct {
+	BaseResponse
+	List []*DoProjectEventItem `json:"list"`
+}
+
+// DoQuotaTopResponse FCL Quota 超限 Top20 响应
+type DoQuotaTopResponse struct {
+	BaseResponse
+	List []*DoEventTopItem `json:"list"`
+}
+
 // DoEventTopItem FDR 内存/磁盘 Top 单条（按事件聚合）
 type DoEventTopItem struct {
 	EventName string `json:"event_name"`
@@ -502,6 +520,26 @@ type DoSwVersionItem struct {
 type DoSwVersionResponse struct {
 	BaseResponse
 	List []*DoSwVersionItem `json:"list"`
+}
+
+// DoNetSpeedSeries 网速统计单条时序（按车型）
+type DoNetSpeedSeries struct {
+	CarType string    `json:"car_type"`
+	Data    []float64 `json:"data"`
+}
+
+// DoNetSpeedResponse 各车型平均上传带宽响应
+type DoNetSpeedResponse struct {
+	BaseResponse
+	Dates  []string            `json:"dates"`
+	Series []*DoNetSpeedSeries `json:"series"`
+}
+
+// DoFclBwResponse FCL 整体平均上传带宽响应
+type DoFclBwResponse struct {
+	BaseResponse
+	Dates  []string  `json:"dates"`
+	Values []float64 `json:"values"`
 }
 
 // DoFailReasonItem 失败原因分析单条

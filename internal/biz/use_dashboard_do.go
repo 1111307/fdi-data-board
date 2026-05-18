@@ -19,6 +19,10 @@ type DoDashboardRepo interface {
 	GetMemTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
 	GetDiskTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
 	GetCloseTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
+	GetQuotaTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
+	GetProjectEvent(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoProjectEventItem, error)
+	GetNetSpeed(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoNetSpeedResponse, error)
+	GetFclBw(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoFclBwResponse, error)
 }
 
 // DoCommonParam 通用查询参数（无特殊字段的 Top 类接口复用）
@@ -222,6 +226,48 @@ func (uc *DoDashboardUseCase) GetCloseTop(ctx context.Context, req *dashboard_ap
 		return nil, err
 	}
 	return &dashboard_api.DoCloseTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+}
+
+func (uc *DoDashboardUseCase) GetQuotaTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoQuotaTopResponse, error) {
+	param := &DoCommonParam{
+		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	list, err := uc.repo.GetQuotaTop(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoQuotaTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+}
+
+func (uc *DoDashboardUseCase) GetProjectEvent(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoProjectEventResponse, error) {
+	param := &DoCommonParam{
+		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	list, err := uc.repo.GetProjectEvent(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoProjectEventResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+}
+
+func (uc *DoDashboardUseCase) GetNetSpeed(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoNetSpeedResponse, error) {
+	param := &DoCommonParam{
+		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	return uc.repo.GetNetSpeed(ctx, param)
+}
+
+func (uc *DoDashboardUseCase) GetFclBw(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoFclBwResponse, error) {
+	param := &DoCommonParam{
+		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	return uc.repo.GetFclBw(ctx, param)
 }
 
 func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_api.DoFailReasonRequest) (*dashboard_api.DoFailReasonResponse, error) {
