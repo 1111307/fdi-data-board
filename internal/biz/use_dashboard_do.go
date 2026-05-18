@@ -16,6 +16,9 @@ type DoDashboardRepo interface {
 	GetSwVersion(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoSwVersionItem, error)
 	GetTriggerRank(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
 	GetProjectCar(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoProjectCarResponse, error)
+	GetMemTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
+	GetDiskTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
+	GetCloseTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
 }
 
 // DoCommonParam 通用查询参数（无特殊字段的 Top 类接口复用）
@@ -181,6 +184,44 @@ func (uc *DoDashboardUseCase) GetProjectCar(ctx context.Context, req *dashboard_
 		EndDt:       req.EndDt,
 	}
 	return uc.repo.GetProjectCar(ctx, param)
+}
+
+func (uc *DoDashboardUseCase) GetMemTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoMemTopResponse, error) {
+	param := &DoCommonParam{
+		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	list, err := uc.repo.GetMemTop(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoMemTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+}
+
+func (uc *DoDashboardUseCase) GetDiskTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoDiskTopResponse, error) {
+	param := &DoCommonParam{
+		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	list, err := uc.repo.GetDiskTop(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoDiskTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+}
+
+func (uc *DoDashboardUseCase) GetCloseTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoCloseTopResponse, error) {
+	param := &DoCommonParam{
+		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		StartDt: req.StartDt, EndDt: req.EndDt,
+	}
+	list, err := uc.repo.GetCloseTop(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoCloseTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
 }
 
 func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_api.DoFailReasonRequest) (*dashboard_api.DoFailReasonResponse, error) {

@@ -318,6 +318,82 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 	return resp, nil
 }
 
+func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT event_name, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND fff_status = 'success' AND fdr_status != 'success'
+		AND fdr_detail IN ('because of full gc', 'mem pool water line')
+		AND event_name IS NOT NULL AND event_name != ''
+		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
+
+	type row struct {
+		EventName string `gorm:"column:event_name"`
+		Cnt       int64  `gorm:"column:cnt"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	list := make([]*dashboard_api.DoEventTopItem, 0, len(rows))
+	for _, r := range rows {
+		list = append(list, &dashboard_api.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
+	}
+	return list, nil
+}
+
+func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT event_name, COUNT(*) AS cnt
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND fff_status = 'success' AND fdr_status != 'success'
+		AND fdr_detail IN ('Disk overrun', 'Exceeds the maximum number of files')
+		AND event_name IS NOT NULL AND event_name != ''
+		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
+
+	type row struct {
+		EventName string `gorm:"column:event_name"`
+		Cnt       int64  `gorm:"column:cnt"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	list := make([]*dashboard_api.DoEventTopItem, 0, len(rows))
+	for _, r := range rows {
+		list = append(list, &dashboard_api.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
+	}
+	return list, nil
+}
+
+func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT filter_name, COUNT(*) AS cnt
+		FROM dwd_cfdi_basic_fff_close` + where + `
+		AND filter_name IS NOT NULL AND filter_name != ''
+		GROUP BY filter_name ORDER BY cnt DESC LIMIT 20`
+
+	type row struct {
+		FilterName string `gorm:"column:filter_name"`
+		Cnt        int64  `gorm:"column:cnt"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	list := make([]*dashboard_api.DoCoolTopItem, 0, len(rows))
+	for _, r := range rows {
+		list = append(list, &dashboard_api.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
+	}
+	return list, nil
+}
+
 // buildDoCommonWhere 构建 DO dashboard 公共 WHERE 子句（dwd_cfdi_status_monitor_analysis）
 func buildDoCommonWhere(filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
 	var conds []string

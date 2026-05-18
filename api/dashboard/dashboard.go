@@ -453,6 +453,30 @@ type DoCoolTopResponse struct {
 	List []*DoCoolTopItem `json:"list"`
 }
 
+// DoEventTopItem FDR 内存/磁盘 Top 单条（按事件聚合）
+type DoEventTopItem struct {
+	EventName string `json:"event_name"`
+	Count     int64  `json:"count"`
+}
+
+// DoMemTopResponse FDR 内存不足 Top20 响应
+type DoMemTopResponse struct {
+	BaseResponse
+	List []*DoEventTopItem `json:"list"`
+}
+
+// DoDiskTopResponse FDR 磁盘不足 Top20 响应
+type DoDiskTopResponse struct {
+	BaseResponse
+	List []*DoEventTopItem `json:"list"`
+}
+
+// DoCloseTopResponse 关闭次数 Top 筛选器响应
+type DoCloseTopResponse struct {
+	BaseResponse
+	List []*DoCoolTopItem `json:"list"`
+}
+
 // DoProjectCarResponse 项目×车型分布响应
 type DoProjectCarResponse struct {
 	BaseResponse

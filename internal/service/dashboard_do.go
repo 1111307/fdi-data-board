@@ -255,6 +255,93 @@ func (s *DoDashboardService) GetFailReason(ctx *gin.Context) (api.HttpResponse, 
 //	@Param			end_dt			query	string	false	"结束日期"
 //	@Success		200				{object}	dashboard_api.DoTrendResponse
 //	@Router			/dashboard/v1/do/trend [GET]
+// GetMemTop godoc
+//
+//	@Summary		DO FDR 内存不足 Top20
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoMemTopResponse
+//	@Router			/dashboard/v1/do/mem_top [GET]
+func (s *DoDashboardService) GetMemTop(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoMemTopResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetMemTop(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetMemTop error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetDiskTop godoc
+//
+//	@Summary		DO FDR 磁盘不足 Top20
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoDiskTopResponse
+//	@Router			/dashboard/v1/do/disk_top [GET]
+func (s *DoDashboardService) GetDiskTop(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoDiskTopResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetDiskTop(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetDiskTop error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetCloseTop godoc
+//
+//	@Summary		DO 关闭次数 Top 筛选器
+//	@Tags			DoDashboard
+//	@Produce		json
+//	@Security		OAuth2Password
+//	@Success		200	{object}	dashboard_api.DoCloseTopResponse
+//	@Router			/dashboard/v1/do/close_top [GET]
+func (s *DoDashboardService) GetCloseTop(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoCloseTopResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetCloseTop(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetCloseTop error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	return result, nil
+}
+
 func (s *DoDashboardService) GetTrend(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoTrendResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
