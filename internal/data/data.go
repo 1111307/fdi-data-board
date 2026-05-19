@@ -83,6 +83,7 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 		&orm.QuerySceneDo{},
 		&orm.QuerySceneParamDo{},
 		&orm.QuerySceneWidgetDo{},
+		&orm.SlowQueryLogDo{},
 	); err != nil {
 		panic(fmt.Sprintf("Update Table Failed: %+v", err))
 	}
