@@ -152,7 +152,18 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 	// UNION ALL 三段，每段有相同的 WHERE 参数，args 需要重复三份
 	tripleArgs := append(append(append([]interface{}{}, args...), args...), args...)
 
-	sql := `SELECT 'FFF' AS stage, fff_detail AS detail, COUNT(*) AS cnt
+	sql := `SELECT stage,
+		CASE WHEN detail LIKE 'Bag invalid:%' THEN 'Bag invalid'
+		     WHEN detail LIKE 'tls%' THEN 'TLS error'
+		     WHEN detail LIKE 'event_name do not recognized%' THEN 'event_name'
+		     WHEN detail LIKE 'Dump bag dir missing%' THEN 'Dump bag dir missing'
+		     WHEN detail LIKE 'query cloud DISCARD, detail:Filter quota exceeded' THEN 'Filter quota exceeded'
+		     WHEN detail LIKE 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'EventName is in blacklist'
+		     ELSE detail
+		END AS detail,
+		SUM(cnt) AS cnt
+	FROM (
+		SELECT 'FFF' AS stage, fff_detail AS detail, COUNT(*) AS cnt
 		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status != 'success' AND fff_detail IS NOT NULL
 		GROUP BY fff_detail
 		UNION ALL
@@ -163,7 +174,9 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 		SELECT 'FCL' AS stage, fcl_detail AS detail, COUNT(*) AS cnt
 		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fdr_status = 'success' AND fcl_status != 'success' AND fcl_detail IS NOT NULL
 		GROUP BY fcl_detail
-		ORDER BY stage, cnt DESC`
+	) t
+	GROUP BY stage, detail
+	ORDER BY stage, cnt DESC`
 
 	var rows []*failReasonRow
 	if err := r.slowLog.Observe(slowQueryMeta{
