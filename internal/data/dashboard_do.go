@@ -599,7 +599,7 @@ func (r *doDashboardRepo) vehicleFailReasons(ctx context.Context, ids []string, 
 
 func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehicleParam) ([]*dashboard_api.DoVehicleItem, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildVehicleWhere(param.EventName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT anonymous_id, car_type, project_name,
 		COUNT(*) AS trigger_count,
@@ -635,7 +635,7 @@ func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehic
 
 func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoAnomalyParam) ([]*dashboard_api.DoVehicleItem, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildVehicleWhere(param.EventName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := fmt.Sprintf(`SELECT anonymous_id, car_type, project_name,
 		COUNT(*) AS trigger_count,
@@ -672,7 +672,7 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 
 func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehicleParam) (*dashboard_api.DoActiveTrendResponse, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildVehicleWhere(param.EventName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT dt, COUNT(DISTINCT anonymous_id) AS active_count
 		FROM dwd_cfdi_status_monitor_analysis` + where + `
@@ -703,7 +703,7 @@ func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehic
 }
 
 // buildVehicleWhere 构建车辆维度分析 WHERE 子句
-func buildVehicleWhere(eventName, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
+func buildVehicleWhere(eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
 	var conds []string
 	var args []interface{}
 
@@ -713,10 +713,7 @@ func buildVehicleWhere(eventName, projectName string, carTypes []string, startDt
 	} else {
 		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
 	}
-	if eventName != "" {
-		conds = append(conds, "event_name = ?")
-		args = append(args, eventName)
-	}
+	conds, args = appendMultiCond(conds, args, "event_name", eventNames)
 	if projectName != "" {
 		conds = append(conds, "project_name = ?")
 		args = append(args, projectName)

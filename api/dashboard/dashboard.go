@@ -535,7 +535,7 @@ type DoVehicleItem struct {
 
 // DoTopVehicleRequest Top活跃车辆请求
 type DoTopVehicleRequest struct {
-	EventName   string `form:"event_name"`
+	EventNames  string `form:"event_names"`
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
@@ -550,7 +550,7 @@ type DoTopVehicleResponse struct {
 
 // DoAnomalyRequest 异常车辆请求
 type DoAnomalyRequest struct {
-	EventName   string `form:"event_name"`
+	EventNames  string `form:"event_names"`
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`

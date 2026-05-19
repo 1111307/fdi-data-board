@@ -30,7 +30,7 @@ type DoDashboardRepo interface {
 
 // DoVehicleParam 车辆维度分析通用查询参数
 type DoVehicleParam struct {
-	EventName   string
+	EventNames  []string
 	ProjectName string
 	CarTypes    []string
 	StartDt     string
@@ -290,7 +290,7 @@ func (uc *DoDashboardUseCase) GetFclBw(ctx context.Context, req *dashboard_api.D
 
 func (uc *DoDashboardUseCase) GetTopVehicles(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoTopVehicleResponse, error) {
 	param := &DoVehicleParam{
-		EventName: req.EventName, ProjectName: req.ProjectName,
+		EventNames: splitNames(req.EventNames), ProjectName: req.ProjectName,
 		CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	list, err := uc.repo.GetTopVehicles(ctx, param)
@@ -307,7 +307,7 @@ func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashb
 	}
 	param := &DoAnomalyParam{
 		DoVehicleParam: DoVehicleParam{
-			EventName: req.EventName, ProjectName: req.ProjectName,
+			EventNames: splitNames(req.EventNames), ProjectName: req.ProjectName,
 			CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
 		},
 		MaxRate: maxRate,
@@ -321,7 +321,7 @@ func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashb
 
 func (uc *DoDashboardUseCase) GetActiveTrend(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoActiveTrendResponse, error) {
 	param := &DoVehicleParam{
-		EventName: req.EventName, ProjectName: req.ProjectName,
+		EventNames: splitNames(req.EventNames), ProjectName: req.ProjectName,
 		CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	return uc.repo.GetActiveTrend(ctx, param)
