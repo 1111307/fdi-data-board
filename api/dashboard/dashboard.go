@@ -6,7 +6,7 @@ type BaseResponse struct {
 	Message string `json:"message"`
 }
 
-func (r *BaseResponse) GetCode() int32    { return r.Code }
+func (r *BaseResponse) GetCode() int32     { return r.Code }
 func (r *BaseResponse) GetMessage() string { return r.Message }
 
 // FffRunningItem 筛选器运行明细单条记录，字段与 dwd_cfdi_basic_fff_running 列对齐
@@ -272,15 +272,15 @@ type UuidDetailItem struct {
 // UuidDetailRequest 全链路明细查询请求
 // 筛选参数来自「筛选器诊断」filter bar（diag*），而非「明细分析」filter bar（daily*）
 type UuidDetailRequest struct {
-	FilterName   string `form:"filter_name"`
-	EventNames   string `form:"event_names"`   // 多选，逗号分隔
-	ProjectName  string `form:"project_name"`
-	StartDt      string `form:"start_dt"`
-	EndDt        string `form:"end_dt"`
-	OnlyFail     int    `form:"only_fail"`     // 1=仅看失败
-	StageFilter  string `form:"stage_filter"`  // fff_discard/fdr_discard/fcl_discard/fcl_success
-	Page         int    `form:"page"`
-	PageSize     int    `form:"page_size"`
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
+	ProjectName string `form:"project_name"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败
+	StageFilter string `form:"stage_filter"` // fff_discard/fdr_discard/fcl_discard/fcl_success
+	Page        int    `form:"page"`
+	PageSize    int    `form:"page_size"`
 }
 
 // UuidDetailResponse 全链路明细响应
@@ -318,6 +318,16 @@ type FunnelRequest struct {
 	EndDt       string `form:"end_dt"`
 }
 
+// DoFunnelRequest DO 数采全链路分析请求
+type DoFunnelRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"`
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
 // FunnelResponse 数采全链路分析响应
 type FunnelResponse struct {
 	BaseResponse
@@ -345,7 +355,7 @@ type StageTrendRequest struct {
 // StageTrendResponse 三阶段触发趋势响应
 type StageTrendResponse struct {
 	BaseResponse
-	Dates []string           `json:"dates"`
+	Dates []string            `json:"dates"`
 	Fff   []*StageTrendSeries `json:"fff"`
 	Fdr   []*StageTrendSeries `json:"fdr"`
 	Fcl   []*StageTrendSeries `json:"fcl"`
@@ -406,7 +416,7 @@ type DoTrendRequest struct {
 	FilterName  string `form:"filter_name"`
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`   // 多选，逗号分隔
+	CarTypes    string `form:"car_types"` // 多选，逗号分隔
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 }

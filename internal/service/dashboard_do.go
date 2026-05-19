@@ -552,3 +552,26 @@ func (s *DoDashboardService) GetTrend(ctx *gin.Context) (api.HttpResponse, error
 
 	return result, nil
 }
+
+func (s *DoDashboardService) GetDoFunnel(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FunnelResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoFunnelRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetDoFunnel(ctx, &req)
+	if err != nil {
+		log.Errorf("DoGetFunnel error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	return result, nil
+}

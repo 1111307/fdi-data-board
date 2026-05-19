@@ -26,6 +26,7 @@ func RegisterDoDashboardService(s *service.DoDashboardService) []GroupUrl {
 				{JsonHandlerFunc: s.GetMemTop, Path: "mem_top", Method: GET},
 				{JsonHandlerFunc: s.GetDiskTop, Path: "disk_top", Method: GET},
 				{JsonHandlerFunc: s.GetCloseTop, Path: "close_top", Method: GET},
+				{JsonHandlerFunc: s.GetDoFunnel, Path: "funnel", Method: GET},
 			},
 		},
 	}

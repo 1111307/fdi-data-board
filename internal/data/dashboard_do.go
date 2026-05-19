@@ -6,6 +6,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/wire"
@@ -800,3 +801,91 @@ func appendMultiCond(conds []string, args []interface{}, col string, vals []stri
 
 // toDoTrendResponse 供 FunnelChart 等公共接口复用（预留）
 var _ = dashboard_api.DoTrendResponse{}
+
+func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.FunnelResponse, error) {
+	db := r.dorisDB(ctx)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	base := " FROM dwd_cfdi_status_monitor_analysis" + where + " AND event_name != 'Forever_log'"
+
+	type statRow struct {
+		FffTotal   int64 `gorm:"column:fff_total"`
+		FffAllow   int64 `gorm:"column:fff_allow"`
+		FdrSuccess int64 `gorm:"column:fdr_success"`
+		FdrFail    int64 `gorm:"column:fdr_fail"`
+		FclSuccess int64 `gorm:"column:fcl_success"`
+		FclFail    int64 `gorm:"column:fcl_fail"`
+	}
+	type detailRow struct {
+		Name string `gorm:"column:name"`
+		Cnt  int64  `gorm:"column:cnt"`
+	}
+
+	statSQL := `SELECT
+		COUNT(*) AS fff_total,
+		SUM(CASE WHEN fff_status='success' THEN 1 ELSE 0 END) AS fff_allow,
+		SUM(CASE WHEN fdr_status='success' THEN 1 ELSE 0 END) AS fdr_success,
+		SUM(CASE WHEN fff_status='success' AND fdr_status!='success' THEN 1 ELSE 0 END) AS fdr_fail,
+		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS fcl_success,
+		SUM(CASE WHEN fdr_status='success' AND fcl_status!='success' THEN 1 ELSE 0 END) AS fcl_fail` + base
+
+	fffFailSQL := `SELECT fff_detail AS name, COUNT(*) AS cnt` + base +
+		` AND fff_status!='success' AND fff_detail IS NOT NULL AND fff_detail!=''
+		GROUP BY fff_detail ORDER BY cnt DESC LIMIT 10`
+
+	fdrFailSQL := `SELECT fdr_detail AS name, COUNT(*) AS cnt` + base +
+		` AND fff_status='success' AND fdr_status!='success' AND fdr_detail IS NOT NULL AND fdr_detail!=''
+		GROUP BY fdr_detail ORDER BY cnt DESC LIMIT 10`
+
+	fclFailSQL := `SELECT fcl_detail AS name, COUNT(*) AS cnt` + base +
+		` AND fdr_status='success' AND fcl_status!='success' AND fcl_detail IS NOT NULL AND fcl_detail!=''
+		GROUP BY fcl_detail ORDER BY cnt DESC LIMIT 10`
+
+	var (
+		stat                    statRow
+		fffFail, fdrFail, fclFail []*detailRow
+		statErr, f1, f2, f3     error
+	)
+	var wg sync.WaitGroup
+	wg.Add(4)
+	go func() { defer wg.Done(); statErr = db.Raw(statSQL, args...).Scan(&stat).Error }()
+	go func() { defer wg.Done(); f1 = db.Raw(fffFailSQL, args...).Scan(&fffFail).Error }()
+	go func() { defer wg.Done(); f2 = db.Raw(fdrFailSQL, args...).Scan(&fdrFail).Error }()
+	go func() { defer wg.Done(); f3 = db.Raw(fclFailSQL, args...).Scan(&fclFail).Error }()
+	wg.Wait()
+
+	for _, e := range []error{statErr, f1, f2, f3} {
+		if e != nil {
+			return nil, e
+		}
+	}
+
+	pct := func(a, b int64) float64 {
+		if b == 0 {
+			return 0
+		}
+		return math.Round(float64(a)/float64(b)*1000) / 10
+	}
+	toReasons := func(rows []*detailRow) []*dashboard_api.FunnelFailReason {
+		out := make([]*dashboard_api.FunnelFailReason, 0, len(rows))
+		for _, r := range rows {
+			out = append(out, &dashboard_api.FunnelFailReason{Name: r.Name, Count: r.Cnt})
+		}
+		return out
+	}
+
+	return &dashboard_api.FunnelResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Stat: &dashboard_api.FunnelStat{
+			FffTotal:   stat.FffTotal,
+			FffAllow:   stat.FffAllow,
+			FdrSuccess: stat.FdrSuccess,
+			FdrFail:    stat.FdrFail,
+			FclSuccess: stat.FclSuccess,
+			FclFail:    stat.FclFail,
+			CfdiRate:   pct(stat.FclSuccess, stat.FffTotal),
+		},
+		FffFail: toReasons(fffFail),
+		FdrFail: toReasons(fdrFail),
+		FclFail: toReasons(fclFail),
+	}, nil
+}

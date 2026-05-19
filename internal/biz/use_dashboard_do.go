@@ -26,6 +26,7 @@ type DoDashboardRepo interface {
 	GetTopVehicles(ctx context.Context, param *DoVehicleParam) ([]*dashboard_api.DoVehicleItem, error)
 	GetAnomalyVehicles(ctx context.Context, param *DoAnomalyParam) ([]*dashboard_api.DoVehicleItem, error)
 	GetActiveTrend(ctx context.Context, param *DoVehicleParam) (*dashboard_api.DoActiveTrendResponse, error)
+	GetDoFunnel(ctx context.Context, param *DoCommonParam) (*dashboard_api.FunnelResponse, error)
 }
 
 // DoVehicleParam 车辆维度分析通用查询参数
@@ -344,6 +345,18 @@ func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		List:         list,
 	}, nil
+}
+
+func (uc *DoDashboardUseCase) GetDoFunnel(ctx context.Context, req *dashboard_api.DoFunnelRequest) (*dashboard_api.FunnelResponse, error) {
+	param := &DoCommonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitNames(req.CarTypes),
+		StartDt:     req.StartDt,
+		EndDt:       req.EndDt,
+	}
+	return uc.repo.GetDoFunnel(ctx, param)
 }
 
 func splitNames(raw string) []string {
