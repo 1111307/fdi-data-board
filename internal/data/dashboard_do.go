@@ -321,7 +321,7 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 
 func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT event_name, COUNT(*) AS cnt
 		FROM dwd_cfdi_status_monitor_analysis` + where + `
@@ -347,7 +347,7 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 
 func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT event_name, COUNT(*) AS cnt
 		FROM dwd_cfdi_status_monitor_analysis` + where + `
@@ -397,7 +397,7 @@ func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonPa
 
 func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT event_name, COUNT(*) AS cnt
 		FROM dwd_cfdi_status_monitor_analysis` + where + `
