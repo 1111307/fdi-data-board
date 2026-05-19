@@ -47,6 +47,7 @@ func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverview
 		SUM(CASE WHEN fdr_status='success' THEN 1 ELSE 0 END) AS fdr_count,
 		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS fcl_count
 		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND event_name != 'Forever_log'
 		GROUP BY event_name ORDER BY trigger_count DESC`
 
 	var rows []*doOverviewRow
@@ -167,7 +168,7 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 
 func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT filter_name, COUNT(*) AS cnt
 		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status != 'success' AND fff_detail = 'check_is_no_need_cooldown' AND filter_name IS NOT NULL
@@ -193,7 +194,7 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 
 func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT filter_name, COUNT(*) AS cnt
 		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND filter_name IS NOT NULL
