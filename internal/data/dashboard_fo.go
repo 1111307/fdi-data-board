@@ -7,9 +7,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/wire"
+	"golang.org/x/sync/singleflight"
 
 	dashboard_api "fdi_data_board/api/dashboard"
 	"fdi_data_board/internal/biz"
@@ -21,16 +23,18 @@ var _ biz.FoDashboardRepo = (*foDashboardRepo)(nil)
 
 type foDashboardRepo struct {
 	*baseRepo
+	dimsSfg singleflight.Group
 }
 
 // foDimsCache 维度枚举缓存条目
 type foDimsCache struct {
-	dims      *biz.FoDimensions
-	expiresAt time.Time
+	dims       *biz.FoDimensions
+	expiresAt  time.Time
+	refreshing atomic.Bool
 }
 
 const foDimsCacheKey = "fo_dashboard:dims"
-const foDimsCacheTTL = 30 * time.Minute
+const foDimsCacheTTL = 60 * time.Minute
 
 func NewFoDashboardRepo(data *Data) biz.FoDashboardRepo {
 	return &foDashboardRepo{baseRepo: &baseRepo{data: data}}
@@ -1304,17 +1308,55 @@ func appendStageEventCond(conds []string, args []interface{}, eventNames []strin
 	return conds, args
 }
 
-// GetDimensions 查询 FO Dashboard 下拉维度（近 7 天），带 30 分钟内存缓存
+// GetDimensions 查询 FO Dashboard 下拉维度，采用逻辑过期策略：
+// 缓存存在时始终立即返回（即使已过期），过期后在后台异步刷新一次；
+// 首次冷启动用 singleflight 保证只有一个请求打 Doris。
 func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions, error) {
-	// 命中缓存直接返回
 	if v, ok := r.data.dimCache.Load(foDimsCacheKey); ok {
 		entry := v.(*foDimsCache)
-		if time.Now().Before(entry.expiresAt) {
-			return entry.dims, nil
+		if time.Now().After(entry.expiresAt) && entry.refreshing.CompareAndSwap(false, true) {
+			go func() {
+				dims, err := r.fetchDimensions(context.Background())
+				if err != nil {
+					entry.refreshing.Store(false)
+					return
+				}
+				r.data.dimCache.Store(foDimsCacheKey, &foDimsCache{
+					dims:      dims,
+					expiresAt: time.Now().Add(foDimsCacheTTL),
+				})
+			}()
 		}
+		return entry.dims, nil
 	}
 
+	// 冷启动：singleflight 保证并发请求只打一次 Doris
+	v, err, _ := r.dimsSfg.Do(foDimsCacheKey, func() (interface{}, error) {
+		// 等待 singleflight 期间可能已有其他请求写入缓存
+		if cached, ok := r.data.dimCache.Load(foDimsCacheKey); ok {
+			return cached.(*foDimsCache).dims, nil
+		}
+		dims, err := r.fetchDimensions(ctx)
+		if err != nil {
+			return nil, err
+		}
+		r.data.dimCache.Store(foDimsCacheKey, &foDimsCache{
+			dims:      dims,
+			expiresAt: time.Now().Add(foDimsCacheTTL),
+		})
+		return dims, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.(*biz.FoDimensions), nil
+}
+
+// fetchDimensions 并发查询 Doris 获取四类维度枚举值
+func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimensions, error) {
 	db := r.dorisDB(ctx)
+
+	type strRow struct{ Val string }
 
 	var (
 		filterNames  []string
@@ -1326,8 +1368,6 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 		errEvent     error
 		errCarType   error
 	)
-
-	type strRow struct{ Val string }
 
 	var wg sync.WaitGroup
 	wg.Add(4)
@@ -1397,17 +1437,10 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 		return nil, errCarType
 	}
 
-	dims := &biz.FoDimensions{
+	return &biz.FoDimensions{
 		FilterNames:  filterNames,
 		EventNames:   eventNames,
 		ProjectNames: projectNames,
 		CarTypes:     carTypes,
-	}
-
-	r.data.dimCache.Store(foDimsCacheKey, &foDimsCache{
-		dims:      dims,
-		expiresAt: time.Now().Add(foDimsCacheTTL),
-	})
-
-	return dims, nil
+	}, nil
 }
