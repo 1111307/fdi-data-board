@@ -28,13 +28,13 @@ SELECT
     CASE
         WHEN fff_detail = 'check_is_no_need_cooldown'                             THEN 'cooldown'
         WHEN fff_detail IN ('check_drm_quota', 'check_drm_quota_weight')          THEN 'drm_quota'
-        WHEN fff_detail = 'check_need_acquire_data'                               THEN 'no_acquire'
-        WHEN fff_detail = 'check_not_reach_trigger_maximum'                       THEN 'trigger_max'
+        WHEN fff_detail = 'check_need_acquire_data'                               THEN 'acquire_data'
+        WHEN fff_detail = 'check_not_reach_trigger_maximum'                       THEN 'trigger_maximum'
         WHEN fff_detail LIKE 'Bag invalid:%'                                      THEN 'bag_invalid'
         WHEN fff_detail LIKE 'event_name do not recognized%'                      THEN 'event_not_recognized'
         WHEN fff_detail LIKE 'tls%'                                               THEN 'tls_error'
         WHEN fff_detail = 'query cloud DISCARD, detail:Filter quota exceeded'     THEN 'quota_exceeded'
-        WHEN fff_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'blacklist'
+        WHEN fff_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'event_in_blacklist'
         WHEN fff_detail IS NULL OR fff_detail = ''                                THEN ''
         ELSE 'other'
     END AS fff_detail_tag,
@@ -50,10 +50,9 @@ SELECT
     END AS fdr_detail_tag,
     CASE
         WHEN fcl_detail = 'query cloud DISCARD, detail:Filter quota exceeded'     THEN 'quota_exceeded'
-        WHEN fcl_detail = 'reach upload limit'                                    THEN 'quota_exceeded'
-        WHEN fcl_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'blacklist'
-        WHEN fcl_detail LIKE 'geofence forbidden%'                                THEN 'geofence'
-        WHEN fcl_detail = 'unexpected geofence cause'                             THEN 'geofence'
+        WHEN fcl_detail = 'reach upload limit'                                    THEN 'reach_upload_limit'
+        WHEN fcl_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'event_in_blacklist'
+        WHEN fcl_detail LIKE 'geofence forbidden%' OR fcl_detail = 'unexpected geofence cause' THEN 'geofence_error'
         WHEN fcl_detail LIKE 'tls%'                                               THEN 'tls_error'
         WHEN fcl_detail IN ('bag not exist', 'meta file lost', 'meta file empty') THEN 'bag_missing'
         WHEN fcl_detail IN ('unexpected bag_upload_query cause',

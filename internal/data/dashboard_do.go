@@ -99,11 +99,7 @@ func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverview
 		if b == 0 {
 			return 0
 		}
-		v := math.Round(float64(a)/float64(b)*1000) / 10
-		if v > 100.0 {
-			return 100.0
-		}
-		return v
+		return math.Round(float64(a)/float64(b)*1000) / 10
 	}
 
 	list := make([]*biz.DoOverviewItem, 0, len(rows))

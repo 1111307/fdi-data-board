@@ -1095,8 +1095,9 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		FdrUnauthorized  int64     `gorm:"column:fdr_unauthorized"`
 		FdrOther         int64     `gorm:"column:fdr_other"`
 		FclSuccess       int64     `gorm:"column:fcl_success"`
-		FclQuotaExceeded int64     `gorm:"column:fcl_quota_exceeded"`
-		FclBlacklist     int64     `gorm:"column:fcl_blacklist"`
+		FclQuotaExceeded    int64     `gorm:"column:fcl_quota_exceeded"`
+		FclReachUploadLimit int64     `gorm:"column:fcl_reach_upload_limit"`
+		FclBlacklist        int64     `gorm:"column:fcl_blacklist"`
 		FclGeofence      int64     `gorm:"column:fcl_geofence"`
 		FclTlsError      int64     `gorm:"column:fcl_tls_error"`
 		FclBagMissing    int64     `gorm:"column:fcl_bag_missing"`
@@ -1109,15 +1110,15 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_success,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='cooldown' THEN cnt ELSE 0 END) AS fff_cooldown,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='drm_quota' THEN cnt ELSE 0 END) AS fff_drm_quota,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='no_acquire' THEN cnt ELSE 0 END) AS fff_no_acquire,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='trigger_max' THEN cnt ELSE 0 END) AS fff_trigger_max,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='acquire_data' THEN cnt ELSE 0 END) AS fff_no_acquire,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='trigger_maximum' THEN cnt ELSE 0 END) AS fff_trigger_max,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fff_bag_invalid,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fff_event_not_recognized,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fff_tls_error,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fff_quota_exceeded,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='blacklist' THEN cnt ELSE 0 END) AS fff_blacklist,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fff_blacklist,
 		SUM(CASE WHEN fff_status='discard'
-			AND fff_detail_tag NOT IN ('cooldown','drm_quota','no_acquire','trigger_max','bag_invalid','event_not_recognized','tls_error','quota_exceeded','blacklist')
+			AND fff_detail_tag NOT IN ('cooldown','drm_quota','acquire_data','trigger_maximum','bag_invalid','event_not_recognized','tls_error','quota_exceeded','event_in_blacklist')
 			THEN cnt ELSE 0 END) AS fff_other,
 		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_success,
 		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='memory' THEN cnt ELSE 0 END) AS fdr_memory,
@@ -1131,14 +1132,15 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 			THEN cnt ELSE 0 END) AS fdr_other,
 		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_success,
 		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fcl_quota_exceeded,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='blacklist' THEN cnt ELSE 0 END) AS fcl_blacklist,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='geofence' THEN cnt ELSE 0 END) AS fcl_geofence,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='reach_upload_limit' THEN cnt ELSE 0 END) AS fcl_reach_upload_limit,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fcl_blacklist,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='geofence_error' THEN cnt ELSE 0 END) AS fcl_geofence,
 		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fcl_tls_error,
 		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='bag_missing' THEN cnt ELSE 0 END) AS fcl_bag_missing,
 		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='upload_error' THEN cnt ELSE 0 END) AS fcl_upload_error,
 		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='network_error' THEN cnt ELSE 0 END) AS fcl_network_error,
 		SUM(CASE WHEN fcl_status='discard'
-			AND fcl_detail_tag NOT IN ('quota_exceeded','blacklist','geofence','tls_error','bag_missing','upload_error','network_error')
+			AND fcl_detail_tag NOT IN ('quota_exceeded','reach_upload_limit','event_in_blacklist','geofence_error','tls_error','bag_missing','upload_error','network_error')
 			THEN cnt ELSE 0 END) AS fcl_other
 		FROM ads_do_cfdi_daily` + where + ` AND event_name != 'Forever_log'
 		GROUP BY dt ORDER BY dt ASC`
@@ -1148,9 +1150,9 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		return nil, err
 	}
 
-	fffNames := []string{"success", "cooldown", "drm_quota", "no_acquire", "trigger_max", "bag_invalid", "event_not_recognized", "tls_error", "quota_exceeded", "blacklist", "other"}
+	fffNames := []string{"success", "cooldown", "drm_quota", "acquire_data", "trigger_maximum", "bag_invalid", "event_not_recognized", "tls_error", "quota_exceeded", "event_in_blacklist", "other"}
 	fdrNames := []string{"success", "memory", "disk", "bag_invalid", "bag_dir_missing", "event_not_recognized", "unauthorized", "other"}
-	fclNames := []string{"success", "quota_exceeded", "blacklist", "geofence", "tls_error", "bag_missing", "upload_error", "network_error", "other"}
+	fclNames := []string{"success", "quota_exceeded", "reach_upload_limit", "event_in_blacklist", "geofence_error", "tls_error", "bag_missing", "upload_error", "network_error", "other"}
 
 	fffVals := make(map[string][]int64, len(rows))
 	fdrVals := make(map[string][]int64, len(rows))
@@ -1161,7 +1163,7 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		dates = append(dates, dt)
 		fffVals[dt] = []int64{row.FffSuccess, row.FffCooldown, row.FffDrmQuota, row.FffNoAcquire, row.FffTriggerMax, row.FffBagInvalid, row.FffEventNotRec, row.FffTlsError, row.FffQuotaExceeded, row.FffBlacklist, row.FffOther}
 		fdrVals[dt] = []int64{row.FdrSuccess, row.FdrMemory, row.FdrDisk, row.FdrBagInvalid, row.FdrBagDirMissing, row.FdrEventNotRec, row.FdrUnauthorized, row.FdrOther}
-		fclVals[dt] = []int64{row.FclSuccess, row.FclQuotaExceeded, row.FclBlacklist, row.FclGeofence, row.FclTlsError, row.FclBagMissing, row.FclUploadError, row.FclNetworkError, row.FclOther}
+		fclVals[dt] = []int64{row.FclSuccess, row.FclQuotaExceeded, row.FclReachUploadLimit, row.FclBlacklist, row.FclGeofence, row.FclTlsError, row.FclBagMissing, row.FclUploadError, row.FclNetworkError, row.FclOther}
 	}
 
 	return &biz.StageTrendData{
