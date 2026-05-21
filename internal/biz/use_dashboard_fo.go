@@ -31,6 +31,7 @@ type FunnelParam struct {
 	FilterName  string
 	EventNames  []string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 }
@@ -48,6 +49,7 @@ type StageTrendParam struct {
 	FilterName  string
 	EventNames  []string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 }
@@ -64,6 +66,7 @@ type StageTrendData struct {
 type CloseReasonParam struct {
 	FilterName  string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 }
@@ -73,6 +76,7 @@ type UuidDetailParam struct {
 	FilterName  string
 	EventNames  []string // 多选
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 	OnlyFail    bool
@@ -86,6 +90,7 @@ type FclTriggerParam struct {
 	FilterName  string
 	EventNames  []string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -97,6 +102,7 @@ type FdrTriggerParam struct {
 	FilterName  string
 	EventNames  []string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -107,6 +113,7 @@ type FdrTriggerParam struct {
 type FffCloseParam struct {
 	FilterName  string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -118,6 +125,7 @@ type FffTriggerParam struct {
 	FilterName  string
 	EventNames  []string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -136,6 +144,7 @@ type FoDimensions struct {
 type FffRunningParam struct {
 	FilterName  string
 	ProjectName string
+	CarTypes    []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -168,6 +177,7 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 		Page:        page,
@@ -204,6 +214,7 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 	param := &FffCloseParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 		Page:        page,
@@ -241,6 +252,7 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 		Page:        page,
@@ -278,6 +290,7 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 		Page:        page,
@@ -324,6 +337,7 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 		FilterName:  req.FilterName,
 		EventNames:  eventNames,
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 		OnlyFail:    req.OnlyFail == 1,
@@ -350,6 +364,7 @@ func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard
 	param := &CloseReasonParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -368,6 +383,7 @@ func (uc *FoDashboardUseCase) GetFunnel(ctx context.Context, req *dashboard_api.
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -389,6 +405,7 @@ func (uc *FoDashboardUseCase) GetStageTrend(ctx context.Context, req *dashboard_
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -435,6 +452,7 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 	param := &FffRunningParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 		Page:        page,

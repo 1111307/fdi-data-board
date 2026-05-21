@@ -137,6 +137,7 @@ func buildFffRunningWhere(param *biz.FffRunningParam) (string, []interface{}) {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
 	if len(conds) == 0 {
 		return "", args
@@ -287,6 +288,7 @@ func buildFffTriggerWhere(param *biz.FffTriggerParam) (string, []interface{}) {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -416,6 +418,7 @@ func buildFffCloseWhere(param *biz.FffCloseParam) (string, []interface{}) {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -554,6 +557,7 @@ func buildFdrTriggerWhere(param *biz.FdrTriggerParam) (string, []interface{}) {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -697,6 +701,7 @@ func buildFclTriggerWhere(param *biz.FclTriggerParam) (string, []interface{}) {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -851,6 +856,7 @@ func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 	if param.OnlyFail {
 		conds = append(conds, "fcl_status != 'success'")
 	}
@@ -969,6 +975,7 @@ func buildCloseReasonWhere(param *biz.CloseReasonParam) (string, []interface{}) 
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -986,7 +993,7 @@ type stageTrendRow struct {
 
 func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam) (*biz.FunnelData, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, nil, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	base := " FROM dwd_cfdi_status_monitor_analysis" + where + " AND event_name != 'Forever_log'"
 
 	type statRow struct {
@@ -1080,7 +1087,7 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 
 func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
 	db := r.dorisDB(ctx)
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, nil, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	type stageAllRow struct {
 		Dt          time.Time `gorm:"column:dt"`

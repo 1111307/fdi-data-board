@@ -35,6 +35,7 @@ type FffRunningItem struct {
 type FffRunningRequest struct {
 	FilterName  string `form:"filter_name"`
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -87,6 +88,7 @@ type FffTriggerRequest struct {
 	FilterName  string `form:"filter_name"`
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -124,6 +126,7 @@ type FffCloseItem struct {
 type FffCloseRequest struct {
 	FilterName  string `form:"filter_name"`
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -172,6 +175,7 @@ type FdrTriggerRequest struct {
 	FilterName  string `form:"filter_name"`
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -216,6 +220,7 @@ type FclTriggerRequest struct {
 	FilterName  string `form:"filter_name"`
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -275,6 +280,7 @@ type UuidDetailRequest struct {
 	FilterName  string `form:"filter_name"`
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败
@@ -314,6 +320,7 @@ type FunnelRequest struct {
 	FilterName  string `form:"filter_name"`
 	EventNames  string `form:"event_names"`
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 }
@@ -348,6 +355,7 @@ type StageTrendRequest struct {
 	FilterName  string `form:"filter_name"`
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 }
@@ -371,6 +379,7 @@ type CloseReasonItem struct {
 type CloseReasonRequest struct {
 	FilterName  string `form:"filter_name"`
 	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 }
