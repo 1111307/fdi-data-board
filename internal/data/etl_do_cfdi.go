@@ -149,8 +149,8 @@ func (r *etlRepo) ListLogs(ctx context.Context, limit int) ([]*biz.EtlLog, error
 func (r *etlRepo) upsertLog(dt, status, runType string, cnt, costMs int64, errMsg string) {
 	if status == "running" {
 		r.data.mysqlDB.Exec(`
-			INSERT INTO etl_job_log (dt, table_name, status, run_type, cnt, cost_ms, error_msg)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO etl_job_log (dt, table_name, status, run_type, cnt, cost_ms, error_msg, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
 			ON DUPLICATE KEY UPDATE
 				status    = VALUES(status),
 				run_type  = VALUES(run_type),
