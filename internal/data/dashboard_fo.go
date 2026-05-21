@@ -978,21 +978,10 @@ func buildCloseReasonWhere(param *biz.CloseReasonParam) (string, []interface{}) 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-// stageTrendRow 三阶段趋势聚合结果（三张表共用同一扫描结构）
-type stageTrendRow struct {
-	Dt       time.Time `gorm:"column:dt"`
-	Success  int64     `gorm:"column:success"`
-	Cat2     int64     `gorm:"column:cat2"`
-	Cat3     int64     `gorm:"column:cat3"`
-	Cat4     int64     `gorm:"column:cat4"`
-	Cat5     int64     `gorm:"column:cat5"`
-	CatOther int64     `gorm:"column:cat_other"`
-}
-
 func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam) (*biz.FunnelData, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
-	base := " FROM dwd_cfdi_status_monitor_analysis" + where + " AND event_name != 'Forever_log'"
+	base := " FROM ads_do_cfdi_daily" + where + " AND event_name != 'Forever_log'"
 
 	type statRow struct {
 		FffTotal   int64 `gorm:"column:fff_total"`
@@ -1008,24 +997,21 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 	}
 
 	statSQL := `SELECT
-		COUNT(*) AS fff_total,
-		SUM(CASE WHEN fff_status='success' THEN 1 ELSE 0 END) AS fff_allow,
-		SUM(CASE WHEN fdr_status='success' THEN 1 ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fff_status='success' AND fdr_status!='success' THEN 1 ELSE 0 END) AS fdr_fail,
-		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS fcl_success,
-		SUM(CASE WHEN fdr_status='success' AND fcl_status!='success' THEN 1 ELSE 0 END) AS fcl_fail` + base
+		SUM(cnt) AS fff_total,
+		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_allow,
+		SUM(CASE WHEN fdr_status='success' OR fcl_status!='' OR fcl_status != NULL THEN cnt ELSE 0 END) AS fdr_success,
+		SUM(CASE WHEN fdr_status='discard' THEN cnt ELSE 0 END) AS fdr_fail,
+		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_success,
+		SUM(CASE WHEN fcl_status='discard' THEN cnt ELSE 0 END) AS fcl_fail` + base
 
-	fffFailSQL := `SELECT fff_detail AS name, COUNT(*) AS cnt` + base +
-		` AND fff_status!='success' AND fff_detail IS NOT NULL AND fff_detail!=''
-		GROUP BY fff_detail ORDER BY cnt DESC LIMIT 10`
+	fffFailSQL := `SELECT fff_detail_tag AS name, SUM(cnt) AS cnt` + base +
+		` AND fff_status='discard' GROUP BY fff_detail_tag ORDER BY cnt DESC LIMIT 10`
 
-	fdrFailSQL := `SELECT fdr_detail AS name, COUNT(*) AS cnt` + base +
-		` AND fff_status='success' AND fdr_status!='success' AND fdr_detail IS NOT NULL AND fdr_detail!=''
-		GROUP BY fdr_detail ORDER BY cnt DESC LIMIT 10`
+	fdrFailSQL := `SELECT fdr_detail_tag AS name, SUM(cnt) AS cnt` + base +
+		` AND fdr_status='discard' GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
 
-	fclFailSQL := `SELECT fcl_detail AS name, COUNT(*) AS cnt` + base +
-		` AND fdr_status='success' AND fcl_status!='success' AND fcl_detail IS NOT NULL AND fcl_detail!=''
-		GROUP BY fcl_detail ORDER BY cnt DESC LIMIT 10`
+	fclFailSQL := `SELECT fcl_detail_tag AS name, SUM(cnt) AS cnt` + base +
+		` AND fcl_status='discard' GROUP BY fcl_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	var (
 		stat                      statRow
@@ -1088,57 +1074,73 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	type stageAllRow struct {
-		Dt          time.Time `gorm:"column:dt"`
-		FffSuccess  int64     `gorm:"column:fff_success"`
-		FffCat2     int64     `gorm:"column:fff_cat2"`
-		FffCat3     int64     `gorm:"column:fff_cat3"`
-		FffCat4     int64     `gorm:"column:fff_cat4"`
-		FffCat5     int64     `gorm:"column:fff_cat5"`
-		FffCatOther int64     `gorm:"column:fff_cat_other"`
-		FdrSuccess  int64     `gorm:"column:fdr_success"`
-		FdrCat2     int64     `gorm:"column:fdr_cat2"`
-		FdrCat3     int64     `gorm:"column:fdr_cat3"`
-		FdrCat4     int64     `gorm:"column:fdr_cat4"`
-		FdrCat5     int64     `gorm:"column:fdr_cat5"`
-		FdrCatOther int64     `gorm:"column:fdr_cat_other"`
-		FclSuccess  int64     `gorm:"column:fcl_success"`
-		FclCat2     int64     `gorm:"column:fcl_cat2"`
-		FclCat3     int64     `gorm:"column:fcl_cat3"`
-		FclCat4     int64     `gorm:"column:fcl_cat4"`
-		FclCat5     int64     `gorm:"column:fcl_cat5"`
-		FclCatOther int64     `gorm:"column:fcl_cat_other"`
+		Dt               time.Time `gorm:"column:dt"`
+		FffSuccess       int64     `gorm:"column:fff_success"`
+		FffCooldown      int64     `gorm:"column:fff_cooldown"`
+		FffDrmQuota      int64     `gorm:"column:fff_drm_quota"`
+		FffNoAcquire     int64     `gorm:"column:fff_no_acquire"`
+		FffTriggerMax    int64     `gorm:"column:fff_trigger_max"`
+		FffBagInvalid    int64     `gorm:"column:fff_bag_invalid"`
+		FffEventNotRec   int64     `gorm:"column:fff_event_not_recognized"`
+		FffTlsError      int64     `gorm:"column:fff_tls_error"`
+		FffQuotaExceeded int64     `gorm:"column:fff_quota_exceeded"`
+		FffBlacklist     int64     `gorm:"column:fff_blacklist"`
+		FffOther         int64     `gorm:"column:fff_other"`
+		FdrSuccess       int64     `gorm:"column:fdr_success"`
+		FdrMemory        int64     `gorm:"column:fdr_memory"`
+		FdrDisk          int64     `gorm:"column:fdr_disk"`
+		FdrBagInvalid    int64     `gorm:"column:fdr_bag_invalid"`
+		FdrBagDirMissing int64     `gorm:"column:fdr_bag_dir_missing"`
+		FdrEventNotRec   int64     `gorm:"column:fdr_event_not_recognized"`
+		FdrUnauthorized  int64     `gorm:"column:fdr_unauthorized"`
+		FdrOther         int64     `gorm:"column:fdr_other"`
+		FclSuccess       int64     `gorm:"column:fcl_success"`
+		FclQuotaExceeded int64     `gorm:"column:fcl_quota_exceeded"`
+		FclBlacklist     int64     `gorm:"column:fcl_blacklist"`
+		FclGeofence      int64     `gorm:"column:fcl_geofence"`
+		FclTlsError      int64     `gorm:"column:fcl_tls_error"`
+		FclBagMissing    int64     `gorm:"column:fcl_bag_missing"`
+		FclUploadError   int64     `gorm:"column:fcl_upload_error"`
+		FclNetworkError  int64     `gorm:"column:fcl_network_error"`
+		FclOther         int64     `gorm:"column:fcl_other"`
 	}
 
 	sql := `SELECT dt,
-		SUM(CASE WHEN fff_status='success' THEN 1 ELSE 0 END) AS fff_success,
-		SUM(CASE WHEN fff_status!='success' AND fff_detail='check_is_no_need_cooldown' THEN 1 ELSE 0 END) AS fff_cat2,
-		SUM(CASE WHEN fff_status!='success' AND fff_detail IN ('check_drm_quota','check_drm_quota_weight') THEN 1 ELSE 0 END) AS fff_cat3,
-		SUM(CASE WHEN fff_status!='success' AND fff_detail='check_not_reach_trigger_maximum' THEN 1 ELSE 0 END) AS fff_cat4,
-		SUM(CASE WHEN fff_status!='success' AND fff_detail='check_need_acquire_data' THEN 1 ELSE 0 END) AS fff_cat5,
-		SUM(CASE WHEN fff_status!='success'
-			AND fff_detail NOT IN ('check_is_no_need_cooldown','check_drm_quota','check_drm_quota_weight',
-			                       'check_not_reach_trigger_maximum','check_need_acquire_data')
-			THEN 1 ELSE 0 END) AS fff_cat_other,
-		SUM(CASE WHEN fdr_status='success' THEN 1 ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fdr_status!='success' AND INSTR(fdr_detail,'because of full gc')>0 THEN 1 ELSE 0 END) AS fdr_cat2,
-		SUM(CASE WHEN fdr_status!='success' AND INSTR(fdr_detail,'do not recognized')>0 THEN 1 ELSE 0 END) AS fdr_cat3,
-		SUM(CASE WHEN fdr_status!='success' AND INSTR(fdr_detail,'mem pool water line')>0 THEN 1 ELSE 0 END) AS fdr_cat4,
-		SUM(CASE WHEN fdr_status!='success' AND INSTR(fdr_detail,'Bag invalid')>0 THEN 1 ELSE 0 END) AS fdr_cat5,
-		SUM(CASE WHEN fdr_status!='success'
-			AND INSTR(fdr_detail,'because of full gc')=0 AND INSTR(fdr_detail,'do not recognized')=0
-			AND INSTR(fdr_detail,'mem pool water line')=0 AND INSTR(fdr_detail,'Bag invalid')=0
-			THEN 1 ELSE 0 END) AS fdr_cat_other,
-		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS fcl_success,
-		SUM(CASE WHEN fcl_status!='success' AND INSTR(fcl_detail,'geofence forbidden')>0 THEN 1 ELSE 0 END) AS fcl_cat2,
-		SUM(CASE WHEN fcl_status!='success' AND (INSTR(fcl_detail,'bag not exist')>0 OR INSTR(fcl_detail,'meta file lost')>0) THEN 1 ELSE 0 END) AS fcl_cat3,
-		SUM(CASE WHEN fcl_status!='success' AND (INSTR(fcl_detail,'reach upload limit')>0 OR INSTR(fcl_detail,'Filter quota exceeded')>0) THEN 1 ELSE 0 END) AS fcl_cat4,
-		SUM(CASE WHEN fcl_status!='success' AND INSTR(fcl_detail,'EventName is in blacklist')>0 THEN 1 ELSE 0 END) AS fcl_cat5,
-		SUM(CASE WHEN fcl_status!='success'
-			AND INSTR(fcl_detail,'geofence forbidden')=0 AND INSTR(fcl_detail,'bag not exist')=0
-			AND INSTR(fcl_detail,'meta file lost')=0 AND INSTR(fcl_detail,'reach upload limit')=0
-			AND INSTR(fcl_detail,'Filter quota exceeded')=0 AND INSTR(fcl_detail,'EventName is in blacklist')=0
-			THEN 1 ELSE 0 END) AS fcl_cat_other
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND event_name != 'Forever_log'
+		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_success,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='cooldown' THEN cnt ELSE 0 END) AS fff_cooldown,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='drm_quota' THEN cnt ELSE 0 END) AS fff_drm_quota,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='no_acquire' THEN cnt ELSE 0 END) AS fff_no_acquire,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='trigger_max' THEN cnt ELSE 0 END) AS fff_trigger_max,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fff_bag_invalid,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fff_event_not_recognized,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fff_tls_error,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fff_quota_exceeded,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='blacklist' THEN cnt ELSE 0 END) AS fff_blacklist,
+		SUM(CASE WHEN fff_status='discard'
+			AND fff_detail_tag NOT IN ('cooldown','drm_quota','no_acquire','trigger_max','bag_invalid','event_not_recognized','tls_error','quota_exceeded','blacklist')
+			THEN cnt ELSE 0 END) AS fff_other,
+		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_success,
+		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='memory' THEN cnt ELSE 0 END) AS fdr_memory,
+		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='disk' THEN cnt ELSE 0 END) AS fdr_disk,
+		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fdr_bag_invalid,
+		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='bag_dir_missing' THEN cnt ELSE 0 END) AS fdr_bag_dir_missing,
+		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fdr_event_not_recognized,
+		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='unauthorized' THEN cnt ELSE 0 END) AS fdr_unauthorized,
+		SUM(CASE WHEN fdr_status='discard'
+			AND fdr_detail_tag NOT IN ('memory','disk','bag_invalid','bag_dir_missing','event_not_recognized','unauthorized')
+			THEN cnt ELSE 0 END) AS fdr_other,
+		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_success,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fcl_quota_exceeded,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='blacklist' THEN cnt ELSE 0 END) AS fcl_blacklist,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='geofence' THEN cnt ELSE 0 END) AS fcl_geofence,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fcl_tls_error,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='bag_missing' THEN cnt ELSE 0 END) AS fcl_bag_missing,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='upload_error' THEN cnt ELSE 0 END) AS fcl_upload_error,
+		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='network_error' THEN cnt ELSE 0 END) AS fcl_network_error,
+		SUM(CASE WHEN fcl_status='discard'
+			AND fcl_detail_tag NOT IN ('quota_exceeded','blacklist','geofence','tls_error','bag_missing','upload_error','network_error')
+			THEN cnt ELSE 0 END) AS fcl_other
+		FROM ads_do_cfdi_daily` + where + ` AND event_name != 'Forever_log'
 		GROUP BY dt ORDER BY dt ASC`
 
 	var rows []*stageAllRow
@@ -1146,46 +1148,48 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		return nil, err
 	}
 
+	fffNames := []string{"success", "cooldown", "drm_quota", "no_acquire", "trigger_max", "bag_invalid", "event_not_recognized", "tls_error", "quota_exceeded", "blacklist", "other"}
+	fdrNames := []string{"success", "memory", "disk", "bag_invalid", "bag_dir_missing", "event_not_recognized", "unauthorized", "other"}
+	fclNames := []string{"success", "quota_exceeded", "blacklist", "geofence", "tls_error", "bag_missing", "upload_error", "network_error", "other"}
+
+	fffVals := make(map[string][]int64, len(rows))
+	fdrVals := make(map[string][]int64, len(rows))
+	fclVals := make(map[string][]int64, len(rows))
 	dates := make([]string, 0, len(rows))
-	fffMap := make(map[string]*stageTrendRow, len(rows))
-	fdrMap := make(map[string]*stageTrendRow, len(rows))
-	fclMap := make(map[string]*stageTrendRow, len(rows))
 	for _, row := range rows {
 		dt := row.Dt.Format("2006-01-02")
 		dates = append(dates, dt)
-		fffMap[dt] = &stageTrendRow{Dt: row.Dt, Success: row.FffSuccess, Cat2: row.FffCat2, Cat3: row.FffCat3, Cat4: row.FffCat4, Cat5: row.FffCat5, CatOther: row.FffCatOther}
-		fdrMap[dt] = &stageTrendRow{Dt: row.Dt, Success: row.FdrSuccess, Cat2: row.FdrCat2, Cat3: row.FdrCat3, Cat4: row.FdrCat4, Cat5: row.FdrCat5, CatOther: row.FdrCatOther}
-		fclMap[dt] = &stageTrendRow{Dt: row.Dt, Success: row.FclSuccess, Cat2: row.FclCat2, Cat3: row.FclCat3, Cat4: row.FclCat4, Cat5: row.FclCat5, CatOther: row.FclCatOther}
+		fffVals[dt] = []int64{row.FffSuccess, row.FffCooldown, row.FffDrmQuota, row.FffNoAcquire, row.FffTriggerMax, row.FffBagInvalid, row.FffEventNotRec, row.FffTlsError, row.FffQuotaExceeded, row.FffBlacklist, row.FffOther}
+		fdrVals[dt] = []int64{row.FdrSuccess, row.FdrMemory, row.FdrDisk, row.FdrBagInvalid, row.FdrBagDirMissing, row.FdrEventNotRec, row.FdrUnauthorized, row.FdrOther}
+		fclVals[dt] = []int64{row.FclSuccess, row.FclQuotaExceeded, row.FclBlacklist, row.FclGeofence, row.FclTlsError, row.FclBagMissing, row.FclUploadError, row.FclNetworkError, row.FclOther}
 	}
 
 	return &biz.StageTrendData{
 		Dates: dates,
-		Fff:   buildStageSeries(dates, fffMap, []string{"FFF 成功", "冷却丢弃", "DRM Quota", "触发上限", "数采限制", "其他丢弃"}),
-		Fdr:   buildStageSeries(dates, fdrMap, []string{"FDR 成功", "Full GC", "事件不识别", "内存限制", "Bag Invalid", "其他丢弃"}),
-		Fcl:   buildStageSeries(dates, fclMap, []string{"FCL 成功", "Geofence限制", "bag/meta丢失", "上传Quota", "事件黑名单", "其他丢弃"}),
+		Fff:   buildStageSeries(dates, fffVals, fffNames),
+		Fdr:   buildStageSeries(dates, fdrVals, fdrNames),
+		Fcl:   buildStageSeries(dates, fclVals, fclNames),
 	}, nil
 }
 
-func buildStageSeries(dates []string, rowMap map[string]*stageTrendRow, names []string) []*biz.StageTrendSeries {
+func buildStageSeries(dates []string, valMap map[string][]int64, names []string) []*biz.StageTrendSeries {
 	series := make([]*biz.StageTrendSeries, len(names))
 	for i, name := range names {
 		series[i] = &biz.StageTrendSeries{Name: name, Data: make([]int64, len(dates))}
 	}
 	for i, dt := range dates {
-		row, ok := rowMap[dt]
+		vals, ok := valMap[dt]
 		if !ok {
 			continue
 		}
-		vals := []int64{row.Success, row.Cat2, row.Cat3, row.Cat4, row.Cat5, row.CatOther}
-		for j, v := range vals {
-			if j < len(series) {
-				series[j].Data[i] = v
+		for j := range series {
+			if j < len(vals) {
+				series[j].Data[i] = vals[j]
 			}
 		}
 	}
 	return series
 }
-
 
 // GetDimensions 查询 FO Dashboard 下拉维度，采用逻辑过期策略：
 // 缓存存在时始终立即返回（即使已过期），过期后在后台异步刷新一次；
