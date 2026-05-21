@@ -999,7 +999,7 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 	statSQL := `SELECT
 		SUM(cnt) AS fff_total,
 		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_allow,
-		SUM(CASE WHEN fdr_status='success' OR fcl_status!='' OR fcl_status != NULL THEN cnt ELSE 0 END) AS fdr_success,
+		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_success,
 		SUM(CASE WHEN fdr_status='discard' THEN cnt ELSE 0 END) AS fdr_fail,
 		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_success,
 		SUM(CASE WHEN fcl_status='discard' THEN cnt ELSE 0 END) AS fcl_fail` + base

@@ -33,7 +33,6 @@ func NewDoDashboardRepo(data *Data) biz.DoDashboardRepo {
 // doOverviewRow 事件横向对比聚合行
 type doOverviewRow struct {
 	EventName    string `gorm:"column:event_name"`
-	VehicleCount int64  `gorm:"column:vehicle_count"`
 	TriggerCount int64  `gorm:"column:trigger_count"`
 	FffCount     int64  `gorm:"column:fff_count"`
 	FdrCount     int64  `gorm:"column:fdr_count"`
@@ -44,38 +43,74 @@ func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverview
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT event_name,
-		COUNT(DISTINCT anonymous_id) AS vehicle_count,
-		COUNT(*) AS trigger_count,
-		SUM(CASE WHEN fff_status='success' THEN 1 ELSE 0 END) AS fff_count,
-		SUM(CASE WHEN fdr_status='success' THEN 1 ELSE 0 END) AS fdr_count,
-		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS fcl_count
-		FROM dwd_cfdi_status_monitor_analysis` + where + `
+	adsSql := `SELECT event_name,
+		SUM(cnt) AS trigger_count,
+		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_count,
+		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_count,
+		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_count
+		FROM ads_do_cfdi_daily` + where + `
 		AND event_name != 'Forever_log'
 		GROUP BY event_name ORDER BY trigger_count DESC`
 
-	var rows []*doOverviewRow
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetOverview", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames, FilterName: param.FilterName,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
-		return nil, err
+	type vehicleRow struct {
+		EventName    string `gorm:"column:event_name"`
+		VehicleCount int64  `gorm:"column:vehicle_count"`
+	}
+	dwdSql := `SELECT event_name, COUNT(DISTINCT anonymous_id) AS vehicle_count
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		AND event_name != 'Forever_log'
+		GROUP BY event_name`
+
+	var (
+		rows   []*doOverviewRow
+		vRows  []*vehicleRow
+		adsErr error
+		dwdErr error
+	)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		adsErr = r.slowLog.Observe(slowQueryMeta{
+			QueryType: "GetOverview", StartDt: param.StartDt, EndDt: param.EndDt,
+			EventNames: param.EventNames, FilterName: param.FilterName,
+		}, func() error {
+			return db.Raw(adsSql, args...).Scan(&rows).Error
+		})
+	}()
+	go func() {
+		defer wg.Done()
+		dwdErr = db.Raw(dwdSql, args...).Scan(&vRows).Error
+	}()
+	wg.Wait()
+	if adsErr != nil {
+		return nil, adsErr
+	}
+	if dwdErr != nil {
+		return nil, dwdErr
+	}
+
+	vehicleMap := make(map[string]int64, len(vRows))
+	for _, v := range vRows {
+		vehicleMap[v.EventName] = v.VehicleCount
 	}
 
 	pct := func(a, b int64) float64 {
 		if b == 0 {
 			return 0
 		}
-		return math.Round(float64(a)/float64(b)*1000) / 10
+		v := math.Round(float64(a)/float64(b)*1000) / 10
+		if v > 100.0 {
+			return 100.0
+		}
+		return v
 	}
 
 	list := make([]*biz.DoOverviewItem, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, &biz.DoOverviewItem{
 			EventName:    row.EventName,
-			VehicleCount: row.VehicleCount,
+			VehicleCount: vehicleMap[row.EventName],
 			TriggerCount: row.TriggerCount,
 			CfdiRate:     pct(row.FclCount, row.TriggerCount),
 			FffCount:     row.FffCount,
@@ -101,9 +136,9 @@ func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam)
 	where, args := buildDoTrendWhere(param)
 
 	sql := `SELECT dt,
-		COUNT(*) AS total,
-		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS success
-		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		SUM(cnt) AS total,
+		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS success
+		FROM ads_do_cfdi_daily` + where + `
 		GROUP BY dt ORDER BY dt ASC`
 
 	var rows []*doTrendRow
@@ -140,7 +175,7 @@ func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam)
 // failReasonRow UNION ALL 聚合行
 type failReasonRow struct {
 	Stage  string `gorm:"column:stage"`
-	Detail string `gorm:"column:detail"`
+	Detail string `gorm:"column:detail_tag"`
 	Cnt    int64  `gorm:"column:cnt"`
 }
 
@@ -148,35 +183,21 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	// UNION ALL 三段，每段有相同的 WHERE 参数，args 需要重复三份
-	tripleArgs := append(append(append([]interface{}{}, args...), args...), args...)
-
-	sql := `SELECT stage,
-		CASE WHEN detail LIKE 'Bag invalid:%' THEN 'Bag invalid'
-		     WHEN detail LIKE 'tls%' THEN 'TLS error'
-		     WHEN detail LIKE 'event_name do not recognized%' THEN 'event_name'
-		     WHEN detail LIKE 'Dump bag dir missing%' THEN 'Dump bag dir missing'
-		     WHEN detail LIKE 'query cloud DISCARD, detail:Filter quota exceeded' THEN 'Filter quota exceeded'
-		     WHEN detail LIKE 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'EventName is in blacklist'
-		     ELSE detail
-		END AS detail,
-		SUM(cnt) AS cnt
+	sql := `SELECT stage, detail_tag, SUM(cnt) AS cnt
 	FROM (
-		SELECT 'FFF' AS stage, fff_detail AS detail, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status != 'success' AND fff_detail IS NOT NULL
-		GROUP BY fff_detail
+		SELECT 'FFF' AS stage, fff_detail_tag AS detail_tag, cnt
+		FROM ads_do_cfdi_daily` + where + ` AND fff_status = 'discard' AND fff_detail_tag IS NOT NULL AND fff_detail_tag != ''
 		UNION ALL
-		SELECT 'FDR' AS stage, fdr_detail AS detail, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status = 'success' AND fdr_status != 'success' AND fdr_detail IS NOT NULL
-		GROUP BY fdr_detail
+		SELECT 'FDR' AS stage, fdr_detail_tag AS detail_tag, cnt
+		FROM ads_do_cfdi_daily` + where + ` AND fdr_status = 'discard' AND fdr_detail_tag IS NOT NULL AND fdr_detail_tag != ''
 		UNION ALL
-		SELECT 'FCL' AS stage, fcl_detail AS detail, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fdr_status = 'success' AND fcl_status != 'success' AND fcl_detail IS NOT NULL
-		GROUP BY fcl_detail
+		SELECT 'FCL' AS stage, fcl_detail_tag AS detail_tag, cnt
+		FROM ads_do_cfdi_daily` + where + ` AND fcl_status = 'discard' AND fcl_detail_tag IS NOT NULL AND fcl_detail_tag != ''
 	) t
-	GROUP BY stage, detail
+	GROUP BY stage, detail_tag
 	ORDER BY stage, cnt DESC`
 
+	tripleArgs := append(append(append([]interface{}{}, args...), args...), args...)
 	var rows []*failReasonRow
 	if err := r.slowLog.Observe(slowQueryMeta{
 		QueryType: "GetFailReason", StartDt: param.StartDt, EndDt: param.EndDt,
@@ -201,8 +222,8 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT filter_name, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_status != 'success' AND fff_detail = 'check_is_no_need_cooldown' AND filter_name IS NOT NULL
+	sql := `SELECT filter_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + ` AND fff_status != 'success' AND fff_detail_tag = 'cooldown' AND filter_name IS NOT NULL
 		GROUP BY filter_name
 		ORDER BY cnt DESC
 		LIMIT 20`
@@ -232,8 +253,8 @@ func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommo
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT filter_name, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND filter_name IS NOT NULL
+	sql := `SELECT filter_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + ` AND filter_name IS NOT NULL
 		GROUP BY filter_name
 		ORDER BY cnt DESC
 		LIMIT 10`
@@ -263,8 +284,8 @@ func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonP
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT fff_sw_version AS sw_version, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + ` AND fff_sw_version IS NOT NULL AND fff_sw_version != ''
+	sql := `SELECT fff_sw_version AS sw_version, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + ` AND fff_sw_version IS NOT NULL AND fff_sw_version != ''
 		GROUP BY fff_sw_version
 		ORDER BY cnt DESC
 		LIMIT 20`
@@ -294,8 +315,8 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT project_name, car_type, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + `
+	sql := `SELECT project_name, car_type, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + `
 		AND project_name IS NOT NULL AND project_name != ''
 		AND car_type IS NOT NULL AND car_type != ''
 		GROUP BY project_name, car_type
@@ -367,10 +388,10 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT event_name, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + `
-		AND fff_status = 'success' AND fdr_status != 'success'
-		AND fdr_detail IN ('because of full gc', 'mem pool water line')
+	sql := `SELECT event_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + `
+		AND fdr_status != 'success'
+		AND fdr_detail_tag = 'memory'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
@@ -397,10 +418,10 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT event_name, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + `
-		AND fff_status = 'success' AND fdr_status != 'success'
-		AND fdr_detail IN ('Disk overrun', 'Exceeds the maximum number of files')
+	sql := `SELECT event_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + `
+		AND fdr_status != 'success'
+		AND fdr_detail_tag = 'disk'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
@@ -455,10 +476,10 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT event_name, COUNT(*) AS cnt
-		FROM dwd_cfdi_status_monitor_analysis` + where + `
-		AND fdr_status = 'success' AND fcl_status != 'success'
-		AND fcl_detail = 'query cloud DISCARD, detail:Filter quota exceeded'
+	sql := `SELECT event_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + `
+		fcl_status != 'discard'
+		AND fcl_detail_tag = 'quota_exceeded'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
@@ -486,7 +507,7 @@ func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoComm
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT project_name, COUNT(DISTINCT event_name) AS event_count
-		FROM dwd_cfdi_status_monitor_analysis` + where + `
+		FROM ads_do_cfdi_daily` + where + `
 		AND fcl_status = 'success'
 		AND project_name IS NOT NULL AND project_name != ''
 		GROUP BY project_name ORDER BY event_count DESC`
@@ -879,7 +900,7 @@ func appendMultiCond(conds []string, args []interface{}, col string, vals []stri
 func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonParam) (*biz.FunnelData, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
-	base := " FROM dwd_cfdi_status_monitor_analysis" + where + " AND event_name != 'Forever_log'"
+	base := " FROM ads_do_cfdi_daily" + where + " AND event_name != 'Forever_log'"
 
 	type statRow struct {
 		FffTotal   int64 `gorm:"column:fff_total"`
@@ -895,24 +916,21 @@ func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonPa
 	}
 
 	statSQL := `SELECT
-		COUNT(*) AS fff_total,
-		SUM(CASE WHEN fff_status='success' THEN 1 ELSE 0 END) AS fff_allow,
-		SUM(CASE WHEN fdr_status='success' THEN 1 ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fff_status='success' AND fdr_status!='success' THEN 1 ELSE 0 END) AS fdr_fail,
-		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS fcl_success,
-		SUM(CASE WHEN fdr_status='success' AND fcl_status!='success' THEN 1 ELSE 0 END) AS fcl_fail` + base
+		SUM(cnt) AS fff_total,
+		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_allow,
+		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_success,
+		SUM(CASE WHEN fdr_status='discard' THEN cnt ELSE 0 END) AS fdr_fail,
+		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_success,
+		SUM(CASE WHEN fcl_status='discard' THEN cnt ELSE 0 END) AS fcl_fail` + base
 
-	fffFailSQL := `SELECT fff_detail AS name, COUNT(*) AS cnt` + base +
-		` AND fff_status!='success' AND fff_detail IS NOT NULL AND fff_detail!=''
-		GROUP BY fff_detail ORDER BY cnt DESC LIMIT 10`
+	fffFailSQL := `SELECT fff_detail_tag AS name, SUM(cnt) AS cnt` + base +
+		` AND fff_status='discard' GROUP BY fff_detail_tag ORDER BY cnt DESC LIMIT 10`
 
-	fdrFailSQL := `SELECT fdr_detail AS name, COUNT(*) AS cnt` + base +
-		` AND fff_status='success' AND fdr_status!='success' AND fdr_detail IS NOT NULL AND fdr_detail!=''
-		GROUP BY fdr_detail ORDER BY cnt DESC LIMIT 10`
+	fdrFailSQL := `SELECT fdr_detail_tag AS name, SUM(cnt) AS cnt` + base +
+		` AND fdr_status='discard' GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
 
-	fclFailSQL := `SELECT fcl_detail AS name, COUNT(*) AS cnt` + base +
-		` AND fdr_status='success' AND fcl_status!='success' AND fcl_detail IS NOT NULL AND fcl_detail!=''
-		GROUP BY fcl_detail ORDER BY cnt DESC LIMIT 10`
+	fclFailSQL := `SELECT fcl_detail_tag AS name, SUM(cnt) AS cnt` + base +
+		` AND fcl_status='discard' GROUP BY fcl_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	var (
 		stat                      statRow
