@@ -15,13 +15,13 @@ const (
 // FoDashboardRepo FO Dashboard 数据仓储接口
 type FoDashboardRepo interface {
 	GetFunnel(ctx context.Context, param *FunnelParam) (*FunnelData, error)
-	ListFffRunning(ctx context.Context, param *FffRunningParam) ([]*dashboard_api.FffRunningItem, int64, error)
-	ListFffTrigger(ctx context.Context, param *FffTriggerParam) ([]*dashboard_api.FffTriggerItem, int64, error)
-	ListFffClose(ctx context.Context, param *FffCloseParam) ([]*dashboard_api.FffCloseItem, int64, error)
-	ListFdrTrigger(ctx context.Context, param *FdrTriggerParam) ([]*dashboard_api.FdrTriggerItem, int64, error)
-	ListFclTrigger(ctx context.Context, param *FclTriggerParam) ([]*dashboard_api.FclTriggerItem, int64, error)
-	ListUuidDetail(ctx context.Context, param *UuidDetailParam) ([]*dashboard_api.UuidDetailItem, int64, error)
-	GetCloseReason(ctx context.Context, param *CloseReasonParam) ([]*dashboard_api.CloseReasonItem, error)
+	ListFffRunning(ctx context.Context, param *FffRunningParam) ([]*FffRunningItem, int64, error)
+	ListFffTrigger(ctx context.Context, param *FffTriggerParam) ([]*FffTriggerItem, int64, error)
+	ListFffClose(ctx context.Context, param *FffCloseParam) ([]*FffCloseItem, int64, error)
+	ListFdrTrigger(ctx context.Context, param *FdrTriggerParam) ([]*FdrTriggerItem, int64, error)
+	ListFclTrigger(ctx context.Context, param *FclTriggerParam) ([]*FclTriggerItem, int64, error)
+	ListUuidDetail(ctx context.Context, param *UuidDetailParam) ([]*UuidDetailItem, int64, error)
+	GetCloseReason(ctx context.Context, param *CloseReasonParam) ([]*CloseReasonItem, error)
 	GetStageTrend(ctx context.Context, param *StageTrendParam) (*StageTrendData, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
 }
@@ -38,10 +38,10 @@ type FunnelParam struct {
 
 // FunnelData biz 层聚合结果
 type FunnelData struct {
-	Stat    *dashboard_api.FunnelStat
-	FffFail []*dashboard_api.FunnelFailReason
-	FdrFail []*dashboard_api.FunnelFailReason
-	FclFail []*dashboard_api.FunnelFailReason
+	Stat    *FunnelStat
+	FffFail []*FunnelFailReason
+	FdrFail []*FunnelFailReason
+	FclFail []*FunnelFailReason
 }
 
 // StageTrendParam 三阶段触发趋势查询参数
@@ -57,9 +57,9 @@ type StageTrendParam struct {
 // StageTrendData biz 层聚合结果
 type StageTrendData struct {
 	Dates []string
-	Fff   []*dashboard_api.StageTrendSeries
-	Fdr   []*dashboard_api.StageTrendSeries
-	Fcl   []*dashboard_api.StageTrendSeries
+	Fff   []*StageTrendSeries
+	Fdr   []*StageTrendSeries
+	Fcl   []*StageTrendSeries
 }
 
 // CloseReasonParam 算子关闭原因分布查询参数
@@ -161,17 +161,7 @@ func NewFoDashboardUseCase(repo FoDashboardRepo) *FoDashboardUseCase {
 }
 
 func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FffTriggerResponse, error) {
-	page := req.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
+	page, pageSize := normalizePage(req.Page, req.PageSize)
 
 	param := &FffTriggerParam{
 		FilterName:  req.FilterName,
@@ -194,22 +184,12 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 		Total:        total,
 		Page:         page,
 		PageSize:     pageSize,
-		List:         list,
+		List:         toApiFffTriggerItems(list),
 	}, nil
 }
 
 func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_api.FffCloseRequest) (*dashboard_api.FffCloseResponse, error) {
-	page := req.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
+	page, pageSize := normalizePage(req.Page, req.PageSize)
 
 	param := &FffCloseParam{
 		FilterName:  req.FilterName,
@@ -231,22 +211,12 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 		Total:        total,
 		Page:         page,
 		PageSize:     pageSize,
-		List:         list,
+		List:         toApiFffCloseItems(list),
 	}, nil
 }
 
 func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard_api.FdrTriggerRequest) (*dashboard_api.FdrTriggerResponse, error) {
-	page := req.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
+	page, pageSize := normalizePage(req.Page, req.PageSize)
 
 	param := &FdrTriggerParam{
 		FilterName:  req.FilterName,
@@ -269,22 +239,12 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 		Total:        total,
 		Page:         page,
 		PageSize:     pageSize,
-		List:         list,
+		List:         toApiFdrTriggerItems(list),
 	}, nil
 }
 
 func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard_api.FclTriggerRequest) (*dashboard_api.FclTriggerResponse, error) {
-	page := req.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
+	page, pageSize := normalizePage(req.Page, req.PageSize)
 
 	param := &FclTriggerParam{
 		FilterName:  req.FilterName,
@@ -307,35 +267,16 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 		Total:        total,
 		Page:         page,
 		PageSize:     pageSize,
-		List:         list,
+		List:         toApiFclTriggerItems(list),
 	}, nil
 }
 
 func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard_api.UuidDetailRequest) (*dashboard_api.UuidDetailResponse, error) {
-	page := req.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
-
-	var eventNames []string
-	if req.EventNames != "" {
-		for _, e := range strings.Split(req.EventNames, ",") {
-			if e = strings.TrimSpace(e); e != "" {
-				eventNames = append(eventNames, e)
-			}
-		}
-	}
+	page, pageSize := normalizePage(req.Page, req.PageSize)
 
 	param := &UuidDetailParam{
 		FilterName:  req.FilterName,
-		EventNames:  eventNames,
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
@@ -356,7 +297,7 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 		Total:        total,
 		Page:         page,
 		PageSize:     pageSize,
-		List:         list,
+		List:         toApiUuidDetailItems(list),
 	}, nil
 }
 
@@ -374,7 +315,7 @@ func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard
 	}
 	return &dashboard_api.CloseReasonResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		List:         list,
+		List:         toApiCloseReasonItems(list),
 	}, nil
 }
 
@@ -393,10 +334,10 @@ func (uc *FoDashboardUseCase) GetFunnel(ctx context.Context, req *dashboard_api.
 	}
 	return &dashboard_api.FunnelResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		Stat:         data.Stat,
-		FffFail:      data.FffFail,
-		FdrFail:      data.FdrFail,
-		FclFail:      data.FclFail,
+		Stat:         toApiFunnelStat(data.Stat),
+		FffFail:      toApiFunnelFailReasons(data.FffFail),
+		FdrFail:      toApiFunnelFailReasons(data.FdrFail),
+		FclFail:      toApiFunnelFailReasons(data.FclFail),
 	}, nil
 }
 
@@ -416,9 +357,9 @@ func (uc *FoDashboardUseCase) GetStageTrend(ctx context.Context, req *dashboard_
 	return &dashboard_api.StageTrendResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		Dates:        data.Dates,
-		Fff:          data.Fff,
-		Fdr:          data.Fdr,
-		Fcl:          data.Fcl,
+		Fff:          toApiStageTrendSeries(data.Fff),
+		Fdr:          toApiStageTrendSeries(data.Fdr),
+		Fcl:          toApiStageTrendSeries(data.Fcl),
 	}, nil
 }
 
@@ -437,17 +378,7 @@ func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context) (*dashboard_api
 }
 
 func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard_api.FffRunningRequest) (*dashboard_api.FffRunningResponse, error) {
-	page := req.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = defaultPageSize
-	}
-	if pageSize > maxPageSize {
-		pageSize = maxPageSize
-	}
+	page, pageSize := normalizePage(req.Page, req.PageSize)
 
 	param := &FffRunningParam{
 		FilterName:  req.FilterName,
@@ -469,11 +400,25 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 		Total:        total,
 		Page:         page,
 		PageSize:     pageSize,
-		List:         list,
+		List:         toApiFffRunningItems(list),
 	}, nil
 }
 
-// splitEventNames 将逗号分隔的事件名字符串拆分为切片，空字符串返回 nil
+// normalizePage 统一校正分页参数
+func normalizePage(page, pageSize int) (int, int) {
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = defaultPageSize
+	}
+	if pageSize > maxPageSize {
+		pageSize = maxPageSize
+	}
+	return page, pageSize
+}
+
+// splitEventNames 将逗号分隔的字符串拆分为切片，空字符串返回 nil
 func splitEventNames(raw string) []string {
 	if raw == "" {
 		return nil
@@ -485,4 +430,237 @@ func splitEventNames(raw string) []string {
 		}
 	}
 	return result
+}
+
+// ---------- biz domain → api DTO 映射函数 ----------
+
+func toApiFffRunningItems(list []*FffRunningItem) []*dashboard_api.FffRunningItem {
+	out := make([]*dashboard_api.FffRunningItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.FffRunningItem{
+			Dt:              v.Dt,
+			FilterName:      v.FilterName,
+			AnonymousId:     v.AnonymousId,
+			TimestampUtc:    v.TimestampUtc,
+			CreateAt:        v.CreateAt,
+			CollectType:     v.CollectType,
+			SwVersion:       v.SwVersion,
+			ProjectName:     v.ProjectName,
+			CarType:         v.CarType,
+			VehicleSource:   v.VehicleSource,
+			SwitchOn:        v.SwitchOn,
+			Version:         v.Version,
+			OnAutopilot:     v.OnAutopilot,
+			FunctionMode:    v.FunctionMode,
+			Status:          v.Status,
+			FdiProjectName:  v.FdiProjectName,
+			ProjectCarType:  v.ProjectCarType,
+			VehicleSourceCn: v.VehicleSourceCn,
+		})
+	}
+	return out
+}
+
+func toApiFffTriggerItems(list []*FffTriggerItem) []*dashboard_api.FffTriggerItem {
+	out := make([]*dashboard_api.FffTriggerItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.FffTriggerItem{
+			Dt:              v.Dt,
+			Uuid:            v.Uuid,
+			EventName:       v.EventName,
+			AnonymousId:     v.AnonymousId,
+			TimestampUtc:    v.TimestampUtc,
+			CreateAt:        v.CreateAt,
+			TriggerTime:     v.TriggerTime,
+			UtcDiffUs:       v.UtcDiffUs,
+			Before:          v.Before,
+			After:           v.After,
+			FilterName:      v.FilterName,
+			TriggerType:     v.TriggerType,
+			CollectType:     v.CollectType,
+			Status:          v.Status,
+			OnAutopilot:     v.OnAutopilot,
+			FunctionMode:    v.FunctionMode,
+			SwVersion:       v.SwVersion,
+			ProjectName:     v.ProjectName,
+			CarType:         v.CarType,
+			VehicleSource:   v.VehicleSource,
+			Bj02Lat:         v.Bj02Lat,
+			Bj02Lon:         v.Bj02Lon,
+			RoadType:        v.RoadType,
+			FdiProjectName:  v.FdiProjectName,
+			ProjectCarType:  v.ProjectCarType,
+			VehicleSourceCn: v.VehicleSourceCn,
+			Tags:            v.Tags,
+			Detail:          v.Detail,
+		})
+	}
+	return out
+}
+
+func toApiFffCloseItems(list []*FffCloseItem) []*dashboard_api.FffCloseItem {
+	out := make([]*dashboard_api.FffCloseItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.FffCloseItem{
+			Dt:              v.Dt,
+			FilterName:      v.FilterName,
+			Version:         v.Version,
+			Reason:          v.Reason,
+			AnonymousId:     v.AnonymousId,
+			CreateAt:        v.CreateAt,
+			SwVersion:       v.SwVersion,
+			TimestampUtc:    v.TimestampUtc,
+			ProjectName:     v.ProjectName,
+			CarType:         v.CarType,
+			VehicleSource:   v.VehicleSource,
+			FdiProjectName:  v.FdiProjectName,
+			ProjectCarType:  v.ProjectCarType,
+			VehicleSourceCn: v.VehicleSourceCn,
+		})
+	}
+	return out
+}
+
+func toApiFdrTriggerItems(list []*FdrTriggerItem) []*dashboard_api.FdrTriggerItem {
+	out := make([]*dashboard_api.FdrTriggerItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.FdrTriggerItem{
+			Dt:                v.Dt,
+			Uuid:              v.Uuid,
+			EventName:         v.EventName,
+			AnonymousId:       v.AnonymousId,
+			TimestampUtc:      v.TimestampUtc,
+			CreateAt:          v.CreateAt,
+			SwVersion:         v.SwVersion,
+			Dse:               v.Dse,
+			TdMb:              v.TdMb,
+			TmMb:              v.TmMb,
+			TriggerTimestamp:  v.TriggerTimestamp,
+			BeginTimestampUts: v.BeginTimestampUts,
+			EndTimestampUts:   v.EndTimestampUts,
+			DumpTimestamp:     v.DumpTimestamp,
+			Status:            v.Status,
+			Detail:            v.Detail,
+			TimeCostMs:        v.TimeCostMs,
+			RecordType:        v.RecordType,
+			ProjectName:       v.ProjectName,
+			CarType:           v.CarType,
+			VehicleSource:     v.VehicleSource,
+			FdiProjectName:    v.FdiProjectName,
+			ProjectCarType:    v.ProjectCarType,
+			VehicleSourceCn:   v.VehicleSourceCn,
+		})
+	}
+	return out
+}
+
+func toApiFclTriggerItems(list []*FclTriggerItem) []*dashboard_api.FclTriggerItem {
+	out := make([]*dashboard_api.FclTriggerItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.FclTriggerItem{
+			Dt:              v.Dt,
+			Uuid:            v.Uuid,
+			EventName:       v.EventName,
+			AnonymousId:     v.AnonymousId,
+			TimestampUtc:    v.TimestampUtc,
+			CreateAt:        v.CreateAt,
+			Status:          v.Status,
+			Detail:          v.Detail,
+			CompletePercent: v.CompletePercent,
+			LocalFile:       v.LocalFile,
+			UploadFailTimes: v.UploadFailTimes,
+			PrefixStitch:    v.PrefixStitch,
+			TriggerSource:   v.TriggerSource,
+			SwVersion:       v.SwVersion,
+			ProjectName:     v.ProjectName,
+			CarType:         v.CarType,
+			VehicleSource:   v.VehicleSource,
+			FdiProjectName:  v.FdiProjectName,
+			ProjectCarType:  v.ProjectCarType,
+			VehicleSourceCn: v.VehicleSourceCn,
+		})
+	}
+	return out
+}
+
+func toApiUuidDetailItems(list []*UuidDetailItem) []*dashboard_api.UuidDetailItem {
+	out := make([]*dashboard_api.UuidDetailItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.UuidDetailItem{
+			Dt:                v.Dt,
+			AnonymousId:       v.AnonymousId,
+			EventName:         v.EventName,
+			Uuid:              v.Uuid,
+			CreateAt:          v.CreateAt,
+			FilterName:        v.FilterName,
+			FffSwVersion:      v.FffSwVersion,
+			FdrSwVersion:      v.FdrSwVersion,
+			FclSwVersion:      v.FclSwVersion,
+			TriggerType:       v.TriggerType,
+			CollectType:       v.CollectType,
+			FffUpdatedAt:      v.FffUpdatedAt,
+			FdrUpdatedAt:      v.FdrUpdatedAt,
+			FclUpdatedAt:      v.FclUpdatedAt,
+			FffStatus:         v.FffStatus,
+			FdrStatus:         v.FdrStatus,
+			FclStatus:         v.FclStatus,
+			FffDetail:         v.FffDetail,
+			FdrDetail:         v.FdrDetail,
+			FclDetail:         v.FclDetail,
+			BeginTimestampUts: v.BeginTimestampUts,
+			DumpTimestamp:     v.DumpTimestamp,
+			EndTimestampUts:   v.EndTimestampUts,
+			Md5:               v.Md5,
+			BagName:           v.BagName,
+			CompletePercent:   v.CompletePercent,
+			ProjectName:       v.ProjectName,
+			CarType:           v.CarType,
+			VehicleSource:     v.VehicleSource,
+			TimestampUtc:      v.TimestampUtc,
+			FdiProjectName:    v.FdiProjectName,
+			ProjectCarType:    v.ProjectCarType,
+			VehicleSourceCn:   v.VehicleSourceCn,
+			Dse:               v.Dse,
+		})
+	}
+	return out
+}
+
+func toApiCloseReasonItems(list []*CloseReasonItem) []*dashboard_api.CloseReasonItem {
+	out := make([]*dashboard_api.CloseReasonItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.CloseReasonItem{Name: v.Name, Value: v.Value})
+	}
+	return out
+}
+
+func toApiFunnelStat(s *FunnelStat) *dashboard_api.FunnelStat {
+	if s == nil {
+		return nil
+	}
+	return &dashboard_api.FunnelStat{
+		FffTotal:   s.FffTotal,
+		FffAllow:   s.FffAllow,
+		FdrSuccess: s.FdrSuccess,
+		FdrFail:    s.FdrFail,
+		FclSuccess: s.FclSuccess,
+		FclFail:    s.FclFail,
+		CfdiRate:   s.CfdiRate,
+	}
+}
+
+func toApiFunnelFailReasons(list []*FunnelFailReason) []*dashboard_api.FunnelFailReason {
+	out := make([]*dashboard_api.FunnelFailReason, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.FunnelFailReason{Name: v.Name, Count: v.Count})
+	}
+	return out
+}
+
+func toApiStageTrendSeries(list []*StageTrendSeries) []*dashboard_api.StageTrendSeries {
+	out := make([]*dashboard_api.StageTrendSeries, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.StageTrendSeries{Name: v.Name, Data: v.Data})
+	}
+	return out
 }

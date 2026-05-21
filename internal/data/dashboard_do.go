@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/wire"
 
-	dashboard_api "fdi_data_board/api/dashboard"
 	"fdi_data_board/internal/biz"
 )
 
@@ -41,7 +40,7 @@ type doOverviewRow struct {
 	FclCount     int64  `gorm:"column:fcl_count"`
 }
 
-func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverviewParam) ([]*dashboard_api.DoOverviewItem, error) {
+func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverviewParam) ([]*biz.DoOverviewItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -72,9 +71,9 @@ func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverview
 		return math.Round(float64(a)/float64(b)*1000) / 10
 	}
 
-	list := make([]*dashboard_api.DoOverviewItem, 0, len(rows))
+	list := make([]*biz.DoOverviewItem, 0, len(rows))
 	for _, row := range rows {
-		list = append(list, &dashboard_api.DoOverviewItem{
+		list = append(list, &biz.DoOverviewItem{
 			EventName:    row.EventName,
 			VehicleCount: row.VehicleCount,
 			TriggerCount: row.TriggerCount,
@@ -145,7 +144,7 @@ type failReasonRow struct {
 	Cnt    int64  `gorm:"column:cnt"`
 }
 
-func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailReasonParam) ([]*dashboard_api.DoFailReasonItem, error) {
+func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailReasonParam) ([]*biz.DoFailReasonItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -188,18 +187,17 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 		return nil, err
 	}
 
-	list := make([]*dashboard_api.DoFailReasonItem, 0, len(rows))
+	list := make([]*biz.DoFailReasonItem, 0, len(rows))
 	for _, row := range rows {
-		name := row.Stage + "-" + row.Detail
-		list = append(list, &dashboard_api.DoFailReasonItem{
-			Name:  name,
+		list = append(list, &biz.DoFailReasonItem{
+			Name:  row.Stage + "-" + row.Detail,
 			Value: row.Cnt,
 		})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error) {
+func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -223,14 +221,14 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 		return nil, err
 	}
 
-	list := make([]*dashboard_api.DoCoolTopItem, 0, len(rows))
+	list := make([]*biz.DoCoolTopItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
+		list = append(list, &biz.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error) {
+func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -254,14 +252,14 @@ func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommo
 		return nil, err
 	}
 
-	list := make([]*dashboard_api.DoCoolTopItem, 0, len(rows))
+	list := make([]*biz.DoCoolTopItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
+		list = append(list, &biz.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoSwVersionItem, error) {
+func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoSwVersionItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -285,14 +283,14 @@ func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonP
 		return nil, err
 	}
 
-	list := make([]*dashboard_api.DoSwVersionItem, 0, len(rows))
+	list := make([]*biz.DoSwVersionItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoSwVersionItem{SwVersion: r.SwVersion, Count: r.Cnt})
+		list = append(list, &biz.DoSwVersionItem{SwVersion: r.SwVersion, Count: r.Cnt})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.DoProjectCarResponse, error) {
+func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommonParam) (*biz.DoProjectCarData, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -318,7 +316,6 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 		return nil, err
 	}
 
-	// 聚合各项目总量
 	projTotal := map[string]int64{}
 	carTypeSet := map[string]struct{}{}
 	for _, row := range rows {
@@ -326,7 +323,6 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 		carTypeSet[row.CarType] = struct{}{}
 	}
 
-	// 项目按总量降序排列
 	projects := make([]string, 0, len(projTotal))
 	for p := range projTotal {
 		projects = append(projects, p)
@@ -335,20 +331,17 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 		return projTotal[projects[i]] > projTotal[projects[j]]
 	})
 
-	// 车型排序
 	carTypes := make([]string, 0, len(carTypeSet))
 	for ct := range carTypeSet {
 		carTypes = append(carTypes, ct)
 	}
 	sort.Strings(carTypes)
 
-	// 建索引
 	projIdx := make(map[string]int, len(projects))
 	for i, p := range projects {
 		projIdx[p] = i
 	}
 
-	// 填充 matrix
 	matrix := make(map[string][]int64, len(carTypes))
 	for _, ct := range carTypes {
 		matrix[ct] = make([]int64, len(projects))
@@ -357,23 +350,20 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 		matrix[row.CarType][projIdx[row.ProjectName]] = row.Cnt
 	}
 
-	// 各项目总量数组（与 projects 顺序一致）
 	totals := make([]int64, len(projects))
 	for i, p := range projects {
 		totals[i] = projTotal[p]
 	}
 
-	resp := &dashboard_api.DoProjectCarResponse{}
-	resp.Code = 0
-	resp.Message = "OK"
-	resp.Projects = projects
-	resp.CarTypes = carTypes
-	resp.Matrix = matrix
-	resp.ProjectTotals = totals
-	return resp, nil
+	return &biz.DoProjectCarData{
+		Projects:      projects,
+		CarTypes:      carTypes,
+		Matrix:        matrix,
+		ProjectTotals: totals,
+	}, nil
 }
 
-func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
+func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoEventTopItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -396,14 +386,14 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 	}); err != nil {
 		return nil, err
 	}
-	list := make([]*dashboard_api.DoEventTopItem, 0, len(rows))
+	list := make([]*biz.DoEventTopItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
+		list = append(list, &biz.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
+func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoEventTopItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -426,14 +416,14 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 	}); err != nil {
 		return nil, err
 	}
-	list := make([]*dashboard_api.DoEventTopItem, 0, len(rows))
+	list := make([]*biz.DoEventTopItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
+		list = append(list, &biz.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error) {
+func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -454,14 +444,14 @@ func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonPa
 	}); err != nil {
 		return nil, err
 	}
-	list := make([]*dashboard_api.DoCoolTopItem, 0, len(rows))
+	list := make([]*biz.DoCoolTopItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
+		list = append(list, &biz.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoEventTopItem, error) {
+func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoEventTopItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -484,14 +474,14 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 	}); err != nil {
 		return nil, err
 	}
-	list := make([]*dashboard_api.DoEventTopItem, 0, len(rows))
+	list := make([]*biz.DoEventTopItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
+		list = append(list, &biz.DoEventTopItem{EventName: r.EventName, Count: r.Cnt})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoCommonParam) ([]*dashboard_api.DoProjectEventItem, error) {
+func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoProjectEventItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -514,14 +504,14 @@ func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoComm
 	}); err != nil {
 		return nil, err
 	}
-	list := make([]*dashboard_api.DoProjectEventItem, 0, len(rows))
+	list := make([]*biz.DoProjectEventItem, 0, len(rows))
 	for _, r := range rows {
-		list = append(list, &dashboard_api.DoProjectEventItem{ProjectName: r.ProjectName, EventCount: r.EventCount})
+		list = append(list, &biz.DoProjectEventItem{ProjectName: r.ProjectName, EventCount: r.EventCount})
 	}
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.DoNetSpeedResponse, error) {
+func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonParam) (*biz.DoNetSpeedData, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildFclUploadWhere(param)
 
@@ -546,7 +536,6 @@ func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonPa
 		return nil, err
 	}
 
-	// 收集有序日期和车型
 	dateSet := map[string]struct{}{}
 	carSet := map[string]struct{}{}
 	for _, r := range rows {
@@ -561,7 +550,6 @@ func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonPa
 		dateIdx[d] = i
 	}
 
-	// 填充矩阵
 	matrix := make(map[string][]float64, len(carTypes))
 	for _, ct := range carTypes {
 		matrix[ct] = make([]float64, len(dates))
@@ -570,20 +558,18 @@ func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonPa
 		matrix[r.CarType][dateIdx[r.Dt]] = r.AvgBw
 	}
 
-	series := make([]*dashboard_api.DoNetSpeedSeries, 0, len(carTypes))
+	series := make([]*biz.DoNetSpeedSeries, 0, len(carTypes))
 	for _, ct := range carTypes {
-		series = append(series, &dashboard_api.DoNetSpeedSeries{CarType: ct, Data: matrix[ct]})
+		series = append(series, &biz.DoNetSpeedSeries{CarType: ct, Data: matrix[ct]})
 	}
 
-	resp := &dashboard_api.DoNetSpeedResponse{}
-	resp.Code = 0
-	resp.Message = "OK"
-	resp.Dates = dates
-	resp.Series = series
-	return resp, nil
+	return &biz.DoNetSpeedData{
+		Dates:  dates,
+		Series: series,
+	}, nil
 }
 
-func (r *doDashboardRepo) GetFclBw(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.DoFclBwResponse, error) {
+func (r *doDashboardRepo) GetFclBw(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFclBwData, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildFclUploadWhere(param)
 
@@ -613,12 +599,10 @@ func (r *doDashboardRepo) GetFclBw(ctx context.Context, param *biz.DoCommonParam
 		values = append(values, r.AvgBw)
 	}
 
-	resp := &dashboard_api.DoFclBwResponse{}
-	resp.Code = 0
-	resp.Message = "OK"
-	resp.Dates = dates
-	resp.Values = values
-	return resp, nil
+	return &biz.DoFclBwData{
+		Dates:  dates,
+		Values: values,
+	}, nil
 }
 
 // vehicleStatsRow 车辆统计聚合行
@@ -670,7 +654,6 @@ func (r *doDashboardRepo) vehicleFailReasons(ctx context.Context, ids []string, 
 	if err := db.Raw(sql, idArgs...).Scan(&rows).Error; err != nil {
 		return nil
 	}
-	// 取每辆车 cnt 最大的 fail_reason（SQL 已 ORDER BY cnt DESC，取第一条即可）
 	result := make(map[string]string, len(ids))
 	for _, row := range rows {
 		if _, exists := result[row.AnonymousId]; !exists {
@@ -680,7 +663,7 @@ func (r *doDashboardRepo) vehicleFailReasons(ctx context.Context, ids []string, 
 	return result
 }
 
-func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehicleParam) ([]*dashboard_api.DoVehicleItem, error) {
+func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehicleParam) ([]*biz.DoVehicleItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -710,9 +693,9 @@ func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehic
 	}
 	reasons := r.vehicleFailReasons(ctx, ids, where, args)
 
-	list := make([]*dashboard_api.DoVehicleItem, 0, len(rows))
+	list := make([]*biz.DoVehicleItem, 0, len(rows))
 	for _, row := range rows {
-		list = append(list, &dashboard_api.DoVehicleItem{
+		list = append(list, &biz.DoVehicleItem{
 			AnonymousId: row.AnonymousId, CarType: row.CarType, ProjectName: row.ProjectName,
 			TriggerCount: row.TriggerCount, SuccessCount: row.SuccessCount, CfdiRate: row.CfdiRate,
 			MainReason: reasons[row.AnonymousId],
@@ -721,7 +704,7 @@ func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehic
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoAnomalyParam) ([]*dashboard_api.DoVehicleItem, error) {
+func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoAnomalyParam) ([]*biz.DoVehicleItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -752,9 +735,9 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 	}
 	reasons := r.vehicleFailReasons(ctx, ids, where, args)
 
-	list := make([]*dashboard_api.DoVehicleItem, 0, len(rows))
+	list := make([]*biz.DoVehicleItem, 0, len(rows))
 	for _, row := range rows {
-		list = append(list, &dashboard_api.DoVehicleItem{
+		list = append(list, &biz.DoVehicleItem{
 			AnonymousId: row.AnonymousId, CarType: row.CarType, ProjectName: row.ProjectName,
 			TriggerCount: row.TriggerCount, SuccessCount: row.SuccessCount, CfdiRate: row.CfdiRate,
 			MainReason: reasons[row.AnonymousId],
@@ -763,7 +746,7 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 	return list, nil
 }
 
-func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehicleParam) (*dashboard_api.DoActiveTrendResponse, error) {
+func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehicleParam) (*biz.DoActiveTrendData, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
@@ -792,12 +775,10 @@ func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehic
 		counts = append(counts, r.ActiveCount)
 	}
 
-	resp := &dashboard_api.DoActiveTrendResponse{}
-	resp.Code = 0
-	resp.Message = "OK"
-	resp.Dates = dates
-	resp.Counts = counts
-	return resp, nil
+	return &biz.DoActiveTrendData{
+		Dates:  dates,
+		Counts: counts,
+	}, nil
 }
 
 // buildVehicleWhere 构建车辆维度分析 WHERE 子句
@@ -895,10 +876,7 @@ func appendMultiCond(conds []string, args []interface{}, col string, vals []stri
 	return conds, args
 }
 
-// toDoTrendResponse 供 FunnelChart 等公共接口复用（预留）
-var _ = dashboard_api.DoTrendResponse{}
-
-func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonParam) (*dashboard_api.FunnelResponse, error) {
+func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonParam) (*biz.FunnelData, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	base := " FROM dwd_cfdi_status_monitor_analysis" + where + " AND event_name != 'Forever_log'"
@@ -968,17 +946,16 @@ func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonPa
 		}
 		return math.Round(float64(a)/float64(b)*1000) / 10
 	}
-	toReasons := func(rows []*detailRow) []*dashboard_api.FunnelFailReason {
-		out := make([]*dashboard_api.FunnelFailReason, 0, len(rows))
+	toReasons := func(rows []*detailRow) []*biz.FunnelFailReason {
+		out := make([]*biz.FunnelFailReason, 0, len(rows))
 		for _, r := range rows {
-			out = append(out, &dashboard_api.FunnelFailReason{Name: r.Name, Count: r.Cnt})
+			out = append(out, &biz.FunnelFailReason{Name: r.Name, Count: r.Cnt})
 		}
 		return out
 	}
 
-	return &dashboard_api.FunnelResponse{
-		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		Stat: &dashboard_api.FunnelStat{
+	return &biz.FunnelData{
+		Stat: &biz.FunnelStat{
 			FffTotal:   stat.FffTotal,
 			FffAllow:   stat.FffAllow,
 			FdrSuccess: stat.FdrSuccess,

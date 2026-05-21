@@ -2,31 +2,30 @@ package biz
 
 import (
 	"context"
-	"strings"
 
 	dashboard_api "fdi_data_board/api/dashboard"
 )
 
 // DoDashboardRepo DO Dashboard 数据仓储接口
 type DoDashboardRepo interface {
-	GetOverview(ctx context.Context, param *DoOverviewParam) ([]*dashboard_api.DoOverviewItem, error)
+	GetOverview(ctx context.Context, param *DoOverviewParam) ([]*DoOverviewItem, error)
 	GetTrend(ctx context.Context, param *DoTrendParam) (*DoTrendData, error)
-	GetFailReason(ctx context.Context, param *DoFailReasonParam) ([]*dashboard_api.DoFailReasonItem, error)
-	GetCoolTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
-	GetSwVersion(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoSwVersionItem, error)
-	GetTriggerRank(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
-	GetProjectCar(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoProjectCarResponse, error)
-	GetMemTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
-	GetDiskTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
-	GetCloseTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoCoolTopItem, error)
-	GetQuotaTop(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoEventTopItem, error)
-	GetProjectEvent(ctx context.Context, param *DoCommonParam) ([]*dashboard_api.DoProjectEventItem, error)
-	GetNetSpeed(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoNetSpeedResponse, error)
-	GetFclBw(ctx context.Context, param *DoCommonParam) (*dashboard_api.DoFclBwResponse, error)
-	GetTopVehicles(ctx context.Context, param *DoVehicleParam) ([]*dashboard_api.DoVehicleItem, error)
-	GetAnomalyVehicles(ctx context.Context, param *DoAnomalyParam) ([]*dashboard_api.DoVehicleItem, error)
-	GetActiveTrend(ctx context.Context, param *DoVehicleParam) (*dashboard_api.DoActiveTrendResponse, error)
-	GetDoFunnel(ctx context.Context, param *DoCommonParam) (*dashboard_api.FunnelResponse, error)
+	GetFailReason(ctx context.Context, param *DoFailReasonParam) ([]*DoFailReasonItem, error)
+	GetCoolTop(ctx context.Context, param *DoCommonParam) ([]*DoCoolTopItem, error)
+	GetSwVersion(ctx context.Context, param *DoCommonParam) ([]*DoSwVersionItem, error)
+	GetTriggerRank(ctx context.Context, param *DoCommonParam) ([]*DoCoolTopItem, error)
+	GetProjectCar(ctx context.Context, param *DoCommonParam) (*DoProjectCarData, error)
+	GetMemTop(ctx context.Context, param *DoCommonParam) ([]*DoEventTopItem, error)
+	GetDiskTop(ctx context.Context, param *DoCommonParam) ([]*DoEventTopItem, error)
+	GetCloseTop(ctx context.Context, param *DoCommonParam) ([]*DoCoolTopItem, error)
+	GetQuotaTop(ctx context.Context, param *DoCommonParam) ([]*DoEventTopItem, error)
+	GetProjectEvent(ctx context.Context, param *DoCommonParam) ([]*DoProjectEventItem, error)
+	GetNetSpeed(ctx context.Context, param *DoCommonParam) (*DoNetSpeedData, error)
+	GetFclBw(ctx context.Context, param *DoCommonParam) (*DoFclBwData, error)
+	GetTopVehicles(ctx context.Context, param *DoVehicleParam) ([]*DoVehicleItem, error)
+	GetAnomalyVehicles(ctx context.Context, param *DoAnomalyParam) ([]*DoVehicleItem, error)
+	GetActiveTrend(ctx context.Context, param *DoVehicleParam) (*DoActiveTrendData, error)
+	GetDoFunnel(ctx context.Context, param *DoCommonParam) (*FunnelData, error)
 }
 
 // DoVehicleParam 车辆维度分析通用查询参数
@@ -103,9 +102,9 @@ func NewDoDashboardUseCase(repo DoDashboardRepo) *DoDashboardUseCase {
 func (uc *DoDashboardUseCase) GetOverview(ctx context.Context, req *dashboard_api.DoOverviewRequest) (*dashboard_api.DoOverviewResponse, error) {
 	param := &DoOverviewParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -115,16 +114,16 @@ func (uc *DoDashboardUseCase) GetOverview(ctx context.Context, req *dashboard_ap
 	}
 	return &dashboard_api.DoOverviewResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		List:         list,
+		List:         toApiDoOverviewItems(list),
 	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.DoTrendRequest) (*dashboard_api.DoTrendResponse, error) {
 	param := &DoTrendParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -143,9 +142,9 @@ func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.D
 func (uc *DoDashboardUseCase) GetCoolTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoCoolTopResponse, error) {
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -155,16 +154,16 @@ func (uc *DoDashboardUseCase) GetCoolTop(ctx context.Context, req *dashboard_api
 	}
 	return &dashboard_api.DoCoolTopResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		List:         list,
+		List:         toApiDoCoolTopItems(list),
 	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetTriggerRank(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoTriggerRankResponse, error) {
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -174,16 +173,16 @@ func (uc *DoDashboardUseCase) GetTriggerRank(ctx context.Context, req *dashboard
 	}
 	return &dashboard_api.DoTriggerRankResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		List:         list,
+		List:         toApiDoCoolTopItems(list),
 	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetSwVersion(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoSwVersionResponse, error) {
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -193,112 +192,160 @@ func (uc *DoDashboardUseCase) GetSwVersion(ctx context.Context, req *dashboard_a
 	}
 	return &dashboard_api.DoSwVersionResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		List:         list,
+		List:         toApiDoSwVersionItems(list),
 	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetProjectCar(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoProjectCarResponse, error) {
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
-	return uc.repo.GetProjectCar(ctx, param)
+	data, err := uc.repo.GetProjectCar(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoProjectCarResponse{
+		BaseResponse:  dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Projects:      data.Projects,
+		CarTypes:      data.CarTypes,
+		Matrix:        data.Matrix,
+		ProjectTotals: data.ProjectTotals,
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetMemTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoMemTopResponse, error) {
 	param := &DoCommonParam{
-		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
-		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	list, err := uc.repo.GetMemTop(ctx, param)
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard_api.DoMemTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+	return &dashboard_api.DoMemTopResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoEventTopItems(list),
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetDiskTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoDiskTopResponse, error) {
 	param := &DoCommonParam{
-		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
-		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	list, err := uc.repo.GetDiskTop(ctx, param)
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard_api.DoDiskTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+	return &dashboard_api.DoDiskTopResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoEventTopItems(list),
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetCloseTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoCloseTopResponse, error) {
 	param := &DoCommonParam{
-		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	list, err := uc.repo.GetCloseTop(ctx, param)
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard_api.DoCloseTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+	return &dashboard_api.DoCloseTopResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoCoolTopItems(list),
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetQuotaTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoQuotaTopResponse, error) {
 	param := &DoCommonParam{
-		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
-		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	list, err := uc.repo.GetQuotaTop(ctx, param)
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard_api.DoQuotaTopResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+	return &dashboard_api.DoQuotaTopResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoEventTopItems(list),
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetProjectEvent(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoProjectEventResponse, error) {
 	param := &DoCommonParam{
-		FilterName: req.FilterName, EventNames: splitNames(req.EventNames),
-		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	list, err := uc.repo.GetProjectEvent(ctx, param)
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard_api.DoProjectEventResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+	return &dashboard_api.DoProjectEventResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoProjectEventItems(list),
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetNetSpeed(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoNetSpeedResponse, error) {
 	param := &DoCommonParam{
-		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
-	return uc.repo.GetNetSpeed(ctx, param)
+	data, err := uc.repo.GetNetSpeed(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	series := make([]*dashboard_api.DoNetSpeedSeries, 0, len(data.Series))
+	for _, s := range data.Series {
+		series = append(series, &dashboard_api.DoNetSpeedSeries{CarType: s.CarType, Data: s.Data})
+	}
+	return &dashboard_api.DoNetSpeedResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Dates:        data.Dates,
+		Series:       series,
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetFclBw(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoFclBwResponse, error) {
 	param := &DoCommonParam{
-		ProjectName: req.ProjectName, CarTypes: splitNames(req.CarTypes),
+		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: req.StartDt, EndDt: req.EndDt,
 	}
-	return uc.repo.GetFclBw(ctx, param)
+	data, err := uc.repo.GetFclBw(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoFclBwResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Dates:        data.Dates,
+		Values:       data.Values,
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetTopVehicles(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoTopVehicleResponse, error) {
 	param := &DoVehicleParam{
-		EventNames: splitNames(req.EventNames), ProjectName: req.ProjectName,
-		CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
+		EventNames: splitEventNames(req.EventNames), ProjectName: req.ProjectName,
+		CarTypes: splitEventNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
 	}
 	list, err := uc.repo.GetTopVehicles(ctx, param)
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard_api.DoTopVehicleResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+	return &dashboard_api.DoTopVehicleResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoVehicleItems(list),
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashboard_api.DoAnomalyRequest) (*dashboard_api.DoAnomalyResponse, error) {
@@ -308,8 +355,8 @@ func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashb
 	}
 	param := &DoAnomalyParam{
 		DoVehicleParam: DoVehicleParam{
-			EventNames: splitNames(req.EventNames), ProjectName: req.ProjectName,
-			CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
+			EventNames: splitEventNames(req.EventNames), ProjectName: req.ProjectName,
+			CarTypes: splitEventNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
 		},
 		MaxRate: maxRate,
 	}
@@ -317,23 +364,34 @@ func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashb
 	if err != nil {
 		return nil, err
 	}
-	return &dashboard_api.DoAnomalyResponse{BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"}, List: list}, nil
+	return &dashboard_api.DoAnomalyResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoVehicleItems(list),
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetActiveTrend(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoActiveTrendResponse, error) {
 	param := &DoVehicleParam{
-		EventNames: splitNames(req.EventNames), ProjectName: req.ProjectName,
-		CarTypes: splitNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
+		EventNames: splitEventNames(req.EventNames), ProjectName: req.ProjectName,
+		CarTypes: splitEventNames(req.CarTypes), StartDt: req.StartDt, EndDt: req.EndDt,
 	}
-	return uc.repo.GetActiveTrend(ctx, param)
+	data, err := uc.repo.GetActiveTrend(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoActiveTrendResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Dates:        data.Dates,
+		Counts:       data.Counts,
+	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_api.DoFailReasonRequest) (*dashboard_api.DoFailReasonResponse, error) {
 	param := &DoFailReasonParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
@@ -343,31 +401,105 @@ func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_
 	}
 	return &dashboard_api.DoFailReasonResponse{
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
-		List:         list,
+		List:         toApiDoFailReasonItems(list),
 	}, nil
 }
 
 func (uc *DoDashboardUseCase) GetDoFunnel(ctx context.Context, req *dashboard_api.DoFunnelRequest) (*dashboard_api.FunnelResponse, error) {
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitNames(req.EventNames),
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
-		CarTypes:    splitNames(req.CarTypes),
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     req.StartDt,
 		EndDt:       req.EndDt,
 	}
-	return uc.repo.GetDoFunnel(ctx, param)
+	data, err := uc.repo.GetDoFunnel(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.FunnelResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Stat:         toApiFunnelStat(data.Stat),
+		FffFail:      toApiFunnelFailReasons(data.FffFail),
+		FdrFail:      toApiFunnelFailReasons(data.FdrFail),
+		FclFail:      toApiFunnelFailReasons(data.FclFail),
+	}, nil
 }
 
-func splitNames(raw string) []string {
-	if raw == "" {
-		return nil
+// ---------- biz domain → api DTO 映射函数 ----------
+
+func toApiDoOverviewItems(list []*DoOverviewItem) []*dashboard_api.DoOverviewItem {
+	out := make([]*dashboard_api.DoOverviewItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoOverviewItem{
+			EventName:    v.EventName,
+			VehicleCount: v.VehicleCount,
+			TriggerCount: v.TriggerCount,
+			CfdiRate:     v.CfdiRate,
+			FffCount:     v.FffCount,
+			FffRate:      v.FffRate,
+			FdrCount:     v.FdrCount,
+			FdrRate:      v.FdrRate,
+			FclCount:     v.FclCount,
+			FclRate:      v.FclRate,
+		})
 	}
-	var result []string
-	for _, e := range strings.Split(raw, ",") {
-		if e = strings.TrimSpace(e); e != "" {
-			result = append(result, e)
-		}
+	return out
+}
+
+func toApiDoCoolTopItems(list []*DoCoolTopItem) []*dashboard_api.DoCoolTopItem {
+	out := make([]*dashboard_api.DoCoolTopItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoCoolTopItem{FilterName: v.FilterName, Count: v.Count})
 	}
-	return result
+	return out
+}
+
+func toApiDoSwVersionItems(list []*DoSwVersionItem) []*dashboard_api.DoSwVersionItem {
+	out := make([]*dashboard_api.DoSwVersionItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoSwVersionItem{SwVersion: v.SwVersion, Count: v.Count})
+	}
+	return out
+}
+
+func toApiDoEventTopItems(list []*DoEventTopItem) []*dashboard_api.DoEventTopItem {
+	out := make([]*dashboard_api.DoEventTopItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoEventTopItem{EventName: v.EventName, Count: v.Count})
+	}
+	return out
+}
+
+func toApiDoProjectEventItems(list []*DoProjectEventItem) []*dashboard_api.DoProjectEventItem {
+	out := make([]*dashboard_api.DoProjectEventItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoProjectEventItem{ProjectName: v.ProjectName, EventCount: v.EventCount})
+	}
+	return out
+}
+
+func toApiDoVehicleItems(list []*DoVehicleItem) []*dashboard_api.DoVehicleItem {
+	out := make([]*dashboard_api.DoVehicleItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoVehicleItem{
+			AnonymousId:  v.AnonymousId,
+			CarType:      v.CarType,
+			ProjectName:  v.ProjectName,
+			TriggerCount: v.TriggerCount,
+			SuccessCount: v.SuccessCount,
+			CfdiRate:     v.CfdiRate,
+			MainReason:   v.MainReason,
+		})
+	}
+	return out
+}
+
+func toApiDoFailReasonItems(list []*DoFailReasonItem) []*dashboard_api.DoFailReasonItem {
+	out := make([]*dashboard_api.DoFailReasonItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoFailReasonItem{Name: v.Name, Value: v.Value})
+	}
+	return out
 }

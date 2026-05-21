@@ -12,7 +12,6 @@ import (
 	"github.com/google/wire"
 	"golang.org/x/sync/singleflight"
 
-	dashboard_api "fdi_data_board/api/dashboard"
 	"fdi_data_board/internal/biz"
 )
 
@@ -62,7 +61,7 @@ type fffRunningRow struct {
 	VehicleSourceCn string    `gorm:"column:vehicle_source_cn"`
 }
 
-func (r *foDashboardRepo) ListFffRunning(ctx context.Context, param *biz.FffRunningParam) ([]*dashboard_api.FffRunningItem, int64, error) {
+func (r *foDashboardRepo) ListFffRunning(ctx context.Context, param *biz.FffRunningParam) ([]*biz.FffRunningItem, int64, error) {
 	db := r.dorisDB(ctx)
 
 	where, args := buildFffRunningWhere(param)
@@ -105,7 +104,7 @@ func (r *foDashboardRepo) ListFffRunning(ctx context.Context, param *biz.FffRunn
 		return nil, 0, dataErr
 	}
 
-	list := make([]*dashboard_api.FffRunningItem, 0, len(rows))
+	list := make([]*biz.FffRunningItem, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, toFffRunningItem(row))
 	}
@@ -145,8 +144,8 @@ func buildFffRunningWhere(param *biz.FffRunningParam) (string, []interface{}) {
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-func toFffRunningItem(row *fffRunningRow) *dashboard_api.FffRunningItem {
-	return &dashboard_api.FffRunningItem{
+func toFffRunningItem(row *fffRunningRow) *biz.FffRunningItem {
+	return &biz.FffRunningItem{
 		Dt:              row.Dt.Format("2006-01-02"),
 		FilterName:      row.FilterName,
 		AnonymousId:     row.AnonymousId,
@@ -201,7 +200,7 @@ type fffTriggerRow struct {
 	Detail          string    `gorm:"column:detail"`
 }
 
-func (r *foDashboardRepo) ListFffTrigger(ctx context.Context, param *biz.FffTriggerParam) ([]*dashboard_api.FffTriggerItem, int64, error) {
+func (r *foDashboardRepo) ListFffTrigger(ctx context.Context, param *biz.FffTriggerParam) ([]*biz.FffTriggerItem, int64, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildFffTriggerWhere(param)
 
@@ -245,7 +244,7 @@ func (r *foDashboardRepo) ListFffTrigger(ctx context.Context, param *biz.FffTrig
 		return nil, 0, dataErr
 	}
 
-	list := make([]*dashboard_api.FffTriggerItem, 0, len(rows))
+	list := make([]*biz.FffTriggerItem, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, toFffTriggerItem(row))
 	}
@@ -293,8 +292,8 @@ func buildFffTriggerWhere(param *biz.FffTriggerParam) (string, []interface{}) {
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-func toFffTriggerItem(row *fffTriggerRow) *dashboard_api.FffTriggerItem {
-	return &dashboard_api.FffTriggerItem{
+func toFffTriggerItem(row *fffTriggerRow) *biz.FffTriggerItem {
+	return &biz.FffTriggerItem{
 		Dt:              row.Dt.Format("2006-01-02"),
 		Uuid:            row.Uuid,
 		EventName:       row.EventName,
@@ -344,7 +343,7 @@ type fffCloseRow struct {
 	VehicleSourceCn string    `gorm:"column:vehicle_source_cn"`
 }
 
-func (r *foDashboardRepo) ListFffClose(ctx context.Context, param *biz.FffCloseParam) ([]*dashboard_api.FffCloseItem, int64, error) {
+func (r *foDashboardRepo) ListFffClose(ctx context.Context, param *biz.FffCloseParam) ([]*biz.FffCloseItem, int64, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildFffCloseWhere(param)
 
@@ -386,7 +385,7 @@ func (r *foDashboardRepo) ListFffClose(ctx context.Context, param *biz.FffCloseP
 		return nil, 0, dataErr
 	}
 
-	list := make([]*dashboard_api.FffCloseItem, 0, len(rows))
+	list := make([]*biz.FffCloseItem, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, toFffCloseItem(row))
 	}
@@ -423,8 +422,8 @@ func buildFffCloseWhere(param *biz.FffCloseParam) (string, []interface{}) {
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-func toFffCloseItem(row *fffCloseRow) *dashboard_api.FffCloseItem {
-	return &dashboard_api.FffCloseItem{
+func toFffCloseItem(row *fffCloseRow) *biz.FffCloseItem {
+	return &biz.FffCloseItem{
 		Dt:              row.Dt.Format("2006-01-02"),
 		FilterName:      row.FilterName,
 		Version:         row.Version,
@@ -471,7 +470,7 @@ type fdrTriggerRow struct {
 	VehicleSourceCn   string    `gorm:"column:vehicle_source_cn"`
 }
 
-func (r *foDashboardRepo) ListFdrTrigger(ctx context.Context, param *biz.FdrTriggerParam) ([]*dashboard_api.FdrTriggerItem, int64, error) {
+func (r *foDashboardRepo) ListFdrTrigger(ctx context.Context, param *biz.FdrTriggerParam) ([]*biz.FdrTriggerItem, int64, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildFdrTriggerWhere(param)
 
@@ -514,7 +513,7 @@ func (r *foDashboardRepo) ListFdrTrigger(ctx context.Context, param *biz.FdrTrig
 		return nil, 0, dataErr
 	}
 
-	list := make([]*dashboard_api.FdrTriggerItem, 0, len(rows))
+	list := make([]*biz.FdrTriggerItem, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, toFdrTriggerItem(row))
 	}
@@ -562,8 +561,8 @@ func buildFdrTriggerWhere(param *biz.FdrTriggerParam) (string, []interface{}) {
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-func toFdrTriggerItem(row *fdrTriggerRow) *dashboard_api.FdrTriggerItem {
-	return &dashboard_api.FdrTriggerItem{
+func toFdrTriggerItem(row *fdrTriggerRow) *biz.FdrTriggerItem {
+	return &biz.FdrTriggerItem{
 		Dt:                row.Dt.Format("2006-01-02"),
 		Uuid:              row.Uuid,
 		EventName:         row.EventName,
@@ -615,7 +614,7 @@ type fclTriggerRow struct {
 	VehicleSourceCn string    `gorm:"column:vehicle_source_cn"`
 }
 
-func (r *foDashboardRepo) ListFclTrigger(ctx context.Context, param *biz.FclTriggerParam) ([]*dashboard_api.FclTriggerItem, int64, error) {
+func (r *foDashboardRepo) ListFclTrigger(ctx context.Context, param *biz.FclTriggerParam) ([]*biz.FclTriggerItem, int64, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildFclTriggerWhere(param)
 
@@ -658,7 +657,7 @@ func (r *foDashboardRepo) ListFclTrigger(ctx context.Context, param *biz.FclTrig
 		return nil, 0, dataErr
 	}
 
-	list := make([]*dashboard_api.FclTriggerItem, 0, len(rows))
+	list := make([]*biz.FclTriggerItem, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, toFclTriggerItem(row))
 	}
@@ -706,8 +705,8 @@ func buildFclTriggerWhere(param *biz.FclTriggerParam) (string, []interface{}) {
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-func toFclTriggerItem(row *fclTriggerRow) *dashboard_api.FclTriggerItem {
-	return &dashboard_api.FclTriggerItem{
+func toFclTriggerItem(row *fclTriggerRow) *biz.FclTriggerItem {
+	return &biz.FclTriggerItem{
 		Dt:              row.Dt.Format("2006-01-02"),
 		Uuid:            row.Uuid,
 		EventName:       row.EventName,
@@ -767,7 +766,7 @@ type uuidDetailRow struct {
 	Dse               string    `gorm:"column:dse"`
 }
 
-func (r *foDashboardRepo) ListUuidDetail(ctx context.Context, param *biz.UuidDetailParam) ([]*dashboard_api.UuidDetailItem, int64, error) {
+func (r *foDashboardRepo) ListUuidDetail(ctx context.Context, param *biz.UuidDetailParam) ([]*biz.UuidDetailItem, int64, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildUuidDetailWhere(param)
 
@@ -813,7 +812,7 @@ func (r *foDashboardRepo) ListUuidDetail(ctx context.Context, param *biz.UuidDet
 		return nil, 0, dataErr
 	}
 
-	list := make([]*dashboard_api.UuidDetailItem, 0, len(rows))
+	list := make([]*biz.UuidDetailItem, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, toUuidDetailItem(row))
 	}
@@ -874,9 +873,8 @@ func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
-func toUuidDetailItem(row *uuidDetailRow) *dashboard_api.UuidDetailItem {
-
-	return &dashboard_api.UuidDetailItem{
+func toUuidDetailItem(row *uuidDetailRow) *biz.UuidDetailItem {
+	return &biz.UuidDetailItem{
 		Dt:                row.Dt.Format("2006-01-02"),
 		AnonymousId:       row.AnonymousId,
 		EventName:         row.EventName,
@@ -917,7 +915,7 @@ type closeReasonRow struct {
 	Cnt      int64  `gorm:"column:cnt"`
 }
 
-func (r *foDashboardRepo) GetCloseReason(ctx context.Context, param *biz.CloseReasonParam) ([]*dashboard_api.CloseReasonItem, error) {
+func (r *foDashboardRepo) GetCloseReason(ctx context.Context, param *biz.CloseReasonParam) ([]*biz.CloseReasonItem, error) {
 	db := r.dorisDB(ctx)
 	where, args := buildCloseReasonWhere(param)
 
@@ -940,9 +938,9 @@ func (r *foDashboardRepo) GetCloseReason(ctx context.Context, param *biz.CloseRe
 		return nil, err
 	}
 
-	list := make([]*dashboard_api.CloseReasonItem, 0, len(rows))
+	list := make([]*biz.CloseReasonItem, 0, len(rows))
 	for _, row := range rows {
-		list = append(list, &dashboard_api.CloseReasonItem{
+		list = append(list, &biz.CloseReasonItem{
 			Name:  row.Category,
 			Value: row.Cnt,
 		})
@@ -1061,16 +1059,16 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 		cfdiRate = math.Round(float64(stat.FclSuccess)/float64(stat.FffTotal)*1000) / 10
 	}
 
-	toReasons := func(rows []*detailRow) []*dashboard_api.FunnelFailReason {
-		out := make([]*dashboard_api.FunnelFailReason, 0, len(rows))
+	toReasons := func(rows []*detailRow) []*biz.FunnelFailReason {
+		out := make([]*biz.FunnelFailReason, 0, len(rows))
 		for _, r := range rows {
-			out = append(out, &dashboard_api.FunnelFailReason{Name: r.Name, Count: r.Cnt})
+			out = append(out, &biz.FunnelFailReason{Name: r.Name, Count: r.Cnt})
 		}
 		return out
 	}
 
 	return &biz.FunnelData{
-		Stat: &dashboard_api.FunnelStat{
+		Stat: &biz.FunnelStat{
 			FffTotal:   stat.FffTotal,
 			FffAllow:   stat.FffAllow,
 			FdrSuccess: stat.FdrSuccess,
@@ -1168,10 +1166,10 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 	}, nil
 }
 
-func buildStageSeries(dates []string, rowMap map[string]*stageTrendRow, names []string) []*dashboard_api.StageTrendSeries {
-	series := make([]*dashboard_api.StageTrendSeries, len(names))
+func buildStageSeries(dates []string, rowMap map[string]*stageTrendRow, names []string) []*biz.StageTrendSeries {
+	series := make([]*biz.StageTrendSeries, len(names))
 	for i, name := range names {
-		series[i] = &dashboard_api.StageTrendSeries{Name: name, Data: make([]int64, len(dates))}
+		series[i] = &biz.StageTrendSeries{Name: name, Data: make([]int64, len(dates))}
 	}
 	for i, dt := range dates {
 		row, ok := rowMap[dt]
