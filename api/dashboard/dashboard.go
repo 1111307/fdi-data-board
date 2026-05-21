@@ -631,3 +631,15 @@ type DoFailReasonResponse struct {
 	BaseResponse
 	List []*DoFailReasonItem `json:"list"`
 }
+
+// EtlRunResponse 手动触发 ETL 响应
+type EtlRunResponse struct {
+	BaseResponse
+	Cnt int64 `json:"cnt"`
+}
+
+// EtlStatusResponse ETL 任务日志响应
+type EtlStatusResponse struct {
+	BaseResponse
+	List interface{} `json:"list"`
+}

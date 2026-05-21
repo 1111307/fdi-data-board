@@ -17,6 +17,7 @@ func RegisterHttpService(
 	sceneGroupService *service.SceneGroupService,
 	foDashboardService *service.FoDashboardService,
 	doDashboardService *service.DoDashboardService,
+	etlService *service.EtlService,
 ) []GroupUrl {
 
 	var routes []GroupUrl
@@ -24,6 +25,7 @@ func RegisterHttpService(
 	routes = append(routes, RegisterQuerySceneService(querySceneService, datasourceService, sceneGroupService, cd)...)
 	routes = append(routes, RegisterFoDashboardService(foDashboardService)...)
 	routes = append(routes, RegisterDoDashboardService(doDashboardService)...)
+	routes = append(routes, RegisterEtlService(etlService)...)
 
 	return routes
 }

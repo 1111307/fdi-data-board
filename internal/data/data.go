@@ -29,6 +29,7 @@ var ProviderSet = wire.NewSet(
 	NewSceneGroupRepo,
 	NewFoDashboardRepo,
 	NewDoDashboardRepo,
+	NewEtlRepo,
 )
 
 // Data .
@@ -84,6 +85,7 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 		&orm.QuerySceneParamDo{},
 		&orm.QuerySceneWidgetDo{},
 		&orm.SlowQueryLogDo{},
+		&orm.EtlJobLogDo{},
 	); err != nil {
 		panic(fmt.Sprintf("Update Table Failed: %+v", err))
 	}

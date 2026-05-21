@@ -4,6 +4,8 @@ import (
 	"fdi_data_board/utils/transport/simple"
 )
 
-func NewSimpleServer() *simple.Server {
-	return simple.NewServer()
+func NewSimpleServer(etl *ETLServer) *simple.Server {
+	srv := simple.NewServer()
+	srv.RegisterSimpleServer(etl)
+	return srv
 }

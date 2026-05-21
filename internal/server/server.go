@@ -11,7 +11,7 @@ import (
 )
 
 // ProviderSet is server providers.
-var ProviderSet = wire.NewSet(NewGRPCServer, NewSimpleServer, NewAllHttpServer)
+var ProviderSet = wire.NewSet(NewGRPCServer, NewSimpleServer, NewAllHttpServer, NewETLServer)
 
 func NewAllHttpServer(c *conf.Server, d *conf.Data, logger log.Logger,
 	urls []route.GroupUrl, greeter *service.GreeterService) []*http.Server {
