@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-kratos/kratos/v2/log"
 
@@ -47,6 +49,11 @@ func (s *DoDashboardService) GetOverview(ctx *gin.Context) (api.HttpResponse, er
 
 	result, err := s.uc.GetOverview(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetOverview error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -84,6 +91,11 @@ func (s *DoDashboardService) GetProjectCar(ctx *gin.Context) (api.HttpResponse, 
 
 	result, err := s.uc.GetProjectCar(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetProjectCar error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -121,6 +133,11 @@ func (s *DoDashboardService) GetTriggerRank(ctx *gin.Context) (api.HttpResponse,
 
 	result, err := s.uc.GetTriggerRank(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetTriggerRank error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -158,6 +175,11 @@ func (s *DoDashboardService) GetSwVersion(ctx *gin.Context) (api.HttpResponse, e
 
 	result, err := s.uc.GetSwVersion(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetSwVersion error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -195,6 +217,11 @@ func (s *DoDashboardService) GetCoolTop(ctx *gin.Context) (api.HttpResponse, err
 
 	result, err := s.uc.GetCoolTop(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetCoolTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -232,6 +259,11 @@ func (s *DoDashboardService) GetFailReason(ctx *gin.Context) (api.HttpResponse, 
 
 	result, err := s.uc.GetFailReason(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetFailReason error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -273,6 +305,11 @@ func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse,
 	}
 	result, err := s.uc.GetTopVehicles(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetTopVehicles error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
@@ -297,6 +334,11 @@ func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpRespo
 	}
 	result, err := s.uc.GetAnomalyVehicles(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetAnomalyVehicles error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
@@ -321,6 +363,11 @@ func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse,
 	}
 	result, err := s.uc.GetActiveTrend(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetActiveTrend error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
@@ -348,6 +395,11 @@ func (s *DoDashboardService) GetNetSpeed(ctx *gin.Context) (api.HttpResponse, er
 	}
 	result, err := s.uc.GetNetSpeed(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetNetSpeed error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -377,6 +429,11 @@ func (s *DoDashboardService) GetFclBw(ctx *gin.Context) (api.HttpResponse, error
 	}
 	result, err := s.uc.GetFclBw(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetFclBw error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -406,6 +463,11 @@ func (s *DoDashboardService) GetQuotaTop(ctx *gin.Context) (api.HttpResponse, er
 	}
 	result, err := s.uc.GetQuotaTop(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetQuotaTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -435,6 +497,11 @@ func (s *DoDashboardService) GetProjectEvent(ctx *gin.Context) (api.HttpResponse
 	}
 	result, err := s.uc.GetProjectEvent(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetProjectEvent error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -464,6 +531,11 @@ func (s *DoDashboardService) GetMemTop(ctx *gin.Context) (api.HttpResponse, erro
 	}
 	result, err := s.uc.GetMemTop(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetMemTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -493,6 +565,11 @@ func (s *DoDashboardService) GetDiskTop(ctx *gin.Context) (api.HttpResponse, err
 	}
 	result, err := s.uc.GetDiskTop(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetDiskTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -522,6 +599,11 @@ func (s *DoDashboardService) GetCloseTop(ctx *gin.Context) (api.HttpResponse, er
 	}
 	result, err := s.uc.GetCloseTop(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetCloseTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -544,6 +626,11 @@ func (s *DoDashboardService) GetTrend(ctx *gin.Context) (api.HttpResponse, error
 
 	result, err := s.uc.GetTrend(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetTrend error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -567,6 +654,11 @@ func (s *DoDashboardService) GetDoFunnel(ctx *gin.Context) (api.HttpResponse, er
 
 	result, err := s.uc.GetDoFunnel(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("DoGetFunnel error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/go-kratos/kratos/v2/log"
 
@@ -48,6 +50,11 @@ func (s *FoDashboardService) ListFffTrigger(ctx *gin.Context) (api.HttpResponse,
 
 	result, err := s.uc.ListFffTrigger(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("ListFffTrigger error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -85,6 +92,11 @@ func (s *FoDashboardService) ListFffClose(ctx *gin.Context) (api.HttpResponse, e
 
 	result, err := s.uc.ListFffClose(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("ListFffClose error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -122,6 +134,11 @@ func (s *FoDashboardService) ListFdrTrigger(ctx *gin.Context) (api.HttpResponse,
 
 	result, err := s.uc.ListFdrTrigger(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("ListFdrTrigger error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -159,6 +176,11 @@ func (s *FoDashboardService) ListFclTrigger(ctx *gin.Context) (api.HttpResponse,
 
 	result, err := s.uc.ListFclTrigger(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("ListFclTrigger error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -199,6 +221,11 @@ func (s *FoDashboardService) ListUuidDetail(ctx *gin.Context) (api.HttpResponse,
 
 	result, err := s.uc.ListUuidDetail(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("ListUuidDetail error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -235,6 +262,11 @@ func (s *FoDashboardService) GetFunnel(ctx *gin.Context) (api.HttpResponse, erro
 
 	result, err := s.uc.GetFunnel(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("GetFunnel error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -271,6 +303,11 @@ func (s *FoDashboardService) GetStageTrend(ctx *gin.Context) (api.HttpResponse, 
 
 	result, err := s.uc.GetStageTrend(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("GetStageTrend error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -306,6 +343,11 @@ func (s *FoDashboardService) GetCloseReason(ctx *gin.Context) (api.HttpResponse,
 
 	result, err := s.uc.GetCloseReason(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("GetCloseReason error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
@@ -367,6 +409,11 @@ func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse,
 
 	result, err := s.uc.ListFffRunning(ctx, &req)
 	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
 		log.Errorf("ListFffRunning error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"

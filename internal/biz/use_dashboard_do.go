@@ -100,7 +100,10 @@ func NewDoDashboardUseCase(repo DoDashboardRepo) *DoDashboardUseCase {
 }
 
 func (uc *DoDashboardUseCase) GetOverview(ctx context.Context, req *dashboard_api.DoOverviewRequest) (*dashboard_api.DoOverviewResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoOverviewParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -120,7 +123,10 @@ func (uc *DoDashboardUseCase) GetOverview(ctx context.Context, req *dashboard_ap
 }
 
 func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.DoTrendRequest) (*dashboard_api.DoTrendResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoTrendParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -142,7 +148,10 @@ func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.D
 }
 
 func (uc *DoDashboardUseCase) GetCoolTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoCoolTopResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -162,7 +171,10 @@ func (uc *DoDashboardUseCase) GetCoolTop(ctx context.Context, req *dashboard_api
 }
 
 func (uc *DoDashboardUseCase) GetTriggerRank(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoTriggerRankResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -182,7 +194,10 @@ func (uc *DoDashboardUseCase) GetTriggerRank(ctx context.Context, req *dashboard
 }
 
 func (uc *DoDashboardUseCase) GetSwVersion(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoSwVersionResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -202,7 +217,10 @@ func (uc *DoDashboardUseCase) GetSwVersion(ctx context.Context, req *dashboard_a
 }
 
 func (uc *DoDashboardUseCase) GetProjectCar(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoProjectCarResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -225,7 +243,10 @@ func (uc *DoDashboardUseCase) GetProjectCar(ctx context.Context, req *dashboard_
 }
 
 func (uc *DoDashboardUseCase) GetMemTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoMemTopResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
@@ -242,7 +263,10 @@ func (uc *DoDashboardUseCase) GetMemTop(ctx context.Context, req *dashboard_api.
 }
 
 func (uc *DoDashboardUseCase) GetDiskTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoDiskTopResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
@@ -259,7 +283,10 @@ func (uc *DoDashboardUseCase) GetDiskTop(ctx context.Context, req *dashboard_api
 }
 
 func (uc *DoDashboardUseCase) GetCloseTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoCloseTopResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: startDt, EndDt: endDt,
@@ -275,7 +302,10 @@ func (uc *DoDashboardUseCase) GetCloseTop(ctx context.Context, req *dashboard_ap
 }
 
 func (uc *DoDashboardUseCase) GetQuotaTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoQuotaTopResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
@@ -292,7 +322,10 @@ func (uc *DoDashboardUseCase) GetQuotaTop(ctx context.Context, req *dashboard_ap
 }
 
 func (uc *DoDashboardUseCase) GetProjectEvent(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoProjectEventResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName: req.FilterName, EventNames: splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
@@ -309,7 +342,10 @@ func (uc *DoDashboardUseCase) GetProjectEvent(ctx context.Context, req *dashboar
 }
 
 func (uc *DoDashboardUseCase) GetNetSpeed(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoNetSpeedResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: startDt, EndDt: endDt,
@@ -330,7 +366,10 @@ func (uc *DoDashboardUseCase) GetNetSpeed(ctx context.Context, req *dashboard_ap
 }
 
 func (uc *DoDashboardUseCase) GetFclBw(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoFclBwResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: startDt, EndDt: endDt,
@@ -347,7 +386,10 @@ func (uc *DoDashboardUseCase) GetFclBw(ctx context.Context, req *dashboard_api.D
 }
 
 func (uc *DoDashboardUseCase) GetTopVehicles(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoTopVehicleResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoVehicleParam{
 		EventNames: splitEventNames(req.EventNames), ProjectName: req.ProjectName,
 		CarTypes: splitEventNames(req.CarTypes), StartDt: startDt, EndDt: endDt,
@@ -367,7 +409,10 @@ func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashb
 	if maxRate == 0 {
 		maxRate = 80
 	}
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoAnomalyParam{
 		DoVehicleParam: DoVehicleParam{
 			EventNames: splitEventNames(req.EventNames), ProjectName: req.ProjectName,
@@ -386,7 +431,10 @@ func (uc *DoDashboardUseCase) GetAnomalyVehicles(ctx context.Context, req *dashb
 }
 
 func (uc *DoDashboardUseCase) GetActiveTrend(ctx context.Context, req *dashboard_api.DoTopVehicleRequest) (*dashboard_api.DoActiveTrendResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoVehicleParam{
 		EventNames: splitEventNames(req.EventNames), ProjectName: req.ProjectName,
 		CarTypes: splitEventNames(req.CarTypes), StartDt: startDt, EndDt: endDt,
@@ -403,7 +451,10 @@ func (uc *DoDashboardUseCase) GetActiveTrend(ctx context.Context, req *dashboard
 }
 
 func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_api.DoFailReasonRequest) (*dashboard_api.DoFailReasonResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoFailReasonParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -423,7 +474,10 @@ func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_
 }
 
 func (uc *DoDashboardUseCase) GetDoFunnel(ctx context.Context, req *dashboard_api.DoFunnelRequest) (*dashboard_api.FunnelResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &DoCommonParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),

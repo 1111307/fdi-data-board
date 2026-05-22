@@ -2,11 +2,14 @@ package biz
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
 	dashboard_api "fdi_data_board/api/dashboard"
 )
+
+var ErrInvalidDateRange = errors.New("invalid date format, expected YYYY-MM-DD")
 
 const (
 	defaultPageSize = 50
@@ -164,7 +167,10 @@ func NewFoDashboardUseCase(repo FoDashboardRepo) *FoDashboardUseCase {
 
 func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FffTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 
 	param := &FffTriggerParam{
 		FilterName:  req.FilterName,
@@ -193,7 +199,10 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_api.FffCloseRequest) (*dashboard_api.FffCloseResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 
 	param := &FffCloseParam{
 		FilterName:  req.FilterName,
@@ -221,7 +230,10 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 
 func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard_api.FdrTriggerRequest) (*dashboard_api.FdrTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 
 	param := &FdrTriggerParam{
 		FilterName:  req.FilterName,
@@ -250,7 +262,10 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard_api.FclTriggerRequest) (*dashboard_api.FclTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 
 	param := &FclTriggerParam{
 		FilterName:  req.FilterName,
@@ -279,7 +294,10 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard_api.UuidDetailRequest) (*dashboard_api.UuidDetailResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 
 	param := &UuidDetailParam{
 		FilterName:  req.FilterName,
@@ -309,7 +327,10 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 }
 
 func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard_api.CloseReasonRequest) (*dashboard_api.CloseReasonResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &CloseReasonParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
@@ -328,7 +349,10 @@ func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard
 }
 
 func (uc *FoDashboardUseCase) GetFunnel(ctx context.Context, req *dashboard_api.FunnelRequest) (*dashboard_api.FunnelResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &FunnelParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -351,7 +375,10 @@ func (uc *FoDashboardUseCase) GetFunnel(ctx context.Context, req *dashboard_api.
 }
 
 func (uc *FoDashboardUseCase) GetStageTrend(ctx context.Context, req *dashboard_api.StageTrendRequest) (*dashboard_api.StageTrendResponse, error) {
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 	param := &StageTrendParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
@@ -389,7 +416,10 @@ func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context) (*dashboard_api
 
 func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard_api.FffRunningRequest) (*dashboard_api.FffRunningResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
 
 	param := &FffRunningParam{
 		FilterName:  req.FilterName,
@@ -430,14 +460,18 @@ func normalizePage(page, pageSize int) (int, int) {
 }
 
 // normalizeDateRange 校验日期范围：格式校验、顺序校正、跨度限制
-func normalizeDateRange(startDt, endDt string) (string, string) {
+func normalizeDateRange(startDt, endDt string) (string, string, error) {
 	const layout = "2006-01-02"
+
+	if startDt == "" && endDt == "" {
+		return "", "", nil
+	}
 
 	start, err1 := time.Parse(layout, startDt)
 	end, err2 := time.Parse(layout, endDt)
 
 	if err1 != nil || err2 != nil {
-		return "", ""
+		return "", "", ErrInvalidDateRange
 	}
 
 	if start.After(end) {
@@ -448,7 +482,7 @@ func normalizeDateRange(startDt, endDt string) (string, string) {
 		end = start.AddDate(0, 0, maxDateRange)
 	}
 
-	return start.Format(layout), end.Format(layout)
+	return start.Format(layout), end.Format(layout), nil
 }
 
 // splitEventNames 将逗号分隔的字符串拆分为切片，空字符串返回 nil
