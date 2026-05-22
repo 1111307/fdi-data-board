@@ -79,11 +79,13 @@ func NewHTTPServer(c *conf.Server, greeter *service.GreeterService, logger log.L
 				code = gerror.Code(err)
 			}
 
+			log.Errorf("[http] error: code=%d err=%v", code.Code(), err)
+
 			body, err1 := codec.Marshal(struct {
 				Code    int32  `json:"code"`
 				Message string `json:"message"`
 			}{
-				Message: err.Error(),
+				Message: "internal server error",
 				Code:    int32(code.Code()),
 			})
 			if err1 != nil {

@@ -49,7 +49,7 @@ func (s *DoDashboardService) GetOverview(ctx *gin.Context) (api.HttpResponse, er
 	if err != nil {
 		log.Errorf("DoGetOverview error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -86,7 +86,7 @@ func (s *DoDashboardService) GetProjectCar(ctx *gin.Context) (api.HttpResponse, 
 	if err != nil {
 		log.Errorf("DoGetProjectCar error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -123,7 +123,7 @@ func (s *DoDashboardService) GetTriggerRank(ctx *gin.Context) (api.HttpResponse,
 	if err != nil {
 		log.Errorf("DoGetTriggerRank error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -160,7 +160,7 @@ func (s *DoDashboardService) GetSwVersion(ctx *gin.Context) (api.HttpResponse, e
 	if err != nil {
 		log.Errorf("DoGetSwVersion error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -197,7 +197,7 @@ func (s *DoDashboardService) GetCoolTop(ctx *gin.Context) (api.HttpResponse, err
 	if err != nil {
 		log.Errorf("DoGetCoolTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -234,7 +234,7 @@ func (s *DoDashboardService) GetFailReason(ctx *gin.Context) (api.HttpResponse, 
 	if err != nil {
 		log.Errorf("DoGetFailReason error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -274,7 +274,7 @@ func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse,
 	result, err := s.uc.GetTopVehicles(ctx, &req)
 	if err != nil {
 		log.Errorf("DoGetTopVehicles error: %v", err)
-		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = err.Error(); return resp, nil
+		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
 }
@@ -298,7 +298,7 @@ func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpRespo
 	result, err := s.uc.GetAnomalyVehicles(ctx, &req)
 	if err != nil {
 		log.Errorf("DoGetAnomalyVehicles error: %v", err)
-		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = err.Error(); return resp, nil
+		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
 }
@@ -322,7 +322,7 @@ func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse,
 	result, err := s.uc.GetActiveTrend(ctx, &req)
 	if err != nil {
 		log.Errorf("DoGetActiveTrend error: %v", err)
-		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = err.Error(); return resp, nil
+		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
 }
@@ -350,7 +350,7 @@ func (s *DoDashboardService) GetNetSpeed(ctx *gin.Context) (api.HttpResponse, er
 	if err != nil {
 		log.Errorf("DoGetNetSpeed error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 	return result, nil
@@ -379,7 +379,7 @@ func (s *DoDashboardService) GetFclBw(ctx *gin.Context) (api.HttpResponse, error
 	if err != nil {
 		log.Errorf("DoGetFclBw error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 	return result, nil
@@ -408,7 +408,7 @@ func (s *DoDashboardService) GetQuotaTop(ctx *gin.Context) (api.HttpResponse, er
 	if err != nil {
 		log.Errorf("DoGetQuotaTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 	return result, nil
@@ -437,7 +437,7 @@ func (s *DoDashboardService) GetProjectEvent(ctx *gin.Context) (api.HttpResponse
 	if err != nil {
 		log.Errorf("DoGetProjectEvent error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 	return result, nil
@@ -466,7 +466,7 @@ func (s *DoDashboardService) GetMemTop(ctx *gin.Context) (api.HttpResponse, erro
 	if err != nil {
 		log.Errorf("DoGetMemTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 	return result, nil
@@ -495,7 +495,7 @@ func (s *DoDashboardService) GetDiskTop(ctx *gin.Context) (api.HttpResponse, err
 	if err != nil {
 		log.Errorf("DoGetDiskTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 	return result, nil
@@ -524,7 +524,7 @@ func (s *DoDashboardService) GetCloseTop(ctx *gin.Context) (api.HttpResponse, er
 	if err != nil {
 		log.Errorf("DoGetCloseTop error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 	return result, nil
@@ -546,7 +546,7 @@ func (s *DoDashboardService) GetTrend(ctx *gin.Context) (api.HttpResponse, error
 	if err != nil {
 		log.Errorf("DoGetTrend error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -569,7 +569,7 @@ func (s *DoDashboardService) GetDoFunnel(ctx *gin.Context) (api.HttpResponse, er
 	if err != nil {
 		log.Errorf("DoGetFunnel error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 

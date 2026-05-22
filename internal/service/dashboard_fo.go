@@ -50,7 +50,7 @@ func (s *FoDashboardService) ListFffTrigger(ctx *gin.Context) (api.HttpResponse,
 	if err != nil {
 		log.Errorf("ListFffTrigger error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -87,7 +87,7 @@ func (s *FoDashboardService) ListFffClose(ctx *gin.Context) (api.HttpResponse, e
 	if err != nil {
 		log.Errorf("ListFffClose error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -124,7 +124,7 @@ func (s *FoDashboardService) ListFdrTrigger(ctx *gin.Context) (api.HttpResponse,
 	if err != nil {
 		log.Errorf("ListFdrTrigger error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -161,7 +161,7 @@ func (s *FoDashboardService) ListFclTrigger(ctx *gin.Context) (api.HttpResponse,
 	if err != nil {
 		log.Errorf("ListFclTrigger error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -201,7 +201,7 @@ func (s *FoDashboardService) ListUuidDetail(ctx *gin.Context) (api.HttpResponse,
 	if err != nil {
 		log.Errorf("ListUuidDetail error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -237,7 +237,7 @@ func (s *FoDashboardService) GetFunnel(ctx *gin.Context) (api.HttpResponse, erro
 	if err != nil {
 		log.Errorf("GetFunnel error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -273,7 +273,7 @@ func (s *FoDashboardService) GetStageTrend(ctx *gin.Context) (api.HttpResponse, 
 	if err != nil {
 		log.Errorf("GetStageTrend error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -308,7 +308,7 @@ func (s *FoDashboardService) GetCloseReason(ctx *gin.Context) (api.HttpResponse,
 	if err != nil {
 		log.Errorf("GetCloseReason error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -332,7 +332,7 @@ func (s *FoDashboardService) GetDimensions(ctx *gin.Context) (api.HttpResponse, 
 	if err != nil {
 		log.Errorf("GetDimensions error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
@@ -369,7 +369,7 @@ func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse,
 	if err != nil {
 		log.Errorf("ListFffRunning error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
-		resp.Message = err.Error()
+		resp.Message = "internal server error"
 		return resp, nil
 	}
 
