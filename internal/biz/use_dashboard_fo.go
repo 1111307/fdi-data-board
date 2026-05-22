@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"strings"
+	"time"
 
 	dashboard_api "fdi_data_board/api/dashboard"
 )
@@ -10,6 +11,7 @@ import (
 const (
 	defaultPageSize = 50
 	maxPageSize     = 500
+	maxDateRange    = 365
 )
 
 // FoDashboardRepo FO Dashboard 数据仓储接口
@@ -162,14 +164,15 @@ func NewFoDashboardUseCase(repo FoDashboardRepo) *FoDashboardUseCase {
 
 func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FffTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 
 	param := &FffTriggerParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 		Page:        page,
 		PageSize:    pageSize,
 	}
@@ -190,13 +193,14 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_api.FffCloseRequest) (*dashboard_api.FffCloseResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 
 	param := &FffCloseParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 		Page:        page,
 		PageSize:    pageSize,
 	}
@@ -217,14 +221,15 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 
 func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard_api.FdrTriggerRequest) (*dashboard_api.FdrTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 
 	param := &FdrTriggerParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 		Page:        page,
 		PageSize:    pageSize,
 	}
@@ -245,14 +250,15 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard_api.FclTriggerRequest) (*dashboard_api.FclTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 
 	param := &FclTriggerParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 		Page:        page,
 		PageSize:    pageSize,
 	}
@@ -273,14 +279,15 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard_api.UuidDetailRequest) (*dashboard_api.UuidDetailResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 
 	param := &UuidDetailParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 		OnlyFail:    req.OnlyFail == 1,
 		StageFilter: req.StageFilter,
 		Page:        page,
@@ -302,12 +309,13 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 }
 
 func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard_api.CloseReasonRequest) (*dashboard_api.CloseReasonResponse, error) {
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 	param := &CloseReasonParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	list, err := uc.repo.GetCloseReason(ctx, param)
 	if err != nil {
@@ -320,13 +328,14 @@ func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard
 }
 
 func (uc *FoDashboardUseCase) GetFunnel(ctx context.Context, req *dashboard_api.FunnelRequest) (*dashboard_api.FunnelResponse, error) {
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 	param := &FunnelParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	data, err := uc.repo.GetFunnel(ctx, param)
 	if err != nil {
@@ -342,13 +351,14 @@ func (uc *FoDashboardUseCase) GetFunnel(ctx context.Context, req *dashboard_api.
 }
 
 func (uc *FoDashboardUseCase) GetStageTrend(ctx context.Context, req *dashboard_api.StageTrendRequest) (*dashboard_api.StageTrendResponse, error) {
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 	param := &StageTrendParam{
 		FilterName:  req.FilterName,
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	data, err := uc.repo.GetStageTrend(ctx, param)
 	if err != nil {
@@ -379,13 +389,14 @@ func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context) (*dashboard_api
 
 func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard_api.FffRunningRequest) (*dashboard_api.FffRunningResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
+	startDt, endDt := normalizeDateRange(req.StartDt, req.EndDt)
 
 	param := &FffRunningParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt:     req.StartDt,
-		EndDt:       req.EndDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 		Page:        page,
 		PageSize:    pageSize,
 	}
@@ -416,6 +427,28 @@ func normalizePage(page, pageSize int) (int, int) {
 		pageSize = maxPageSize
 	}
 	return page, pageSize
+}
+
+// normalizeDateRange 校验日期范围：格式校验、顺序校正、跨度限制
+func normalizeDateRange(startDt, endDt string) (string, string) {
+	const layout = "2006-01-02"
+
+	start, err1 := time.Parse(layout, startDt)
+	end, err2 := time.Parse(layout, endDt)
+
+	if err1 != nil || err2 != nil {
+		return "", ""
+	}
+
+	if start.After(end) {
+		start, end = end, start
+	}
+
+	if int(end.Sub(start).Hours()/24) > maxDateRange {
+		end = start.AddDate(0, 0, maxDateRange)
+	}
+
+	return start.Format(layout), end.Format(layout)
 }
 
 // splitEventNames 将逗号分隔的字符串拆分为切片，空字符串返回 nil
