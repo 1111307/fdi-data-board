@@ -23,7 +23,7 @@ type EtlLog struct {
 // EtlRepo ETL 数据仓储接口
 type EtlRepo interface {
 	RunETL(ctx context.Context, dt string, runType string) (cnt int64, err error)
-	IsSuccess(ctx context.Context, dt string) bool
+	IsSuccess(ctx context.Context, dt string) (bool, error)
 	ListLogs(ctx context.Context, limit int) ([]*EtlLog, error)
 }
 
@@ -53,7 +53,12 @@ func (uc *ETLUseCase) Backfill(ctx context.Context, days int) {
 		default:
 		}
 		dt := today.AddDate(0, 0, -i).Format("2006-01-02")
-		if uc.repo.IsSuccess(ctx, dt) {
+		done, err := uc.repo.IsSuccess(ctx, dt)
+		if err != nil {
+			uc.log.Errorf("[etl] backfill check %s error: %v, skip", dt, err)
+			continue
+		}
+		if done {
 			uc.log.Infof("[etl] backfill skip %s (already success)", dt)
 			continue
 		}

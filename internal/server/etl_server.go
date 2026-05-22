@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -16,6 +17,7 @@ type ETLServer struct {
 	uc     *biz.ETLUseCase
 	log    *log.Helper
 	cancel context.CancelFunc
+	wg     sync.WaitGroup
 }
 
 func NewETLServer(uc *biz.ETLUseCase, logger log.Logger) *ETLServer {
@@ -27,7 +29,9 @@ func (s *ETLServer) Start(ctx context.Context) error {
 	s.cancel = cancel
 	s.log.Info("[etl] server starting")
 
+	s.wg.Add(1)
 	go func() {
+		defer s.wg.Done()
 		// 第一次启动时回填近180天数据，后续每天定时刷新近7天数据
 		s.log.Info("[etl] starting backfill for 180 days")
 		s.uc.Backfill(ctx, 180)
@@ -55,6 +59,7 @@ func (s *ETLServer) Stop(_ context.Context) error {
 	if s.cancel != nil {
 		s.cancel()
 	}
+	s.wg.Wait()
 	return nil
 }
 

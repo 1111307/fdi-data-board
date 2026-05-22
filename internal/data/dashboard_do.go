@@ -2,7 +2,6 @@ package data
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -474,7 +473,7 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
 		FROM ads_do_cfdi_daily` + where + `
-		fcl_status != 'discard'
+		AND fcl_status = 'discard'
 		AND fcl_detail_tag = 'quota_exceeded'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
@@ -725,16 +724,17 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 	db := r.dorisDB(ctx)
 	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := fmt.Sprintf(`SELECT anonymous_id, car_type, project_name,
+	args = append(args, param.MaxRate)
+	sql := `SELECT anonymous_id, car_type, project_name,
 		COUNT(*) AS trigger_count,
 		SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END) AS success_count,
 		ROUND(SUM(CASE WHEN fcl_status='success' THEN 1 ELSE 0 END)*100.0/COUNT(*), 1) AS cfdi_rate
-		FROM dwd_cfdi_status_monitor_analysis`+where+`
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
 		AND anonymous_id IS NOT NULL AND anonymous_id != ''
 		GROUP BY anonymous_id, car_type, project_name
-		HAVING cfdi_rate < %d
+		HAVING cfdi_rate < ?
 		ORDER BY cfdi_rate ASC
-		LIMIT 100`, param.MaxRate)
+		LIMIT 100`
 
 	var rows []*vehicleStatsRow
 	if err := r.slowLog.Observe(slowQueryMeta{

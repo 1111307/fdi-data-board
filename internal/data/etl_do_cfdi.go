@@ -2,9 +2,11 @@ package data
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"gorm.io/gorm"
 
 	"fdi_data_board/internal/biz"
 	"fdi_data_board/internal/data/orm"
@@ -93,29 +95,44 @@ func (r *etlRepo) RunETL(ctx context.Context, dt string, runType string) (cnt in
 	defer func() {
 		cost := time.Since(start).Milliseconds()
 		if err != nil {
-			r.upsertLog(dt, "failed", runType, 0, cost, err.Error())
+			if errors.Is(err, context.Canceled) {
+				r.upsertLog(dt, "cancelled", runType, 0, cost, err.Error())
+			} else {
+				r.upsertLog(dt, "failed", runType, 0, cost, err.Error())
+			}
 		} else {
 			r.upsertLog(dt, "success", runType, cnt, cost, "")
 		}
 	}()
 
-	if err = doris.Exec(deleteCfdiDailySQL, dt).Error; err != nil {
-		return
-	}
-	if err = doris.Exec(insertCfdiDailySQL, dt).Error; err != nil {
+	err = doris.Transaction(func(tx *gorm.DB) error {
+		if err = tx.Exec(deleteCfdiDailySQL, dt).Error; err != nil {
+			return err
+		}
+		return tx.Exec(insertCfdiDailySQL, dt).Error
+	})
+	if err != nil {
 		return
 	}
 
-	doris.Raw(`SELECT COUNT(1) FROM fdi.ads_do_cfdi_daily WHERE dt = ?`, dt).Scan(&cnt)
+	if err = doris.Raw(`SELECT COUNT(1) FROM fdi.ads_do_cfdi_daily WHERE dt = ?`, dt).Scan(&cnt).Error; err != nil {
+		return
+	}
 	return
 }
 
-func (r *etlRepo) IsSuccess(ctx context.Context, dt string) bool {
+func (r *etlRepo) IsSuccess(ctx context.Context, dt string) (bool, error) {
 	var record orm.EtlJobLogDo
 	err := r.mysqlDB(ctx).
 		Where("dt = ? AND table_name = ? AND status = 'success'", dt, targetCfdiDaily).
 		First(&record).Error
-	return err == nil
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (r *etlRepo) ListLogs(ctx context.Context, limit int) ([]*biz.EtlLog, error) {
@@ -147,16 +164,18 @@ func (r *etlRepo) ListLogs(ctx context.Context, limit int) ([]*biz.EtlLog, error
 
 func (r *etlRepo) upsertLog(dt, status, runType string, cnt, costMs int64, errMsg string) {
 	if status == "running" {
-		r.data.mysqlDB.Exec(`
+		if err := r.data.mysqlDB.Exec(`
 			INSERT INTO etl_job_log (dt, table_name, status, run_type, cnt, cost_ms, error_msg, created_at)
 			VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
 			ON DUPLICATE KEY UPDATE
 				status    = VALUES(status),
 				run_type  = VALUES(run_type),
 				updated_at = NOW()`,
-			dt, targetCfdiDaily, status, runType, cnt, costMs, errMsg)
+			dt, targetCfdiDaily, status, runType, cnt, costMs, errMsg).Error; err != nil {
+			r.log.Errorf("[etl] upsertLog(running) failed: dt=%s err=%v", dt, err)
+		}
 	} else {
-		r.data.mysqlDB.Exec(`
+		if err := r.data.mysqlDB.Exec(`
 			UPDATE etl_job_log SET
 				status    = ?,
 				run_type  = ?,
@@ -165,6 +184,8 @@ func (r *etlRepo) upsertLog(dt, status, runType string, cnt, costMs int64, errMs
 				error_msg = ?,
 				updated_at = NOW()
 			WHERE dt = ? AND table_name = ?`,
-			status, runType, cnt, costMs, errMsg, dt, targetCfdiDaily)
+			status, runType, cnt, costMs, errMsg, dt, targetCfdiDaily).Error; err != nil {
+			r.log.Errorf("[etl] upsertLog(%s) failed: dt=%s err=%v", status, dt, err)
+		}
 	}
 }
