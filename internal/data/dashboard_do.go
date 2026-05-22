@@ -19,13 +19,11 @@ var _ biz.DoDashboardRepo = (*doDashboardRepo)(nil)
 
 type doDashboardRepo struct {
 	*baseRepo
-	slowLog *slowQueryLogger
 }
 
 func NewDoDashboardRepo(data *Data) biz.DoDashboardRepo {
 	return &doDashboardRepo{
 		baseRepo: &baseRepo{data: data},
-		slowLog:  newSlowQueryLogger(data.mysqlDB),
 	}
 }
 
@@ -70,12 +68,7 @@ func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverview
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		adsErr = r.slowLog.Observe(slowQueryMeta{
-			QueryType: "GetOverview", StartDt: param.StartDt, EndDt: param.EndDt,
-			EventNames: param.EventNames, FilterName: param.FilterName,
-		}, func() error {
-			return db.Raw(adsSql, args...).Scan(&rows).Error
-		})
+		adsErr = db.Raw(adsSql, args...).Scan(&rows).Error
 	}()
 	go func() {
 		defer wg.Done()
@@ -137,12 +130,7 @@ func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam)
 		GROUP BY dt ORDER BY dt ASC`
 
 	var rows []*doTrendRow
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetTrend", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames, FilterName: param.FilterName,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -194,12 +182,7 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 
 	tripleArgs := append(append(append([]interface{}{}, args...), args...), args...)
 	var rows []*failReasonRow
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetFailReason", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames, FilterName: param.FilterName,
-	}, func() error {
-		return db.Raw(sql, tripleArgs...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, tripleArgs...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -228,12 +211,7 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 		Cnt        int64  `gorm:"column:cnt"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetCoolTop", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -259,12 +237,7 @@ func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommo
 		Cnt        int64  `gorm:"column:cnt"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetTriggerRank", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -290,12 +263,7 @@ func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonP
 		Cnt       int64  `gorm:"column:cnt"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetSwVersion", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames, FilterName: param.FilterName,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -323,12 +291,7 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 		Cnt         int64  `gorm:"column:cnt"`
 	}
 	var rows []*pcRow
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetProjectCar", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames, FilterName: param.FilterName,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -395,11 +358,7 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 		Cnt       int64  `gorm:"column:cnt"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetMemTop", StartDt: param.StartDt, EndDt: param.EndDt,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*biz.DoEventTopItem, 0, len(rows))
@@ -425,11 +384,7 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 		Cnt       int64  `gorm:"column:cnt"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetDiskTop", StartDt: param.StartDt, EndDt: param.EndDt,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*biz.DoEventTopItem, 0, len(rows))
@@ -453,11 +408,7 @@ func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonPa
 		Cnt        int64  `gorm:"column:cnt"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetCloseTop", StartDt: param.StartDt, EndDt: param.EndDt,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*biz.DoCoolTopItem, 0, len(rows))
@@ -483,11 +434,7 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 		Cnt       int64  `gorm:"column:cnt"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetQuotaTop", StartDt: param.StartDt, EndDt: param.EndDt,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*biz.DoEventTopItem, 0, len(rows))
@@ -512,12 +459,7 @@ func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoComm
 		EventCount  int64  `gorm:"column:event_count"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetProjectEvent", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames, FilterName: param.FilterName,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*biz.DoProjectEventItem, 0, len(rows))
@@ -544,11 +486,7 @@ func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonPa
 		AvgBw   float64 `gorm:"column:avg_bw"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetNetSpeed", StartDt: param.StartDt, EndDt: param.EndDt,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -600,11 +538,7 @@ func (r *doDashboardRepo) GetFclBw(ctx context.Context, param *biz.DoCommonParam
 		AvgBw float64 `gorm:"column:avg_bw"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetFclBw", StartDt: param.StartDt, EndDt: param.EndDt,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -694,12 +628,7 @@ func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehic
 		LIMIT 20`
 
 	var rows []*vehicleStatsRow
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetTopVehicles", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -737,12 +666,7 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 		LIMIT 100`
 
 	var rows []*vehicleStatsRow
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetAnomalyVehicles", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -776,12 +700,7 @@ func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehic
 		ActiveCount int64  `gorm:"column:active_count"`
 	}
 	var rows []*row
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetActiveTrend", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames,
-	}, func() error {
-		return db.Raw(sql, args...).Scan(&rows).Error
-	}); err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -933,25 +852,17 @@ func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonPa
 		fffFail, fdrFail, fclFail []*detailRow
 		statErr, f1, f2, f3       error
 	)
-	if err := r.slowLog.Observe(slowQueryMeta{
-		QueryType: "GetDoFunnel", StartDt: param.StartDt, EndDt: param.EndDt,
-		EventNames: param.EventNames, FilterName: param.FilterName,
-	}, func() error {
-		var wg sync.WaitGroup
-		wg.Add(4)
-		go func() { defer wg.Done(); statErr = db.Raw(statSQL, args...).Scan(&stat).Error }()
-		go func() { defer wg.Done(); f1 = db.Raw(fffFailSQL, args...).Scan(&fffFail).Error }()
-		go func() { defer wg.Done(); f2 = db.Raw(fdrFailSQL, args...).Scan(&fdrFail).Error }()
-		go func() { defer wg.Done(); f3 = db.Raw(fclFailSQL, args...).Scan(&fclFail).Error }()
-		wg.Wait()
-		for _, e := range []error{statErr, f1, f2, f3} {
-			if e != nil {
-				return e
-			}
+	var wg sync.WaitGroup
+	wg.Add(4)
+	go func() { defer wg.Done(); statErr = db.Raw(statSQL, args...).Scan(&stat).Error }()
+	go func() { defer wg.Done(); f1 = db.Raw(fffFailSQL, args...).Scan(&fffFail).Error }()
+	go func() { defer wg.Done(); f2 = db.Raw(fdrFailSQL, args...).Scan(&fdrFail).Error }()
+	go func() { defer wg.Done(); f3 = db.Raw(fclFailSQL, args...).Scan(&fclFail).Error }()
+	wg.Wait()
+	for _, e := range []error{statErr, f1, f2, f3} {
+		if e != nil {
+			return nil, e
 		}
-		return nil
-	}); err != nil {
-		return nil, err
 	}
 
 	pct := func(a, b int64) float64 {

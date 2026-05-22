@@ -68,7 +68,6 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 
 	if err := db.AutoMigrate(
 		&orm.GreeterDo{},
-		&orm.SlowQueryLogDo{},
 		&orm.EtlJobLogDo{},
 	); err != nil {
 		panic(fmt.Sprintf("Update Table Failed: %+v", err))
