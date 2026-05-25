@@ -82,8 +82,8 @@ message Data {
     }
 
     message Etl {
-        bool on = 1;
-        bool backfill_on = 2;
+        string on = 1;
+        string backfill_on = 2;
         int32 backfill_days = 3;
         int32 refresh_days = 4;
         string lock_key = 5;

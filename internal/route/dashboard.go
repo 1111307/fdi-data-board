@@ -1,13 +1,21 @@
 package route
 
 import (
+	"github.com/gin-gonic/gin"
+
+	"fdi_data_board/internal/conf"
 	"fdi_data_board/internal/service"
 )
 
-func RegisterDoDashboardService(s *service.DoDashboardService) []GroupUrl {
+func RegisterDoDashboardService(s *service.DoDashboardService, cd *conf.Data) []GroupUrl {
+	middleware := []gin.HandlerFunc{
+		UMAuthMiddleware(cd.GetKeycloak().GetUrl(), cd.GetKeycloak().GetRealm()),
+		UMUserResourcesMiddleware(cd.GetRuntime().GetDomain(), cd.GetGrpcClient().GetUmEndpoint()),
+	}
 	return []GroupUrl{
 		{
-			GroupAddr: "/dashboard/v1/do/",
+			GroupAddr:  "/dashboard/v1/do/",
+			Middleware: middleware,
 			Urls: []Url{
 				{JsonHandlerFunc: s.GetOverview, Path: "overview", Method: GET},
 				{JsonHandlerFunc: s.GetTrend, Path: "trend", Method: GET},
@@ -32,18 +40,24 @@ func RegisterDoDashboardService(s *service.DoDashboardService) []GroupUrl {
 	}
 }
 
-func RegisterFoDashboardService(s *service.FoDashboardService) []GroupUrl {
+func RegisterFoDashboardService(s *service.FoDashboardService, cd *conf.Data) []GroupUrl {
+	middleware := []gin.HandlerFunc{
+		UMAuthMiddleware(cd.GetKeycloak().GetUrl(), cd.GetKeycloak().GetRealm()),
+		UMUserResourcesMiddleware(cd.GetRuntime().GetDomain(), cd.GetGrpcClient().GetUmEndpoint()),
+	}
 	return []GroupUrl{
 		{
 			// 公共接口，FO 和 DO 共用
-			GroupAddr: "/dashboard/v1/",
+			GroupAddr:  "/dashboard/v1/",
+			Middleware: middleware,
 			Urls: []Url{
 				{JsonHandlerFunc: s.GetDimensions, Path: "dimensions", Method: GET},
 				{JsonHandlerFunc: s.GetFunnel, Path: "diag/funnel", Method: GET},
 			},
 		},
 		{
-			GroupAddr: "/dashboard/v1/fo/",
+			GroupAddr:  "/dashboard/v1/fo/",
+			Middleware: middleware,
 			Urls: []Url{
 				{JsonHandlerFunc: s.ListFffRunning, Path: "detail/running", Method: GET},
 				{JsonHandlerFunc: s.ListFffTrigger, Path: "detail/trigger", Method: GET},
