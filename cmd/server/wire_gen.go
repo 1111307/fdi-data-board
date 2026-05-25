@@ -42,10 +42,11 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger) (*
 	doDashboardService := service.NewDoDashboardService(doDashboardUseCase)
 	etlRepo := data.NewEtlRepo(dataData, logger)
 	etlUseCase := biz.NewETLUseCase(etlRepo, logger)
+	universalClient := data.NewSchedulerRedisClient(confData, logger)
 	etlService := service.NewEtlService(etlUseCase)
 	v := route.RegisterHttpService(confData, greeterApiService, foDashboardService, doDashboardService, etlService)
 	v2 := server.NewAllHttpServer(confServer, confData, logger, v, greeterService)
-	etlServer := server.NewETLServer(etlUseCase, logger)
+	etlServer := server.NewETLServer(etlUseCase, confData, universalClient, logger)
 	simpleServer := server.NewSimpleServer(etlServer)
 	app := newApp(logger, grpcServer, v2, simpleServer)
 	return app, func() {

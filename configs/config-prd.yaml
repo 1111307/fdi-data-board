@@ -46,3 +46,11 @@ data:
   runtime:
     env: ${RUN_MODE:prd}
     domain: ${FUNC_SCOPE:fdi_cloud}
+  etl:
+    on: ${ETL_ON:true}
+    backfill_on: ${ETL_BACKFILL_ON:true}
+    backfill_days: ${ETL_BACKFILL_DAYS:180}
+    refresh_days: ${ETL_REFRESH_DAYS:7}
+    lock_key: ${ETL_LOCK_KEY:fdi_data_board:etl:scheduler}
+    lock_ttl: ${ETL_LOCK_TTL:120s}
+    lock_refresh_interval: ${ETL_LOCK_REFRESH_INTERVAL:30s}

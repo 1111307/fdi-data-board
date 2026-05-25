@@ -81,10 +81,21 @@ message Data {
         string domain = 2;
     }
 
+    message Etl {
+        bool on = 1;
+        bool backfill_on = 2;
+        int32 backfill_days = 3;
+        int32 refresh_days = 4;
+        string lock_key = 5;
+        google.protobuf.Duration lock_ttl = 6;
+        google.protobuf.Duration lock_refresh_interval = 7;
+    }
+
     Mysql mysql = 1;
     Redis redis = 2;
     Keycloak keycloak = 3;
     GrpcClient grpc_client = 4;
     Runtime runtime = 7;
     Doris doris = 8;
+    Etl etl = 9;
 }

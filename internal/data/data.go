@@ -3,13 +3,16 @@ package data
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/google/wire"
+	redis "github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -26,6 +29,7 @@ var ProviderSet = wire.NewSet(
 	NewFoDashboardRepo,
 	NewDoDashboardRepo,
 	NewEtlRepo,
+	NewSchedulerRedisClient,
 )
 
 // Data .
@@ -126,6 +130,51 @@ func anyDialer(c *conf.Data, logger log.Logger) *grpc.ClientConn {
 	}
 
 	return conn
+}
+
+func NewSchedulerRedisClient(c *conf.Data, logger log.Logger) redis.UniversalClient {
+	if c.GetRedis() == nil || c.GetRedis().GetAddr() == "" {
+		log.NewHelper(logger).Warn("[etl] redis addr is empty, scheduler lock disabled")
+		return nil
+	}
+
+	addrs := splitAndTrim(c.GetRedis().GetAddr())
+	if len(addrs) == 0 {
+		log.NewHelper(logger).Warn("[etl] redis addr is empty, scheduler lock disabled")
+		return nil
+	}
+
+	opts := &redis.UniversalOptions{
+		Addrs:        addrs,
+		Password:     c.GetRedis().GetPassword(),
+		ReadTimeout:  c.GetRedis().GetReadTimeout().AsDuration(),
+		WriteTimeout: c.GetRedis().GetWriteTimeout().AsDuration(),
+	}
+	if strings.EqualFold(c.GetRedis().GetLinkType(), "single") && len(addrs) > 0 {
+		opts.Addrs = addrs[:1]
+	}
+
+	client := redis.NewUniversalClient(opts)
+	pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := client.Ping(pingCtx).Err(); err != nil {
+		log.NewHelper(logger).Errorf("[etl] redis init failed, scheduler lock disabled: %v", err)
+		_ = client.Close()
+		return nil
+	}
+	return client
+}
+
+func splitAndTrim(s string) []string {
+	parts := strings.Split(s, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }
 
 // NewData .
