@@ -20,44 +20,6 @@ func NewEtlService(uc *biz.ETLUseCase) *EtlService {
 	return &EtlService{uc: uc}
 }
 
-// RunETL godoc
-//
-//	@Summary		手动触发指定日期的 ETL
-//	@Tags			ETL
-//	@Produce		json
-//	@Param			dt	query	string	true	"日期，格式 2006-01-02"
-//	@Success		200	{object}	dashboard_api.EtlRunResponse
-//	@Router			/internal/etl/run [POST]
-func (s *EtlService) RunETL(c *gin.Context) (api.HttpResponse, error) {
-	dt := c.Query("dt")
-	if dt == "" {
-		return &dashboard_api.EtlRunResponse{
-			BaseResponse: dashboard_api.BaseResponse{
-				Code:    int32(gcode.CodeInvalidParameter.Code()),
-				Message: "dt is required",
-			},
-		}, nil
-	}
-
-	cnt, err := s.uc.RunForDate(c.Request.Context(), dt)
-	if err != nil {
-		return &dashboard_api.EtlRunResponse{
-			BaseResponse: dashboard_api.BaseResponse{
-				Code:    int32(gcode.CodeInternalError.Code()),
-				Message: err.Error(),
-			},
-		}, nil
-	}
-
-	return &dashboard_api.EtlRunResponse{
-		BaseResponse: dashboard_api.BaseResponse{
-			Code:    int32(gcode.CodeOK.Code()),
-			Message: "ok",
-		},
-		Cnt: cnt,
-	}, nil
-}
-
 // GetStatus godoc
 //
 //	@Summary		查询 ETL 任务日志

@@ -9,7 +9,6 @@ func RegisterEtlService(s *service.EtlService) []GroupUrl {
 		{
 			GroupAddr: "/internal/etl/",
 			Urls: []Url{
-				{JsonHandlerFunc: s.RunETL, Path: "run", Method: POST},
 				{JsonHandlerFunc: s.GetStatus, Path: "status", Method: GET},
 			},
 		},

@@ -37,11 +37,6 @@ func NewETLUseCase(repo EtlRepo, logger log.Logger) *ETLUseCase {
 	return &ETLUseCase{repo: repo, log: log.NewHelper(logger)}
 }
 
-// RunForDate 对指定日期执行 ETL（强制覆盖）
-func (uc *ETLUseCase) RunForDate(ctx context.Context, dt string) (int64, error) {
-	return uc.repo.RunETL(ctx, dt, "manual")
-}
-
 // Backfill 回流近 days 天数据，已成功的跳过
 func (uc *ETLUseCase) Backfill(ctx context.Context, days int) {
 	loc, _ := time.LoadLocation("Asia/Shanghai")
