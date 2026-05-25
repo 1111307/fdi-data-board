@@ -62,7 +62,8 @@ type fffRunningRow struct {
 }
 
 func (r *foDashboardRepo) ListFffRunning(ctx context.Context, param *biz.FffRunningParam) ([]*biz.FffRunningItem, int64, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 
 	where, args := buildFffRunningWhere(param)
 
@@ -201,7 +202,8 @@ type fffTriggerRow struct {
 }
 
 func (r *foDashboardRepo) ListFffTrigger(ctx context.Context, param *biz.FffTriggerParam) ([]*biz.FffTriggerItem, int64, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildFffTriggerWhere(param)
 
 	var (
@@ -344,7 +346,8 @@ type fffCloseRow struct {
 }
 
 func (r *foDashboardRepo) ListFffClose(ctx context.Context, param *biz.FffCloseParam) ([]*biz.FffCloseItem, int64, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildFffCloseWhere(param)
 
 	var (
@@ -471,7 +474,8 @@ type fdrTriggerRow struct {
 }
 
 func (r *foDashboardRepo) ListFdrTrigger(ctx context.Context, param *biz.FdrTriggerParam) ([]*biz.FdrTriggerItem, int64, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildFdrTriggerWhere(param)
 
 	var (
@@ -615,7 +619,8 @@ type fclTriggerRow struct {
 }
 
 func (r *foDashboardRepo) ListFclTrigger(ctx context.Context, param *biz.FclTriggerParam) ([]*biz.FclTriggerItem, int64, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildFclTriggerWhere(param)
 
 	var (
@@ -767,7 +772,8 @@ type uuidDetailRow struct {
 }
 
 func (r *foDashboardRepo) ListUuidDetail(ctx context.Context, param *biz.UuidDetailParam) ([]*biz.UuidDetailItem, int64, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildUuidDetailWhere(param)
 
 	var (
@@ -916,7 +922,8 @@ type closeReasonRow struct {
 }
 
 func (r *foDashboardRepo) GetCloseReason(ctx context.Context, param *biz.CloseReasonParam) ([]*biz.CloseReasonItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildCloseReasonWhere(param)
 
 	sql := fmt.Sprintf(`
@@ -979,7 +986,8 @@ func buildCloseReasonWhere(param *biz.CloseReasonParam) (string, []interface{}) 
 }
 
 func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam) (*biz.FunnelData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	base := " FROM ads_do_cfdi_daily" + where + " AND event_name != 'Forever_log'"
 
@@ -1070,40 +1078,41 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 }
 
 func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	type stageAllRow struct {
-		Dt               time.Time `gorm:"column:dt"`
-		FffSuccess       int64     `gorm:"column:fff_success"`
-		FffCooldown      int64     `gorm:"column:fff_cooldown"`
-		FffDrmQuota      int64     `gorm:"column:fff_drm_quota"`
-		FffNoAcquire     int64     `gorm:"column:fff_no_acquire"`
-		FffTriggerMax    int64     `gorm:"column:fff_trigger_max"`
-		FffBagInvalid    int64     `gorm:"column:fff_bag_invalid"`
-		FffEventNotRec   int64     `gorm:"column:fff_event_not_recognized"`
-		FffTlsError      int64     `gorm:"column:fff_tls_error"`
-		FffQuotaExceeded int64     `gorm:"column:fff_quota_exceeded"`
-		FffBlacklist     int64     `gorm:"column:fff_blacklist"`
-		FffOther         int64     `gorm:"column:fff_other"`
-		FdrSuccess       int64     `gorm:"column:fdr_success"`
-		FdrMemory        int64     `gorm:"column:fdr_memory"`
-		FdrDisk          int64     `gorm:"column:fdr_disk"`
-		FdrBagInvalid    int64     `gorm:"column:fdr_bag_invalid"`
-		FdrBagDirMissing int64     `gorm:"column:fdr_bag_dir_missing"`
-		FdrEventNotRec   int64     `gorm:"column:fdr_event_not_recognized"`
-		FdrUnauthorized  int64     `gorm:"column:fdr_unauthorized"`
-		FdrOther         int64     `gorm:"column:fdr_other"`
-		FclSuccess       int64     `gorm:"column:fcl_success"`
+		Dt                  time.Time `gorm:"column:dt"`
+		FffSuccess          int64     `gorm:"column:fff_success"`
+		FffCooldown         int64     `gorm:"column:fff_cooldown"`
+		FffDrmQuota         int64     `gorm:"column:fff_drm_quota"`
+		FffNoAcquire        int64     `gorm:"column:fff_no_acquire"`
+		FffTriggerMax       int64     `gorm:"column:fff_trigger_max"`
+		FffBagInvalid       int64     `gorm:"column:fff_bag_invalid"`
+		FffEventNotRec      int64     `gorm:"column:fff_event_not_recognized"`
+		FffTlsError         int64     `gorm:"column:fff_tls_error"`
+		FffQuotaExceeded    int64     `gorm:"column:fff_quota_exceeded"`
+		FffBlacklist        int64     `gorm:"column:fff_blacklist"`
+		FffOther            int64     `gorm:"column:fff_other"`
+		FdrSuccess          int64     `gorm:"column:fdr_success"`
+		FdrMemory           int64     `gorm:"column:fdr_memory"`
+		FdrDisk             int64     `gorm:"column:fdr_disk"`
+		FdrBagInvalid       int64     `gorm:"column:fdr_bag_invalid"`
+		FdrBagDirMissing    int64     `gorm:"column:fdr_bag_dir_missing"`
+		FdrEventNotRec      int64     `gorm:"column:fdr_event_not_recognized"`
+		FdrUnauthorized     int64     `gorm:"column:fdr_unauthorized"`
+		FdrOther            int64     `gorm:"column:fdr_other"`
+		FclSuccess          int64     `gorm:"column:fcl_success"`
 		FclQuotaExceeded    int64     `gorm:"column:fcl_quota_exceeded"`
 		FclReachUploadLimit int64     `gorm:"column:fcl_reach_upload_limit"`
 		FclBlacklist        int64     `gorm:"column:fcl_blacklist"`
-		FclGeofence      int64     `gorm:"column:fcl_geofence"`
-		FclTlsError      int64     `gorm:"column:fcl_tls_error"`
-		FclBagMissing    int64     `gorm:"column:fcl_bag_missing"`
-		FclUploadError   int64     `gorm:"column:fcl_upload_error"`
-		FclNetworkError  int64     `gorm:"column:fcl_network_error"`
-		FclOther         int64     `gorm:"column:fcl_other"`
+		FclGeofence         int64     `gorm:"column:fcl_geofence"`
+		FclTlsError         int64     `gorm:"column:fcl_tls_error"`
+		FclBagMissing       int64     `gorm:"column:fcl_bag_missing"`
+		FclUploadError      int64     `gorm:"column:fcl_upload_error"`
+		FclNetworkError     int64     `gorm:"column:fcl_network_error"`
+		FclOther            int64     `gorm:"column:fcl_other"`
 	}
 
 	sql := `SELECT dt,
@@ -1239,7 +1248,8 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 
 // fetchDimensions 并发查询 Doris 获取四类维度枚举值
 func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimensions, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 
 	type strRow struct{ Val string }
 

@@ -73,6 +73,7 @@ message Data {
         int32 max_idl = 7;
         int32 max_open = 8;
         google.protobuf.Duration conn_max_lift = 9;
+        google.protobuf.Duration query_timeout = 10;
     }
 
     message Runtime {

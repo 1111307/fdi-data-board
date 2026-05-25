@@ -37,7 +37,8 @@ type doOverviewRow struct {
 }
 
 func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverviewParam) ([]*biz.DoOverviewItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	adsSql := `SELECT event_name,
@@ -120,7 +121,8 @@ type doTrendRow struct {
 }
 
 func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam) (*biz.DoTrendData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoTrendWhere(param)
 
 	sql := `SELECT dt,
@@ -163,7 +165,8 @@ type failReasonRow struct {
 }
 
 func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailReasonParam) ([]*biz.DoFailReasonItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT stage, detail_tag, SUM(cnt) AS cnt
@@ -197,7 +200,8 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 }
 
 func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT filter_name, SUM(cnt) AS cnt
@@ -223,7 +227,8 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 }
 
 func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT filter_name, SUM(cnt) AS cnt
@@ -249,7 +254,8 @@ func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommo
 }
 
 func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoSwVersionItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT fff_sw_version AS sw_version, SUM(cnt) AS cnt
@@ -275,7 +281,8 @@ func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonP
 }
 
 func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommonParam) (*biz.DoProjectCarData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT project_name, car_type, SUM(cnt) AS cnt
@@ -343,7 +350,8 @@ func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommon
 }
 
 func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoEventTopItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
@@ -369,7 +377,8 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 }
 
 func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoEventTopItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
@@ -395,7 +404,8 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 }
 
 func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT filter_name, COUNT(*) AS cnt
@@ -419,7 +429,8 @@ func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonPa
 }
 
 func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoEventTopItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
@@ -445,7 +456,8 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 }
 
 func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoProjectEventItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT project_name, COUNT(DISTINCT event_name) AS event_count
@@ -470,7 +482,8 @@ func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoComm
 }
 
 func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonParam) (*biz.DoNetSpeedData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildFclUploadWhere(param)
 
 	sql := `SELECT DATE(create_at) AS dt, car_type,
@@ -524,7 +537,8 @@ func (r *doDashboardRepo) GetNetSpeed(ctx context.Context, param *biz.DoCommonPa
 }
 
 func (r *doDashboardRepo) GetFclBw(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFclBwData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildFclUploadWhere(param)
 
 	sql := `SELECT DATE(create_at) AS dt,
@@ -576,7 +590,8 @@ func (r *doDashboardRepo) vehicleFailReasons(ctx context.Context, ids []string, 
 	if len(ids) == 0 {
 		return nil
 	}
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	idArgs := make([]interface{}, 0, len(args)+len(ids))
 	idArgs = append(idArgs, args...)
 	for _, id := range ids {
@@ -614,7 +629,8 @@ func (r *doDashboardRepo) vehicleFailReasons(ctx context.Context, ids []string, 
 }
 
 func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehicleParam) ([]*biz.DoVehicleItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT anonymous_id, car_type, project_name,
@@ -650,7 +666,8 @@ func (r *doDashboardRepo) GetTopVehicles(ctx context.Context, param *biz.DoVehic
 }
 
 func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoAnomalyParam) ([]*biz.DoVehicleItem, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	args = append(args, param.MaxRate)
@@ -688,7 +705,8 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 }
 
 func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehicleParam) (*biz.DoActiveTrendData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT dt, COUNT(DISTINCT anonymous_id) AS active_count
@@ -813,7 +831,8 @@ func appendMultiCond(conds []string, args []interface{}, col string, vals []stri
 }
 
 func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonParam) (*biz.FunnelData, error) {
-	db := r.dorisDB(ctx)
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	base := " FROM ads_do_cfdi_daily" + where + " AND event_name != 'Forever_log'"
 

@@ -1,13 +1,13 @@
 server:
   http:
     addr: 0.0.0.0:8000
-    timeout: 10s
+    timeout: 35s
   grpc:
     addr: 0.0.0.0:9000
-    timeout: 10s
+    timeout: 35s
   gin:
     addr: 0.0.0.0:8080
-    timeout: 10s
+    timeout: 35s
     run_mode: ${RUN_MODE:prd}
 data:
   mysql:
@@ -39,6 +39,7 @@ data:
     username: ${DORIS_USERNAME:root}
     password: ${DORIS_PASSWORD:}
     database: ${DORIS_DATABASE:fdi}
+    query_timeout: 30s
     max_idl: 10
     max_open: 50
     conn_max_lift: 3600s

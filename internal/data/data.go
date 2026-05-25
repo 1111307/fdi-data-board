@@ -30,6 +30,7 @@ var ProviderSet = wire.NewSet(
 
 // Data .
 type Data struct {
+	conf    *conf.Data
 	mysqlDB *gorm.DB
 	dorisDB *gorm.DB
 	anyConn *grpc.ClientConn
@@ -134,6 +135,7 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	dorisDB := newDorisDB(c)
 
 	d := &Data{
+		conf:    c,
 		mysqlDB: mysqlDB,
 		dorisDB: dorisDB,
 		anyConn: anyConn,

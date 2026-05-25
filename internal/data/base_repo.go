@@ -3,11 +3,14 @@ package data
 import (
 	"context"
 	"errors"
+	"time"
 
 	"gorm.io/gorm"
 
 	"fdi_data_board/internal/data/orm"
 )
+
+const defaultDorisQueryTimeout = 30 * time.Second
 
 var errDorisNotConfigured = errors.New("doris database not configured")
 
@@ -35,4 +38,16 @@ func (r *baseRepo) dorisDB(ctx context.Context) *gorm.DB {
 		return &gorm.DB{Error: errDorisNotConfigured}
 	}
 	return r.data.dorisDB.WithContext(ctx)
+}
+
+func (r *baseRepo) dorisQuery(ctx context.Context) (*gorm.DB, context.CancelFunc) {
+	if r.data.dorisDB == nil {
+		return &gorm.DB{Error: errDorisNotConfigured}, func() {}
+	}
+	timeout := defaultDorisQueryTimeout
+	if cfg := r.data.conf.GetDoris().GetQueryTimeout(); cfg != nil && cfg.AsDuration() > 0 {
+		timeout = cfg.AsDuration()
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	return r.data.dorisDB.WithContext(ctx), cancel
 }

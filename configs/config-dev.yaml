@@ -1,13 +1,13 @@
 server:
   http:
     addr: 0.0.0.0:8000
-    timeout: 10s
+    timeout: 35s
   grpc:
     addr: 0.0.0.0:9012
-    timeout: 10s
+    timeout: 35s
   gin:
     addr: 0.0.0.0:8081
-    timeout: 10s
+    timeout: 35s
     run_mode: ${RUN_MODE:dev}
 data:
   mysql:
@@ -41,6 +41,7 @@ data:
     username: ${DORIS_USERNAME:fdi}
     password: ${DORIS_PASSWORD:fdi@20260112}
     database: ${DORIS_DATABASE:fdi}
+    query_timeout: 30s
     max_idl: 10
     max_open: 100
     conn_max_lift: 3600s
@@ -48,4 +49,3 @@ data:
   runtime:
     env: ${RUN_MODE:dev}
     domain: ${FUNC_SCOPE:fdi_cloud}
-
