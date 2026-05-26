@@ -22,12 +22,12 @@ func NewEtlService(uc *biz.ETLUseCase) *EtlService {
 
 // GetStatus godoc
 //
-//	@Summary		查询 ETL 任务日志
-//	@Tags			ETL
-//	@Produce		json
-//	@Param			limit	query	int	false	"返回条数，默认 30"
-//	@Success		200		{object}	dashboard_api.EtlStatusResponse
-//	@Router			/internal/etl/status [GET]
+//	@Summary	查询 ETL 任务日志
+//	@Tags		ETL
+//	@Produce	json
+//	@Param		limit	query		int	false	"返回条数，默认 30"
+//	@Success	200		{object}	dashboard_api.EtlStatusResponse
+//	@Router		/internal/etl/status [GET]
 func (s *EtlService) GetStatus(c *gin.Context) (api.HttpResponse, error) {
 	limit := 30
 	if l := c.Query("limit"); l != "" {

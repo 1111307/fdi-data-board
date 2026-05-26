@@ -23,19 +23,19 @@ func NewFoDashboardService(uc *biz.FoDashboardUseCase) *FoDashboardService {
 
 // ListFffTrigger godoc
 //
-//	@Summary		筛选器触发明细
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_name		query	string	false	"事件名"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Param			page			query	int		false	"页码，默认1"
-//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
-//	@Success		200				{object}	dashboard_api.FffTriggerResponse
-//	@Router			/dashboard/v1/fo/detail/trigger [GET]
+//	@Summary	筛选器触发明细
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_name		query		string	false	"事件名"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Param		page			query		int		false	"页码，默认1"
+//	@Param		page_size		query		int		false	"每页条数，默认50，最大500"
+//	@Success	200				{object}	dashboard_api.FffTriggerResponse
+//	@Router		/dashboard/v1/fo/detail/trigger [GET]
 func (s *FoDashboardService) ListFffTrigger(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.FffTriggerResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -66,18 +66,18 @@ func (s *FoDashboardService) ListFffTrigger(ctx *gin.Context) (api.HttpResponse,
 
 // ListFffClose godoc
 //
-//	@Summary		筛选器关闭明细
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Param			page			query	int		false	"页码，默认1"
-//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
-//	@Success		200				{object}	dashboard_api.FffCloseResponse
-//	@Router			/dashboard/v1/fo/detail/close [GET]
+//	@Summary	筛选器关闭明细
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Param		page			query		int		false	"页码，默认1"
+//	@Param		page_size		query		int		false	"每页条数，默认50，最大500"
+//	@Success	200				{object}	dashboard_api.FffCloseResponse
+//	@Router		/dashboard/v1/fo/detail/close [GET]
 func (s *FoDashboardService) ListFffClose(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.FffCloseResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -108,18 +108,18 @@ func (s *FoDashboardService) ListFffClose(ctx *gin.Context) (api.HttpResponse, e
 
 // ListFdrTrigger godoc
 //
-//	@Summary		FDR 落盘明细
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			event_name		query	string	false	"事件名"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Param			page			query	int		false	"页码，默认1"
-//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
-//	@Success		200				{object}	dashboard_api.FdrTriggerResponse
-//	@Router			/dashboard/v1/fo/detail/fdr [GET]
+//	@Summary	FDR 落盘明细
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		event_name		query		string	false	"事件名"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Param		page			query		int		false	"页码，默认1"
+//	@Param		page_size		query		int		false	"每页条数，默认50，最大500"
+//	@Success	200				{object}	dashboard_api.FdrTriggerResponse
+//	@Router		/dashboard/v1/fo/detail/fdr [GET]
 func (s *FoDashboardService) ListFdrTrigger(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.FdrTriggerResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -150,18 +150,18 @@ func (s *FoDashboardService) ListFdrTrigger(ctx *gin.Context) (api.HttpResponse,
 
 // ListFclTrigger godoc
 //
-//	@Summary		FCL 上传明细
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			event_name		query	string	false	"事件名"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Param			page			query	int		false	"页码，默认1"
-//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
-//	@Success		200				{object}	dashboard_api.FclTriggerResponse
-//	@Router			/dashboard/v1/fo/detail/fcl [GET]
+//	@Summary	FCL 上传明细
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		event_name		query		string	false	"事件名"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Param		page			query		int		false	"页码，默认1"
+//	@Param		page_size		query		int		false	"每页条数，默认50，最大500"
+//	@Success	200				{object}	dashboard_api.FclTriggerResponse
+//	@Router		/dashboard/v1/fo/detail/fcl [GET]
 func (s *FoDashboardService) ListFclTrigger(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.FclTriggerResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -192,21 +192,21 @@ func (s *FoDashboardService) ListFclTrigger(ctx *gin.Context) (api.HttpResponse,
 
 // ListUuidDetail godoc
 //
-//	@Summary		全链路明细
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Param			only_fail		query	int		false	"1=仅看失败记录"
-//	@Param			stage_filter	query	string	false	"阶段过滤: fff_discard/fdr_discard/fcl_discard/fcl_success"
-//	@Param			page			query	int		false	"页码，默认1"
-//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
-//	@Success		200				{object}	dashboard_api.UuidDetailResponse
-//	@Router			/dashboard/v1/fo/detail/uuid [GET]
+//	@Summary	全链路明细
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Param		only_fail		query		int		false	"1=仅看失败记录"
+//	@Param		stage_filter	query		string	false	"阶段过滤: fff_discard/fdr_discard/fcl_discard/fcl_success"
+//	@Param		page			query		int		false	"页码，默认1"
+//	@Param		page_size		query		int		false	"每页条数，默认50，最大500"
+//	@Success	200				{object}	dashboard_api.UuidDetailResponse
+//	@Router		/dashboard/v1/fo/detail/uuid [GET]
 func (s *FoDashboardService) ListUuidDetail(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.UuidDetailResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -237,17 +237,17 @@ func (s *FoDashboardService) ListUuidDetail(ctx *gin.Context) (api.HttpResponse,
 
 // GetFunnel godoc
 //
-//	@Summary		数采全链路分析（节点统计 + 失败原因）
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD，不传默认当天"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Success		200				{object}	dashboard_api.FunnelResponse
-//	@Router			/dashboard/v1/fo/diag/funnel [GET]
+//	@Summary	数采全链路分析（节点统计 + 失败原因）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD，不传默认当天"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.FunnelResponse
+//	@Router		/dashboard/v1/fo/diag/funnel [GET]
 func (s *FoDashboardService) GetFunnel(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.FunnelResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -278,17 +278,17 @@ func (s *FoDashboardService) GetFunnel(ctx *gin.Context) (api.HttpResponse, erro
 
 // GetStageTrend godoc
 //
-//	@Summary		三阶段触发趋势（FFF/FDR/FCL 按日期聚合，堆叠柱图）
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Success		200				{object}	dashboard_api.StageTrendResponse
-//	@Router			/dashboard/v1/fo/diag/stage_trend [GET]
+//	@Summary	三阶段触发趋势（FFF/FDR/FCL 按日期聚合，堆叠柱图）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.StageTrendResponse
+//	@Router		/dashboard/v1/fo/diag/stage_trend [GET]
 func (s *FoDashboardService) GetStageTrend(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.StageTrendResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -319,16 +319,16 @@ func (s *FoDashboardService) GetStageTrend(ctx *gin.Context) (api.HttpResponse, 
 
 // GetCloseReason godoc
 //
-//	@Summary		算子关闭原因分布
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Success		200				{object}	dashboard_api.CloseReasonResponse
-//	@Router			/dashboard/v1/fo/diag/close_reason [GET]
+//	@Summary	算子关闭原因分布
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.CloseReasonResponse
+//	@Router		/dashboard/v1/fo/diag/close_reason [GET]
 func (s *FoDashboardService) GetCloseReason(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.CloseReasonResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -359,12 +359,12 @@ func (s *FoDashboardService) GetCloseReason(ctx *gin.Context) (api.HttpResponse,
 
 // GetDimensions godoc
 //
-//	@Summary		FO Dashboard 下拉维度（近7天活跃数据，30分钟缓存）
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.FoDimensionsResponse
-//	@Router			/dashboard/v1/fo/dimensions [GET]
+//	@Summary	FO Dashboard 下拉维度（近7天活跃数据，30分钟缓存）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.FoDimensionsResponse
+//	@Router		/dashboard/v1/fo/dimensions [GET]
 func (s *FoDashboardService) GetDimensions(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.FoDimensionsResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -383,18 +383,18 @@ func (s *FoDashboardService) GetDimensions(ctx *gin.Context) (api.HttpResponse, 
 
 // ListFffRunning godoc
 //
-//	@Summary		筛选器运行明细
-//	@Tags			FoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			start_dt		query	string	false	"开始日期 YYYY-MM-DD"
-//	@Param			end_dt			query	string	false	"结束日期 YYYY-MM-DD"
-//	@Param			page			query	int		false	"页码，默认1"
-//	@Param			page_size		query	int		false	"每页条数，默认50，最大500"
-//	@Success		200				{object}	dashboard_api.FffRunningResponse
-//	@Router			/dashboard/v1/fo/detail/running [GET]
+//	@Summary	筛选器运行明细
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Param		page			query		int		false	"页码，默认1"
+//	@Param		page_size		query		int		false	"每页条数，默认50，最大500"
+//	@Success	200				{object}	dashboard_api.FffRunningResponse
+//	@Router		/dashboard/v1/fo/detail/running [GET]
 func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.FffRunningResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
