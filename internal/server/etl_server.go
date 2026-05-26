@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -254,8 +255,8 @@ func (s *ETLServer) runtimeConfig() etlRuntimeConfig {
 	}
 
 	if etl := s.conf.GetEtl(); etl != nil {
-		cfg.on = etl.GetOn()
-		cfg.backfillOn = etl.GetBackfillOn()
+		cfg.on = parseConfigBool(etl.GetOn(), cfg.on)
+		cfg.backfillOn = parseConfigBool(etl.GetBackfillOn(), cfg.backfillOn)
 		if etl.GetBackfillDays() > 0 {
 			cfg.backfillDays = int(etl.GetBackfillDays())
 		}
@@ -281,6 +282,19 @@ func (s *ETLServer) runtimeConfig() etlRuntimeConfig {
 	}
 
 	return cfg
+}
+
+func parseConfigBool(value string, defaultValue bool) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "":
+		return defaultValue
+	case "true", "1", "yes", "on":
+		return true
+	case "false", "0", "no", "off":
+		return false
+	default:
+		return defaultValue
+	}
 }
 
 // nextRunTime 返回指定时区 hour:minute 的下一次触发时刻
