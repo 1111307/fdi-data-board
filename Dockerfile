@@ -3,7 +3,8 @@ FROM artifactory.momenta.works/docker-momenta/fleet/fdi-buildbase:v1.0.2 AS buil
 COPY . /src
 WORKDIR /src
 
-RUN sed -i 's/mirrors.tuna.tsinghua.edu.cn/mirrors.aliyun.com/g' /etc/apk/repositories \
+
+RUN sed -i "s|https://dl-cdn.alpinelinux.org/alpine|https://artifactory.momenta.works/artifactory/alpine-remote|g" /etc/apk/repositories \
     && sed -i "s|https://mirrors.tuna.tsinghua.edu.cn/alpine|https://artifactory.momenta.works/artifactory/alpine-remote|g" /etc/apk/repositories \
     && apk update  \
     && apk add --no-cache tzdata \

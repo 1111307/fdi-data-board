@@ -1,6 +1,6 @@
 module fdi_data_board
 
-go 1.22.0
+go 1.21
 
 require (
 	devops.momenta.works/Momenta/FDI/_git/gerr.git v1.0.1
@@ -18,11 +18,11 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.2
-	github.com/tbaehler/gin-keycloak v1.3.0
+	github.com/tbaehler/gin-keycloak v1.5.1
 	go.uber.org/automaxprocs v1.5.1
-	golang.org/x/sync v0.8.0
+	golang.org/x/sync v0.10.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237
-	google.golang.org/grpc v1.64.1
+	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.33.0
 	gorm.io/driver/mysql v1.4.7
 	gorm.io/gorm v1.24.6
@@ -76,12 +76,12 @@ require (
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
-	golang.org/x/mod v0.21.0 // indirect
-	golang.org/x/net v0.29.0 // indirect
+	golang.org/x/crypto v0.26.0 // indirect
+	golang.org/x/mod v0.20.0 // indirect
+	golang.org/x/net v0.28.0 // indirect
 	golang.org/x/oauth2 v0.18.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
+	golang.org/x/sys v0.23.0 // indirect
+	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/tools v0.24.1 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237 // indirect
@@ -89,9 +89,3 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/go-openapi/swag => github.com/go-openapi/swag v0.22.9
-
-replace golang.org/x/crypto => golang.org/x/crypto v0.21.0
-
-replace google.golang.org/protobuf => google.golang.org/protobuf v1.33.0
