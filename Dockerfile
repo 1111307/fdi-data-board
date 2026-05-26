@@ -1,4 +1,4 @@
-FROM artifactory.momenta.works/docker-momenta/fleet/fdi-buildbase:v1.0.2 AS builder
+FROM artifactory.momenta.works/docker-momenta/fleet/fdi-buildbase:v1.0.3 AS builder
 
 COPY . /src
 WORKDIR /src
