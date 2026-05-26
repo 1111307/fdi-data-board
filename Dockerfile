@@ -3,24 +3,25 @@ FROM artifactory.momenta.works/docker-momenta/fleet/fdi-buildbase:v1.0.2 AS buil
 COPY . /src
 WORKDIR /src
 
-RUN sed -i 's/mirrors.tuna.tsinghua.edu.cn/mirrors.aliyun.com/g' /etc/apk/repositories \
+
+RUN sed -i "s|https://dl-cdn.alpinelinux.org/alpine|https://artifactory.momenta.works/artifactory/alpine-remote|g" /etc/apk/repositories \
+    && sed -i "s|https://mirrors.tuna.tsinghua.edu.cn/alpine|https://artifactory.momenta.works/artifactory/alpine-remote|g" /etc/apk/repositories \
     && apk update  \
     && apk add --no-cache tzdata \
     && apk add --no-cache gawk
 
 
 RUN set -x\
-    && go get -u google.golang.org/protobuf \
-    && go install google.golang.org/protobuf/cmd/protoc-gen-go  \
-	&& go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc  \
-	&& go get -u github.com/swaggo/swag/cmd/swag  \
-    && go get -u github.com/favadi/protoc-go-inject-tag \
-	&& go install google.golang.org/grpc/cmd/protoc-gen-go-grpc \
-	&& go install github.com/swaggo/swag/cmd/swag \
-	&& go install github.com/favadi/protoc-go-inject-tag \
-    && go install github.com/go-kratos/kratos/cmd/kratos/v2@latest \
+    && go get google.golang.org/protobuf@v1.33.0 \
+    && go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.3  \
+	&& go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0  \
+    && go get -u github.com/favadi/protoc-go-inject-tag@latest \
+	&& go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0 \
+	&& go install github.com/swaggo/swag/cmd/swag@v1.16.2 \
+	&& go install github.com/favadi/protoc-go-inject-tag@latest \
+    && go install github.com/go-kratos/kratos/cmd/kratos/v2@v2.0.0-20251205160234-b9fab9a5a5ab \
     && go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest \
-    && go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest \
+    && go install github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.0 \
     && go install github.com/google/wire/cmd/wire@latest \
     && go mod download  \
     && go mod tidy
@@ -33,7 +34,9 @@ RUN mkdir -p bin \
 
 FROM artifactory.momenta.works/docker-momenta/alpine:3.13
 
-RUN apk update  \
+RUN  sed -i "s|https://dl-cdn.alpinelinux.org/alpine|https://artifactory.momenta.works/artifactory/alpine-remote|g" /etc/apk/repositories \
+    && sed -i "s|https://mirrors.tuna.tsinghua.edu.cn/alpine|https://artifactory.momenta.works/artifactory/alpine-remote|g" /etc/apk/repositories \
+    && apk update  \
     && apk add --no-cache tzdata
 
 ENV TZ=Asia/Shanghai
