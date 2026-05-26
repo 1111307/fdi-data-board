@@ -19,8 +19,8 @@ func RegisterHttpService(
 
 	var routes []GroupUrl
 	routes = append(routes, RegisterGreeterService(vehicleService, cd))
-	routes = append(routes, RegisterFoDashboardService(foDashboardService)...)
-	routes = append(routes, RegisterDoDashboardService(doDashboardService)...)
+	routes = append(routes, RegisterFoDashboardService(foDashboardService, cd)...)
+	routes = append(routes, RegisterDoDashboardService(doDashboardService, cd)...)
 	routes = append(routes, RegisterEtlService(etlService)...)
 
 	return routes
