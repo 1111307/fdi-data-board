@@ -302,10 +302,10 @@ func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse,
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 	var req dashboard_api.DoTopVehicleRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		resp.Code = int32(gcode.CodeInvalidParameter.Code())
 		resp.Message = err.Error()
 		return resp, nil
-		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
 	}
 	result, err := s.uc.GetTopVehicles(ctx, &req)
 	if err != nil {
@@ -317,7 +317,6 @@ func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse,
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
 		return resp, nil
-		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
 }
@@ -335,10 +334,10 @@ func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpRespo
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 	var req dashboard_api.DoAnomalyRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		resp.Code = int32(gcode.CodeInvalidParameter.Code())
 		resp.Message = err.Error()
 		return resp, nil
-		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
 	}
 	result, err := s.uc.GetAnomalyVehicles(ctx, &req)
 	if err != nil {
@@ -350,7 +349,6 @@ func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpRespo
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
 		return resp, nil
-		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
 }
@@ -368,10 +366,10 @@ func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse,
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 	var req dashboard_api.DoTopVehicleRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
 		resp.Code = int32(gcode.CodeInvalidParameter.Code())
 		resp.Message = err.Error()
 		return resp, nil
-		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
 	}
 	result, err := s.uc.GetActiveTrend(ctx, &req)
 	if err != nil {
@@ -383,7 +381,6 @@ func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse,
 		resp.Code = int32(gcode.CodeInternalError.Code())
 		resp.Message = "internal server error"
 		return resp, nil
-		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
 }
