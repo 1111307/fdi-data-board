@@ -89,3 +89,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/go-openapi/swag => github.com/go-openapi/swag v0.22.9
+
+replace golang.org/x/crypto => golang.org/x/crypto v0.21.0
+
+replace google.golang.org/protobuf => google.golang.org/protobuf v1.33.0
