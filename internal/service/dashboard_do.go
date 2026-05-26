@@ -23,18 +23,18 @@ func NewDoDashboardService(uc *biz.DoDashboardUseCase) *DoDashboardService {
 
 // GetOverview godoc
 //
-//	@Summary		DO 事件横向对比
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
-//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期"
-//	@Success		200				{object}	dashboard_api.DoOverviewResponse
-//	@Router			/dashboard/v1/do/overview [GET]
+//	@Summary	DO 事件横向对比
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoOverviewResponse
+//	@Router		/dashboard/v1/do/overview [GET]
 func (s *DoDashboardService) GetOverview(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoOverviewResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -65,18 +65,18 @@ func (s *DoDashboardService) GetOverview(ctx *gin.Context) (api.HttpResponse, er
 
 // GetProjectCar godoc
 //
-//	@Summary		DO 项目×车型分布
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
-//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期"
-//	@Success		200				{object}	dashboard_api.DoProjectCarResponse
-//	@Router			/dashboard/v1/do/project_car [GET]
+//	@Summary	DO 项目×车型分布
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoProjectCarResponse
+//	@Router		/dashboard/v1/do/project_car [GET]
 func (s *DoDashboardService) GetProjectCar(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoProjectCarResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -107,18 +107,18 @@ func (s *DoDashboardService) GetProjectCar(ctx *gin.Context) (api.HttpResponse, 
 
 // GetTriggerRank godoc
 //
-//	@Summary		DO 触发频次排行 Top10
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
-//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期"
-//	@Success		200				{object}	dashboard_api.DoTriggerRankResponse
-//	@Router			/dashboard/v1/do/trigger_rank [GET]
+//	@Summary	DO 触发频次排行 Top10
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoTriggerRankResponse
+//	@Router		/dashboard/v1/do/trigger_rank [GET]
 func (s *DoDashboardService) GetTriggerRank(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoTriggerRankResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -149,18 +149,18 @@ func (s *DoDashboardService) GetTriggerRank(ctx *gin.Context) (api.HttpResponse,
 
 // GetSwVersion godoc
 //
-//	@Summary		DO 触发记录软件版本分布
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
-//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期"
-//	@Success		200				{object}	dashboard_api.DoSwVersionResponse
-//	@Router			/dashboard/v1/do/sw_version [GET]
+//	@Summary	DO 触发记录软件版本分布
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoSwVersionResponse
+//	@Router		/dashboard/v1/do/sw_version [GET]
 func (s *DoDashboardService) GetSwVersion(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoSwVersionResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -191,18 +191,18 @@ func (s *DoDashboardService) GetSwVersion(ctx *gin.Context) (api.HttpResponse, e
 
 // GetCoolTop godoc
 //
-//	@Summary		DO 冷却 Top20 筛选器
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
-//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期"
-//	@Success		200				{object}	dashboard_api.DoCoolTopResponse
-//	@Router			/dashboard/v1/do/cool_top [GET]
+//	@Summary	DO 冷却 Top20 筛选器
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoCoolTopResponse
+//	@Router		/dashboard/v1/do/cool_top [GET]
 func (s *DoDashboardService) GetCoolTop(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoCoolTopResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -233,18 +233,18 @@ func (s *DoDashboardService) GetCoolTop(ctx *gin.Context) (api.HttpResponse, err
 
 // GetFailReason godoc
 //
-//	@Summary		DO 失败原因分析（三阶段归因）
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
-//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期"
-//	@Success		200				{object}	dashboard_api.DoFailReasonResponse
-//	@Router			/dashboard/v1/do/fail_reason [GET]
+//	@Summary	DO 失败原因分析（三阶段归因）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoFailReasonResponse
+//	@Router		/dashboard/v1/do/fail_reason [GET]
 func (s *DoDashboardService) GetFailReason(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoFailReasonResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -275,32 +275,36 @@ func (s *DoDashboardService) GetFailReason(ctx *gin.Context) (api.HttpResponse, 
 
 // GetTrend godoc
 //
-//	@Summary		DO 数据总览趋势（按天成功次数与成功率）
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Param			filter_name		query	string	false	"筛选器名称"
-//	@Param			event_names		query	string	false	"事件名，多选逗号分隔"
-//	@Param			project_name	query	string	false	"项目名称"
-//	@Param			car_types		query	string	false	"车型，多选逗号分隔"
-//	@Param			start_dt		query	string	false	"开始日期，不传默认近7天"
-//	@Param			end_dt			query	string	false	"结束日期"
-//	@Success		200				{object}	dashboard_api.DoTrendResponse
-//	@Router			/dashboard/v1/do/trend [GET]
+//	@Summary	DO 数据总览趋势（按天成功次数与成功率）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoTrendResponse
+//	@Router		/dashboard/v1/do/trend [GET]
+//
+// GetTopVehicles go
 // GetTopVehicles godoc
 //
-//	@Summary		DO Top20活跃车辆
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoTopVehicleResponse
-//	@Router			/dashboard/v1/do/top_vehicles [GET]
+//	@Summary	DO Top20活跃车辆
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoTopVehicleResponse
+//	@Router		/dashboard/v1/do/top_vehicles [GET]
 func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoTopVehicleResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 	var req dashboard_api.DoTopVehicleRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
 		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
 	}
 	result, err := s.uc.GetTopVehicles(ctx, &req)
@@ -310,7 +314,9 @@ func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse,
 			resp.Message = err.Error()
 			return resp, nil
 		}
-		log.Errorf("DoGetTopVehicles error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
 		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
@@ -318,18 +324,20 @@ func (s *DoDashboardService) GetTopVehicles(ctx *gin.Context) (api.HttpResponse,
 
 // GetAnomalyVehicles godoc
 //
-//	@Summary		DO 异常车辆
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoAnomalyResponse
-//	@Router			/dashboard/v1/do/anomaly_vehicles [GET]
+//	@Summary	DO 异常车辆
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoAnomalyResponse
+//	@Router		/dashboard/v1/do/anomaly_vehicles [GET]
 func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoAnomalyResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 	var req dashboard_api.DoAnomalyRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
 		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
 	}
 	result, err := s.uc.GetAnomalyVehicles(ctx, &req)
@@ -339,7 +347,9 @@ func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpRespo
 			resp.Message = err.Error()
 			return resp, nil
 		}
-		log.Errorf("DoGetAnomalyVehicles error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
 		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
@@ -347,18 +357,20 @@ func (s *DoDashboardService) GetAnomalyVehicles(ctx *gin.Context) (api.HttpRespo
 
 // GetActiveTrend godoc
 //
-//	@Summary		DO 活跃车辆趋势
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoActiveTrendResponse
-//	@Router			/dashboard/v1/do/active_trend [GET]
+//	@Summary	DO 活跃车辆趋势
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoActiveTrendResponse
+//	@Router		/dashboard/v1/do/active_trend [GET]
 func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoActiveTrendResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 	var req dashboard_api.DoTopVehicleRequest
-	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
 		resp.Code = int32(gcode.CodeInvalidParameter.Code()); resp.Message = err.Error(); return resp, nil
 	}
 	result, err := s.uc.GetActiveTrend(ctx, &req)
@@ -368,7 +380,9 @@ func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse,
 			resp.Message = err.Error()
 			return resp, nil
 		}
-		log.Errorf("DoGetActiveTrend error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
 		resp.Code = int32(gcode.CodeInternalError.Code()); resp.Message = "internal server error"; return resp, nil
 	}
 	return result, nil
@@ -376,12 +390,12 @@ func (s *DoDashboardService) GetActiveTrend(ctx *gin.Context) (api.HttpResponse,
 
 // GetNetSpeed godoc
 //
-//	@Summary		DO 各车型平均上传带宽（按天）
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoNetSpeedResponse
-//	@Router			/dashboard/v1/do/net_speed [GET]
+//	@Summary	DO 各车型平均上传带宽（按天）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoNetSpeedResponse
+//	@Router		/dashboard/v1/do/net_speed [GET]
 func (s *DoDashboardService) GetNetSpeed(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoNetSpeedResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -410,12 +424,12 @@ func (s *DoDashboardService) GetNetSpeed(ctx *gin.Context) (api.HttpResponse, er
 
 // GetFclBw godoc
 //
-//	@Summary		DO FCL 整体平均上传带宽（按天）
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoFclBwResponse
-//	@Router			/dashboard/v1/do/fcl_bw [GET]
+//	@Summary	DO FCL 整体平均上传带宽（按天）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoFclBwResponse
+//	@Router		/dashboard/v1/do/fcl_bw [GET]
 func (s *DoDashboardService) GetFclBw(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoFclBwResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -444,12 +458,12 @@ func (s *DoDashboardService) GetFclBw(ctx *gin.Context) (api.HttpResponse, error
 
 // GetQuotaTop godoc
 //
-//	@Summary		DO FCL Quota 超限 Top20
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoQuotaTopResponse
-//	@Router			/dashboard/v1/do/quota_top [GET]
+//	@Summary	DO FCL Quota 超限 Top20
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoQuotaTopResponse
+//	@Router		/dashboard/v1/do/quota_top [GET]
 func (s *DoDashboardService) GetQuotaTop(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoQuotaTopResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -478,12 +492,12 @@ func (s *DoDashboardService) GetQuotaTop(ctx *gin.Context) (api.HttpResponse, er
 
 // GetProjectEvent godoc
 //
-//	@Summary		DO 项目触发回流事件总数
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoProjectEventResponse
-//	@Router			/dashboard/v1/do/project_event [GET]
+//	@Summary	DO 项目触发回流事件总数
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoProjectEventResponse
+//	@Router		/dashboard/v1/do/project_event [GET]
 func (s *DoDashboardService) GetProjectEvent(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoProjectEventResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -512,12 +526,12 @@ func (s *DoDashboardService) GetProjectEvent(ctx *gin.Context) (api.HttpResponse
 
 // GetMemTop godoc
 //
-//	@Summary		DO FDR 内存不足 Top20
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoMemTopResponse
-//	@Router			/dashboard/v1/do/mem_top [GET]
+//	@Summary	DO FDR 内存不足 Top20
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoMemTopResponse
+//	@Router		/dashboard/v1/do/mem_top [GET]
 func (s *DoDashboardService) GetMemTop(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoMemTopResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -546,12 +560,12 @@ func (s *DoDashboardService) GetMemTop(ctx *gin.Context) (api.HttpResponse, erro
 
 // GetDiskTop godoc
 //
-//	@Summary		DO FDR 磁盘不足 Top20
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoDiskTopResponse
-//	@Router			/dashboard/v1/do/disk_top [GET]
+//	@Summary	DO FDR 磁盘不足 Top20
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoDiskTopResponse
+//	@Router		/dashboard/v1/do/disk_top [GET]
 func (s *DoDashboardService) GetDiskTop(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoDiskTopResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
@@ -580,12 +594,12 @@ func (s *DoDashboardService) GetDiskTop(ctx *gin.Context) (api.HttpResponse, err
 
 // GetCloseTop godoc
 //
-//	@Summary		DO 关闭次数 Top 筛选器
-//	@Tags			DoDashboard
-//	@Produce		json
-//	@Security		OAuth2Password
-//	@Success		200	{object}	dashboard_api.DoCloseTopResponse
-//	@Router			/dashboard/v1/do/close_top [GET]
+//	@Summary	DO 关闭次数 Top 筛选器
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Success	200	{object}	dashboard_api.DoCloseTopResponse
+//	@Router		/dashboard/v1/do/close_top [GET]
 func (s *DoDashboardService) GetCloseTop(ctx *gin.Context) (api.HttpResponse, error) {
 	resp := &dashboard_api.DoCloseTopResponse{}
 	resp.Code = int32(gcode.CodeOK.Code())
