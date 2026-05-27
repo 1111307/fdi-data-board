@@ -866,14 +866,18 @@ func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
 		conds = append(conds, "fcl_status != 'success'")
 	}
 	switch param.StageFilter {
+	case "fff_success":
+		conds = append(conds, "fff_status = 'success'")
 	case "fff_discard":
 		conds = append(conds, "fff_status = 'discard'")
+	case "fdr_success":
+		conds = append(conds, "fdr_status = 'success'")
 	case "fdr_discard":
-		conds = append(conds, "fff_status = 'success'", "fdr_status = 'discard'")
-	case "fcl_discard":
-		conds = append(conds, "fdr_status = 'success'", "fcl_status != 'success'", "fcl_status != ''")
+		conds = append(conds, "fdr_status = 'discard'")
 	case "fcl_success":
 		conds = append(conds, "fcl_status = 'success'")
+	case "fcl_discard":
+		conds = append(conds, "fcl_status = 'discard'")
 	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
