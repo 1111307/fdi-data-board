@@ -18,7 +18,7 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.2
-	github.com/tbaehler/gin-keycloak v1.5.1
+	github.com/tbaehler/gin-keycloak v1.3.0
 	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/sync v0.10.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237
