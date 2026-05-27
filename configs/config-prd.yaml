@@ -34,9 +34,9 @@ data:
     any_endpoint: 127.0.0.1:9000
   doris:
     on: ${DORIS_ON:true}
-    host: ${DORIS_HOST:10.10.2.27}
+    host: ${DORIS_HOST:10.18.77.243}
     port: ${DORIS_PORT:9030}
-    username: ${DORIS_USERNAME:root}
+    username: ${DORIS_USERNAME:fdi}
     password: ${DORIS_PASSWORD:fdi@20260112}
     database: ${DORIS_DATABASE:fdi}
     query_timeout: 30s
