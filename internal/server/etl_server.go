@@ -133,7 +133,7 @@ func (s *ETLServer) runDailyRefreshLoop(ctx context.Context, cfg etlRuntimeConfi
 			return
 		}
 
-		next := nextRunTime("Asia/Shanghai", 2, 0)
+		next := nextRunTime("Asia/Shanghai", 10, 0)
 
 		select {
 		case <-ctx.Done():
