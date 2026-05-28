@@ -39,7 +39,7 @@ data:
     username: ${DORIS_USERNAME:fdi}
     password: ${DORIS_PASSWORD:fdi@20260112}
     database: ${DORIS_DATABASE:fdi}
-    query_timeout: 30s
+    query_timeout: 120s
     max_idl: 10
     max_open: 50
     conn_max_lift: 3600s

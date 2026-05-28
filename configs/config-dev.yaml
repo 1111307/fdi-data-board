@@ -26,7 +26,7 @@ data:
     write_timeout: 3s
     link_type: ${LINK_TYPE:single}
   keycloak:
-    url: ${KEYCLOAK_URL:http://10.9.60.88:8080/auth/}
+    url: ${KEYCLOAK_URL:http://10.9.60.88:8080/}
     realm: ${KEYCLOAK_REALM:master}
     token_tpl: ${KEYCLOAK_URL:http://10.9.60.88:8080/}auth/realms/${KEYCLOAK_REALM:master}/protocol/openid-connect/token
   grpc_client:
@@ -41,7 +41,7 @@ data:
     username: ${DORIS_USERNAME:fdi}
     password: ${DORIS_PASSWORD:fdi@20260112}
     database: ${DORIS_DATABASE:fdi}
-    query_timeout: 30s
+    query_timeout: 120s
     max_idl: 10
     max_open: 100
     conn_max_lift: 3600s
