@@ -1010,20 +1010,20 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 
 	statSQL := `SELECT
 		SUM(cnt) AS fff_total,
-		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_allow,
-		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fdr_status='discard' THEN cnt ELSE 0 END) AS fdr_fail,
-		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_success,
-		SUM(CASE WHEN fcl_status='discard' THEN cnt ELSE 0 END) AS fcl_fail` + base
+		SUM(CASE WHEN fff_status!='discard' THEN cnt ELSE 0 END) AS fff_allow,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END) AS fdr_success,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' THEN cnt ELSE 0 END) AS fdr_fail,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS fcl_success,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' THEN cnt ELSE 0 END) AS fcl_fail` + base
 
 	fffFailSQL := `SELECT fff_detail_tag AS name, SUM(cnt) AS cnt` + base +
-		` AND fff_status='discard' GROUP BY fff_detail_tag ORDER BY cnt DESC LIMIT 10`
+		` AND fff_status = 'discard' GROUP BY fff_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	fdrFailSQL := `SELECT fdr_detail_tag AS name, SUM(cnt) AS cnt` + base +
-		` AND fdr_status='discard' GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
+		` AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	fclFailSQL := `SELECT fcl_detail_tag AS name, SUM(cnt) AS cnt` + base +
-		` AND fcl_status='discard' GROUP BY fcl_detail_tag ORDER BY cnt DESC LIMIT 10`
+		` AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' GROUP BY fcl_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	var (
 		stat                      statRow
@@ -1120,7 +1120,7 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 	}
 
 	sql := `SELECT dt,
-		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_success,
+		SUM(CASE WHEN fff_status != 'discard' THEN cnt ELSE 0 END) AS fff_success,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='cooldown' THEN cnt ELSE 0 END) AS fff_cooldown,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='drm_quota' THEN cnt ELSE 0 END) AS fff_drm_quota,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='acquire_data' THEN cnt ELSE 0 END) AS fff_no_acquire,
@@ -1133,26 +1133,26 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		SUM(CASE WHEN fff_status='discard'
 			AND fff_detail_tag NOT IN ('cooldown','drm_quota','acquire_data','trigger_maximum','bag_invalid','event_not_recognized','tls_error','quota_exceeded','event_in_blacklist')
 			THEN cnt ELSE 0 END) AS fff_other,
-		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='memory' THEN cnt ELSE 0 END) AS fdr_memory,
-		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='disk' THEN cnt ELSE 0 END) AS fdr_disk,
-		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fdr_bag_invalid,
-		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='bag_dir_missing' THEN cnt ELSE 0 END) AS fdr_bag_dir_missing,
-		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fdr_event_not_recognized,
-		SUM(CASE WHEN fdr_status='discard' AND fdr_detail_tag='unauthorized' THEN cnt ELSE 0 END) AS fdr_unauthorized,
-		SUM(CASE WHEN fdr_status='discard'
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END) AS fdr_success,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='memory' THEN cnt ELSE 0 END) AS fdr_memory,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='disk' THEN cnt ELSE 0 END) AS fdr_disk,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fdr_bag_invalid,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='bag_dir_missing' THEN cnt ELSE 0 END) AS fdr_bag_dir_missing,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fdr_event_not_recognized,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='unauthorized' THEN cnt ELSE 0 END) AS fdr_unauthorized,
+		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
 			AND fdr_detail_tag NOT IN ('memory','disk','bag_invalid','bag_dir_missing','event_not_recognized','unauthorized')
 			THEN cnt ELSE 0 END) AS fdr_other,
-		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_success,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fcl_quota_exceeded,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='reach_upload_limit' THEN cnt ELSE 0 END) AS fcl_reach_upload_limit,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fcl_blacklist,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='geofence_error' THEN cnt ELSE 0 END) AS fcl_geofence,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fcl_tls_error,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='bag_missing' THEN cnt ELSE 0 END) AS fcl_bag_missing,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='upload_error' THEN cnt ELSE 0 END) AS fcl_upload_error,
-		SUM(CASE WHEN fcl_status='discard' AND fcl_detail_tag='network_error' THEN cnt ELSE 0 END) AS fcl_network_error,
-		SUM(CASE WHEN fcl_status='discard'
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS fcl_success,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fcl_quota_exceeded,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='reach_upload_limit' THEN cnt ELSE 0 END) AS fcl_reach_upload_limit,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fcl_blacklist,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='geofence_error' THEN cnt ELSE 0 END) AS fcl_geofence,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fcl_tls_error,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='bag_missing' THEN cnt ELSE 0 END) AS fcl_bag_missing,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='upload_error' THEN cnt ELSE 0 END) AS fcl_upload_error,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='network_error' THEN cnt ELSE 0 END) AS fcl_network_error,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard'
 			AND fcl_detail_tag NOT IN ('quota_exceeded','reach_upload_limit','event_in_blacklist','geofence_error','tls_error','bag_missing','upload_error','network_error')
 			THEN cnt ELSE 0 END) AS fcl_other
 		FROM ads_do_cfdi_daily` + where + ` AND event_name != 'Forever_log'

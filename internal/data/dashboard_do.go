@@ -43,9 +43,9 @@ func (r *doDashboardRepo) GetOverview(ctx context.Context, param *biz.DoOverview
 
 	adsSql := `SELECT event_name,
 		SUM(cnt) AS trigger_count,
-		SUM(CASE WHEN fff_status='success' OR fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fff_count,
-		SUM(CASE WHEN fdr_status='success' OR fcl_status='success' THEN cnt ELSE 0 END) AS fdr_count,
-		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS fcl_count
+		SUM(CASE WHEN fff_status != 'discard' THEN cnt ELSE 0 END) AS fff_count,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END) AS fdr_count,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS fcl_count
 		FROM ads_do_cfdi_daily` + where + `
 		AND event_name != 'Forever_log'
 		GROUP BY event_name ORDER BY trigger_count DESC`
@@ -127,7 +127,7 @@ func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam)
 
 	sql := `SELECT dt,
 		SUM(cnt) AS total,
-		SUM(CASE WHEN fcl_status='success' THEN cnt ELSE 0 END) AS success
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS success
 		FROM ads_do_cfdi_daily` + where + `
 		GROUP BY dt ORDER BY dt ASC`
 
@@ -175,10 +175,10 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 		FROM ads_do_cfdi_daily` + where + ` AND fff_status = 'discard' AND fff_detail_tag IS NOT NULL AND fff_detail_tag != ''
 		UNION ALL
 		SELECT 'FDR' AS stage, fdr_detail_tag AS detail_tag, cnt
-		FROM ads_do_cfdi_daily` + where + ` AND fdr_status = 'discard' AND fdr_detail_tag IS NOT NULL AND fdr_detail_tag != ''
+		FROM ads_do_cfdi_daily` + where + ` AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag IS NOT NULL AND fdr_detail_tag != ''
 		UNION ALL
 		SELECT 'FCL' AS stage, fcl_detail_tag AS detail_tag, cnt
-		FROM ads_do_cfdi_daily` + where + ` AND fcl_status = 'discard' AND fcl_detail_tag IS NOT NULL AND fcl_detail_tag != ''
+		FROM ads_do_cfdi_daily` + where + ` AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag IS NOT NULL AND fcl_detail_tag != ''
 	) t
 	GROUP BY stage, detail_tag
 	ORDER BY stage, cnt DESC`
@@ -356,7 +356,7 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
 		FROM ads_do_cfdi_daily` + where + `
-		AND fdr_status != 'success'
+		AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
 		AND fdr_detail_tag = 'memory'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
@@ -383,7 +383,7 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
 		FROM ads_do_cfdi_daily` + where + `
-		AND fdr_status != 'success'
+		AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
 		AND fdr_detail_tag = 'disk'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
@@ -435,7 +435,7 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
 		FROM ads_do_cfdi_daily` + where + `
-		AND fcl_status = 'discard'
+		AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard'
 		AND fcl_detail_tag = 'quota_exceeded'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
@@ -462,7 +462,7 @@ func (r *doDashboardRepo) GetProjectEvent(ctx context.Context, param *biz.DoComm
 
 	sql := `SELECT project_name, COUNT(DISTINCT event_name) AS event_count
 		FROM ads_do_cfdi_daily` + where + `
-		AND fcl_status = 'success'
+		AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard'
 		AND project_name IS NOT NULL AND project_name != ''
 		GROUP BY project_name ORDER BY event_count DESC`
 
