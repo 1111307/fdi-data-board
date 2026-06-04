@@ -637,3 +637,18 @@ type EtlStatusResponse struct {
 	BaseResponse
 	List interface{} `json:"list"`
 }
+
+// FffRunningTrendRequest 算子活跃车辆趋势请求
+type FffRunningTrendRequest struct {
+	FilterName  string `form:"filter_name"`  // 必填：算子名称
+	StartDt     string `form:"start_dt"`     // 必填：开始日期 YYYY-MM-DD
+	EndDt       string `form:"end_dt"`       // 必填：结束日期 YYYY-MM-DD
+	ProjectName string `form:"project_name"` // 选填：项目名称
+}
+
+// FffRunningTrendResponse 算子活跃车辆趋势响应（按天聚合）
+type FffRunningTrendResponse struct {
+	BaseResponse
+	Dates  []string `json:"dates"`  // 日期列表 YYYY-MM-DD
+	Counts []int64  `json:"counts"` // 对应日期的活跃车辆数（switch_on=1 的去重车辆数）
+}

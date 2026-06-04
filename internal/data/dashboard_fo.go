@@ -1343,3 +1343,46 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 		CarTypes:     carTypes,
 	}, nil
 }
+
+// runningTrendRow GetFffRunningTrend 聚合扫描结构
+type runningTrendRow struct {
+	Dt           time.Time `gorm:"column:dt"`
+	VehicleCount int64     `gorm:"column:vehicle_count"`
+}
+
+func (r *foDashboardRepo) GetFffRunningTrend(ctx context.Context, param *biz.FffRunningTrendParam) (*biz.FffRunningTrendData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+
+	where, args := buildFffRunningTrendWhere(param)
+	sql := `SELECT dt, COUNT(DISTINCT anonymous_id) AS vehicle_count
+		FROM dwd_cfdi_basic_fff_running` + where + ` GROUP BY dt ORDER BY dt`
+
+	var rows []runningTrendRow
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	dates := make([]string, 0, len(rows))
+	counts := make([]int64, 0, len(rows))
+	for _, row := range rows {
+		dates = append(dates, row.Dt.Format("2006-01-02"))
+		counts = append(counts, row.VehicleCount)
+	}
+	return &biz.FffRunningTrendData{Dates: dates, Counts: counts}, nil
+}
+
+func buildFffRunningTrendWhere(param *biz.FffRunningTrendParam) (string, []interface{}) {
+	conds := []string{
+		"switch_on = 1",
+		"filter_name = ?",
+		"dt BETWEEN ? AND ?",
+	}
+	args := []interface{}{param.FilterName, param.StartDt, param.EndDt}
+
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	return " WHERE " + strings.Join(conds, " AND "), args
+}

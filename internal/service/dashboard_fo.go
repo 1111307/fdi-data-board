@@ -422,3 +422,43 @@ func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse,
 
 	return result, nil
 }
+
+// GetFffRunningTrend godoc
+//
+//	@Summary	算子活跃车辆趋势（按天）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	true	"算子名称（必填）"
+//	@Param		start_dt		query		string	true	"开始日期 YYYY-MM-DD（必填）"
+//	@Param		end_dt			query		string	true	"结束日期 YYYY-MM-DD（必填）"
+//	@Param		project_name	query		string	false	"项目名称（选填）"
+//	@Success	200				{object}	dashboard_api.FffRunningTrendResponse
+//	@Router		/dashboard/v1/fo/running/trend [GET]
+func (s *FoDashboardService) GetFffRunningTrend(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FffRunningTrendResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffRunningTrendRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetFffRunningTrend(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) || errors.Is(err, biz.ErrMissingRequired) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("GetFffRunningTrend error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+
+	return result, nil
+}

@@ -10,6 +10,7 @@ import (
 )
 
 var ErrInvalidDateRange = errors.New("invalid date format, expected YYYY-MM-DD")
+var ErrMissingRequired = errors.New("filter_name, start_dt and end_dt are required")
 
 const (
 	defaultPageSize = 50
@@ -29,6 +30,7 @@ type FoDashboardRepo interface {
 	GetCloseReason(ctx context.Context, param *CloseReasonParam) ([]*CloseReasonItem, error)
 	GetStageTrend(ctx context.Context, param *StageTrendParam) (*StageTrendData, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
+	GetFffRunningTrend(ctx context.Context, param *FffRunningTrendParam) (*FffRunningTrendData, error)
 }
 
 // FunnelParam 数采全链路分析查询参数
@@ -154,6 +156,14 @@ type FffRunningParam struct {
 	EndDt       string
 	Page        int
 	PageSize    int
+}
+
+// FffRunningTrendParam 算子活跃车辆趋势查询参数
+type FffRunningTrendParam struct {
+	FilterName  string // 必填：算子名称
+	ProjectName string // 选填：项目名称
+	StartDt     string // 必填：开始日期
+	EndDt       string // 必填：结束日期
 }
 
 // FoDashboardUseCase FO Dashboard 业务用例
@@ -442,6 +452,35 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 		Page:         page,
 		PageSize:     pageSize,
 		List:         toApiFffRunningItems(list),
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) GetFffRunningTrend(ctx context.Context, req *dashboard_api.FffRunningTrendRequest) (*dashboard_api.FffRunningTrendResponse, error) {
+	if req.FilterName == "" {
+		return nil, ErrMissingRequired
+	}
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	if startDt == "" || endDt == "" {
+		return nil, ErrMissingRequired
+	}
+
+	param := &FffRunningTrendParam{
+		FilterName:  req.FilterName,
+		ProjectName: req.ProjectName,
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	data, err := uc.repo.GetFffRunningTrend(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.FffRunningTrendResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Dates:        data.Dates,
+		Counts:       data.Counts,
 	}, nil
 }
 
