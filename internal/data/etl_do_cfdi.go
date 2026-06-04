@@ -105,13 +105,10 @@ func (r *etlRepo) RunETL(ctx context.Context, dt string, runType string) (cnt in
 		}
 	}()
 
-	err = doris.Transaction(func(tx *gorm.DB) error {
-		if err = tx.Exec(deleteCfdiDailySQL, dt).Error; err != nil {
-			return err
-		}
-		return tx.Exec(insertCfdiDailySQL, dt).Error
-	})
-	if err != nil {
+	if err = doris.Exec(deleteCfdiDailySQL, dt).Error; err != nil {
+		return
+	}
+	if err = doris.Exec(insertCfdiDailySQL, dt).Error; err != nil {
 		return
 	}
 

@@ -86,7 +86,7 @@ func newDorisDB(c *conf.Data) *gorm.DB {
 		return nil
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local&interpolateParams=true",
 		c.GetDoris().GetUsername(),
 		c.GetDoris().GetPassword(),
 		c.GetDoris().GetHost(),

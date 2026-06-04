@@ -84,7 +84,7 @@ func (uc *ETLUseCase) RunWindow(ctx context.Context, days int) {
 		} else {
 			uc.log.Infof("[etl] window refresh %s done, cnt=%d", dt, cnt)
 		}
-		time.Sleep(time.Second)
+		time.Sleep(60 * time.Second)
 	}
 }
 
