@@ -26,7 +26,7 @@ func RegisterDoDashboardService(s *service.DoDashboardService, cd *conf.Data) []
 				{JsonHandlerFunc: s.GetProjectCar, Path: "project_car", Method: GET},
 				{JsonHandlerFunc: s.GetTopVehicles, Path: "top_vehicles", Method: GET},
 				{JsonHandlerFunc: s.GetAnomalyVehicles, Path: "anomaly_vehicles", Method: GET},
-					{JsonHandlerFunc: s.GetActiveTrend, Path: "active_trend", Method: GET},
+				{JsonHandlerFunc: s.GetActiveTrend, Path: "active_trend", Method: GET},
 				{JsonHandlerFunc: s.GetNetSpeed, Path: "net_speed", Method: GET},
 				{JsonHandlerFunc: s.GetFclBw, Path: "fcl_bw", Method: GET},
 				{JsonHandlerFunc: s.GetQuotaTop, Path: "quota_top", Method: GET},
@@ -67,6 +67,7 @@ func RegisterFoDashboardService(s *service.FoDashboardService, cd *conf.Data) []
 				{JsonHandlerFunc: s.ListUuidDetail, Path: "detail/uuid", Method: GET},
 				{JsonHandlerFunc: s.GetStageTrend, Path: "diag/stage_trend", Method: GET},
 				{JsonHandlerFunc: s.GetCloseReason, Path: "diag/close_reason", Method: GET},
+				{JsonHandlerFunc: s.GetFffRunningTrend, Path: "running/trend", Method: GET},
 			},
 		},
 	}

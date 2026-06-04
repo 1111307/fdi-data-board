@@ -190,3 +190,9 @@ type CloseReasonItem struct {
 	Name  string
 	Value int64
 }
+
+// FffRunningTrendData 算子活跃车辆趋势（领域对象）
+type FffRunningTrendData struct {
+	Dates  []string
+	Counts []int64
+}
