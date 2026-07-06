@@ -36,8 +36,8 @@ data:
     on: ${DORIS_ON:true}
     host: ${DORIS_HOST:10.18.77.243}
     port: ${DORIS_PORT:9030}
-    username: ${DORIS_USERNAME:fdi}
-    password: ${DORIS_PASSWORD:fdi@20260112}
+    username: ${DORIS_USERNAME:dataInfra_read}
+    password: ${DORIS_PASSWORD:dataInfra_read@@20260709}
     database: ${DORIS_DATABASE:fdi}
     query_timeout: 120s
     max_idl: 10
