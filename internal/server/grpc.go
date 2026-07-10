@@ -4,6 +4,7 @@ import (
 	v1 "fdi_data_board/idl/helloworld/v1"
 	"fdi_data_board/internal/conf"
 	"fdi_data_board/internal/service"
+
 	"github.com/go-kratos/kratos/v2/middleware/logging"
 
 	"github.com/go-kratos/kratos/v2/log"
