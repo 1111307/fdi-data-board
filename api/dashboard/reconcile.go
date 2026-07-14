@@ -16,9 +16,11 @@ type ReconcileOverviewBag struct {
 
 // ReconcileOverviewEventParse L2 event 级解析/发送健康度
 type ReconcileOverviewEventParse struct {
-	Expected       int64   `json:"expected"`
-	SendFailed     int64   `json:"send_failed"`
-	SendFailedRate float64 `json:"send_failed_rate"`
+	Expected        int64   `json:"expected"`
+	SendFailed      int64   `json:"send_failed"`
+	SendFailedRate  float64 `json:"send_failed_rate"`
+	ParseFailed     int64   `json:"parse_failed"`
+	ParseFailedRate float64 `json:"parse_failed_rate"`
 }
 
 // ReconcileOverviewEventLand L3 event 级落库健康度
@@ -80,6 +82,7 @@ type ReconcileModuleItem struct {
 	LandingFailed int64   `json:"landing_failed"`
 	Missing       int64   `json:"missing"`
 	SendFailed    int64   `json:"send_failed"`
+	ParseFailed   int64   `json:"parse_failed"`
 	MatchRate     float64 `json:"match_rate"`
 }
 
@@ -191,7 +194,7 @@ type ReconcileEventListRequest struct {
 	Date       string `form:"date"`
 	ModuleName string `form:"module_name"`
 	Project    string `form:"project"`
-	Type       string `form:"type"` // missing / extra / send_failed / convert_failed / landing_failed / mismatched
+	Type       string `form:"type"` // missing / extra / send_failed / parse_failed / convert_failed / landing_failed / mismatched
 	Page       int    `form:"page"`
 	PageSize   int    `form:"page_size"`
 }
@@ -283,6 +286,13 @@ type ReconcileSendFailedItem struct {
 	Count      int64  `json:"count"`
 }
 
+// ReconcileParseFailedItem L2 未解析出可对账event按 module_name+err_detail 聚合单条
+type ReconcileParseFailedItem struct {
+	ModuleName string `json:"module_name"`
+	ErrDetail  string `json:"err_detail"`
+	Count      int64  `json:"count"`
+}
+
 // ReconcileConvertFailedItem L3 转换失败按 module_name+err_detail 聚合单条
 type ReconcileConvertFailedItem struct {
 	ModuleName string `json:"module_name"`
@@ -303,6 +313,51 @@ type ReconcileFailureSummaryResponse struct {
 	Date          string                        `json:"date"`
 	DecodeFailed  []*ReconcileDecodeFailedItem  `json:"decode_failed"`
 	SendFailed    []*ReconcileSendFailedItem    `json:"send_failed"`
+	ParseFailed   []*ReconcileParseFailedItem   `json:"parse_failed"`
 	ConvertFailed []*ReconcileConvertFailedItem `json:"convert_failed"`
 	LandingFailed []*ReconcileLandingFailedItem `json:"landing_failed"`
+}
+
+// ReconcilePipelineTreeRequest 全链路树形聚合请求
+type ReconcilePipelineTreeRequest struct {
+	Date       string `form:"date"`
+	Project    string `form:"project"`     // 可选，过滤到单个项目
+	ModuleName string `form:"module_name"` // 可选，只影响 event 层分支
+	Md5        string `form:"md5"`         // 可选，单包下钻模式
+}
+
+// ReconcileFailureReason 树形节点的失败原因分桶单条
+type ReconcileFailureReason struct {
+	Code       string `json:"code"`
+	Desc       string `json:"desc"`
+	ModuleName string `json:"module_name,omitempty"`
+	Sample     string `json:"sample"`
+	Count      int64  `json:"count"`
+}
+
+// ReconcilePipelineNode 全链路树形节点，递归结构
+type ReconcilePipelineNode struct {
+	Key            string                     `json:"key"`
+	Label          string                     `json:"label"`
+	Status         string                     `json:"status"` // root/success/failed/partial/unknown
+	Count          int64                      `json:"count"`
+	Rate           *float64                   `json:"rate,omitempty"`
+	Meta           map[string]int64           `json:"meta,omitempty"`
+	FailureReasons []*ReconcileFailureReason  `json:"failure_reasons,omitempty"`
+	Children       []*ReconcilePipelineNode   `json:"children,omitempty"`
+}
+
+// ReconcilePipelineTreeFilters 树形接口生效的过滤条件回显，未传的为 null
+type ReconcilePipelineTreeFilters struct {
+	Project    *string `json:"project"`
+	ModuleName *string `json:"module_name"`
+	Md5        *string `json:"md5"`
+}
+
+// ReconcilePipelineTreeResponse 全链路树形聚合响应
+type ReconcilePipelineTreeResponse struct {
+	BaseResponse
+	Date    string                       `json:"date"`
+	Filters ReconcilePipelineTreeFilters `json:"filters"`
+	Tree    *ReconcilePipelineNode       `json:"tree"`
 }

@@ -68,6 +68,13 @@ type fakeReconcileRepo struct {
 	failureSummaryDate string
 	failureSummaryData *ReconcileFailureSummaryData
 	failureSummaryErr  error
+
+	pipelineTreeDate       string
+	pipelineTreeProject    string
+	pipelineTreeModuleName string
+	pipelineTreeMd5        string
+	pipelineTreeData       *ReconcilePipelineTreeData
+	pipelineTreeErr        error
 }
 
 func (f *fakeReconcileRepo) GetOverview(ctx context.Context, date string) (*ReconcileOverviewData, error) {
@@ -136,6 +143,14 @@ func (f *fakeReconcileRepo) GetUuidSource(ctx context.Context, date string) ([]*
 func (f *fakeReconcileRepo) GetFailureSummary(ctx context.Context, date string) (*ReconcileFailureSummaryData, error) {
 	f.failureSummaryDate = date
 	return f.failureSummaryData, f.failureSummaryErr
+}
+
+func (f *fakeReconcileRepo) GetPipelineTree(ctx context.Context, date, project, moduleName, md5 string) (*ReconcilePipelineTreeData, error) {
+	f.pipelineTreeDate = date
+	f.pipelineTreeProject = project
+	f.pipelineTreeModuleName = moduleName
+	f.pipelineTreeMd5 = md5
+	return f.pipelineTreeData, f.pipelineTreeErr
 }
 
 func TestReconcileUseCase_GetOverview(t *testing.T) {
@@ -608,6 +623,157 @@ func TestReconcileUseCase_GetFailureSummary(t *testing.T) {
 		}
 		if repo.failureSummaryDate != "2026-07-01" {
 			t.Errorf("repo called with date %q, want 2026-07-01", repo.failureSummaryDate)
+		}
+	})
+}
+
+func TestReconcileUseCase_GetPipelineTree(t *testing.T) {
+	t.Run("builds tree with correct shape, sums and rates", func(t *testing.T) {
+		repo := &fakeReconcileRepo{pipelineTreeData: &ReconcilePipelineTreeData{
+			Bag: ReconcilePipelineBagData{
+				Total:           5000,
+				ParseSuccess:    4985,
+				DecodeSuccess:   4900,
+				DecodePartial:   85,
+				DecodeFailed:    15,
+				StatusLineCount: 5000,
+				SkipLineCount:   10,
+				ParsedLineCount: 12340,
+			},
+			BagFailureReasons: []*ReconcileDecodeFailedItem{
+				{Stage: 1, Count: 15, SampleErrorMsg: "unzip failed"},
+			},
+			EventParse: ReconcilePipelineEventParseData{
+				ParseSuccess: 12329,
+				ParseFailed:  3,
+				SendSuccess:  12322,
+				SendFailed:   7,
+			},
+			EventParseFailureReasons: []*ReconcileParseFailedItem{
+				{ModuleName: "fff_close", ErrDetail: "4:no extractable events in trigger module json", Count: 3},
+			},
+			EventSendFailureReasons: []*ReconcileSendFailedItem{
+				{ModuleName: "fff_close", ErrDetail: "5:broker unavailable", Count: 7},
+			},
+			EventLand: ReconcilePipelineEventLandData{
+				Matched:       12300,
+				ConvertFailed: 12,
+				LandingFailed: 8,
+				Missing:       2,
+			},
+			ConvertFailedReasons: []*ReconcileConvertFailedItem{
+				{ModuleName: "fff_close", ErrDetail: "3:nil trigger", Count: 12},
+			},
+			LandingFailedReasons: []*ReconcileLandingFailedItem{
+				{ModuleName: "fff_close", ErrDetail: "6:write failed", Count: 8},
+			},
+		}}
+		uc := NewReconcileUseCase(repo)
+
+		resp, err := uc.GetPipelineTree(context.Background(), &dashboard_api.ReconcilePipelineTreeRequest{
+			Project:    "proj-a",
+			ModuleName: "fff_close",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		wantDate := time.Now().Format("2006-01-02")
+		if repo.pipelineTreeDate != wantDate || resp.Date != wantDate {
+			t.Errorf("date = repo:%q resp:%q, want %q", repo.pipelineTreeDate, resp.Date, wantDate)
+		}
+		if repo.pipelineTreeProject != "proj-a" || repo.pipelineTreeModuleName != "fff_close" {
+			t.Errorf("unexpected repo call: project=%q module_name=%q", repo.pipelineTreeProject, repo.pipelineTreeModuleName)
+		}
+		if resp.Filters.Project == nil || *resp.Filters.Project != "proj-a" {
+			t.Errorf("resp.Filters.Project = %v, want proj-a", resp.Filters.Project)
+		}
+		if resp.Filters.ModuleName == nil || *resp.Filters.ModuleName != "fff_close" {
+			t.Errorf("resp.Filters.ModuleName = %v, want fff_close", resp.Filters.ModuleName)
+		}
+		if resp.Filters.Md5 != nil {
+			t.Errorf("resp.Filters.Md5 = %v, want nil", resp.Filters.Md5)
+		}
+
+		root := resp.Tree
+		if root == nil {
+			t.Fatal("resp.Tree is nil")
+		}
+		if root.Key != "tar_received" || root.Count != 5000 {
+			t.Fatalf("unexpected root: %+v", root)
+		}
+		if len(root.Children) != 2 {
+			t.Fatalf("root has %d children, want 2", len(root.Children))
+		}
+		tarParseSuccess, tarParseFailed := root.Children[0], root.Children[1]
+		if tarParseSuccess.Count+tarParseFailed.Count != root.Count {
+			t.Errorf("tar-level children sum %d != root.Count %d", tarParseSuccess.Count+tarParseFailed.Count, root.Count)
+		}
+		if tarParseFailed.Count != 15 || len(tarParseFailed.FailureReasons) != 1 || tarParseFailed.FailureReasons[0].Code != "1" {
+			t.Errorf("unexpected tar_parse_failed: %+v", tarParseFailed)
+		}
+		if tarParseSuccess.Meta["skip_line_count"] != 10 || tarParseSuccess.Meta["parsed_line_count"] != 12340 {
+			t.Errorf("unexpected tar_parse_success meta: %+v", tarParseSuccess.Meta)
+		}
+
+		if len(tarParseSuccess.Children) != 2 {
+			t.Fatalf("tar_parse_success has %d children, want 2", len(tarParseSuccess.Children))
+		}
+		eventParseSuccess, eventParseFailed := tarParseSuccess.Children[0], tarParseSuccess.Children[1]
+		if eventParseSuccess.Count != 12329 || eventParseFailed.Count != 3 {
+			t.Errorf("unexpected event parse split: success=%d failed=%d", eventParseSuccess.Count, eventParseFailed.Count)
+		}
+		if eventParseSuccess.Rate == nil || *eventParseSuccess.Rate != 0.9998 {
+			t.Errorf("eventParseSuccess.Rate = %v, want 0.9998", eventParseSuccess.Rate)
+		}
+		if len(eventParseFailed.FailureReasons) != 1 || eventParseFailed.FailureReasons[0].Code != "4" || eventParseFailed.FailureReasons[0].ModuleName != "fff_close" {
+			t.Errorf("unexpected event_parse_failed reasons: %+v", eventParseFailed.FailureReasons)
+		}
+
+		if len(eventParseSuccess.Children) != 2 {
+			t.Fatalf("event_parse_success has %d children, want 2", len(eventParseSuccess.Children))
+		}
+		eventSendSuccess, eventSendFailed := eventParseSuccess.Children[0], eventParseSuccess.Children[1]
+		if eventSendSuccess.Count != 12322 || eventSendFailed.Count != 7 {
+			t.Errorf("unexpected event send split: success=%d failed=%d", eventSendSuccess.Count, eventSendFailed.Count)
+		}
+		if len(eventSendFailed.FailureReasons) != 1 || eventSendFailed.FailureReasons[0].Code != "5" || eventSendFailed.FailureReasons[0].ModuleName != "fff_close" {
+			t.Errorf("unexpected event_send_failed reasons: %+v", eventSendFailed.FailureReasons)
+		}
+
+		if len(eventSendSuccess.Children) != 4 {
+			t.Fatalf("event_send_success has %d children, want 4", len(eventSendSuccess.Children))
+		}
+		var landSum int64
+		for _, c := range eventSendSuccess.Children {
+			landSum += c.Count
+		}
+		if landSum != eventSendSuccess.Count {
+			t.Errorf("event_land children sum %d != event_send_success.Count %d", landSum, eventSendSuccess.Count)
+		}
+		convertFailedNode := eventSendSuccess.Children[1]
+		if convertFailedNode.Key != "event_land_convert_failed" || len(convertFailedNode.FailureReasons) != 1 || convertFailedNode.FailureReasons[0].Code != "3" {
+			t.Errorf("unexpected event_land_convert_failed: %+v", convertFailedNode)
+		}
+		landingFailedNode := eventSendSuccess.Children[2]
+		if landingFailedNode.Key != "event_land_landing_failed" || len(landingFailedNode.FailureReasons) != 1 || landingFailedNode.FailureReasons[0].Code != "6" {
+			t.Errorf("unexpected event_land_landing_failed: %+v", landingFailedNode)
+		}
+	})
+
+	t.Run("passes md5 through and propagates repo error", func(t *testing.T) {
+		repo := &fakeReconcileRepo{pipelineTreeErr: errors.New("doris down")}
+		uc := NewReconcileUseCase(repo)
+
+		_, err := uc.GetPipelineTree(context.Background(), &dashboard_api.ReconcilePipelineTreeRequest{
+			Date: "2026-07-01",
+			Md5:  "abc123",
+		})
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if repo.pipelineTreeDate != "2026-07-01" || repo.pipelineTreeMd5 != "abc123" {
+			t.Errorf("unexpected repo call: date=%q md5=%q", repo.pipelineTreeDate, repo.pipelineTreeMd5)
 		}
 	})
 }

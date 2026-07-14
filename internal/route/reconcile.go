@@ -28,6 +28,7 @@ func RegisterReconcileService(s *service.ReconcileService, cd *conf.Data) []Grou
 				{JsonHandlerFunc: s.GetRecordConsistency, Path: "record_consistency", Method: GET},
 				{JsonHandlerFunc: s.GetUuidSource, Path: "uuid_source", Method: GET},
 				{JsonHandlerFunc: s.GetFailureSummary, Path: "failure_summary", Method: GET},
+				{JsonHandlerFunc: s.GetPipelineTree, Path: "pipeline_tree", Method: GET},
 			},
 		},
 	}

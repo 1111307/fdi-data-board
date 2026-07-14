@@ -409,3 +409,38 @@ func (s *ReconcileService) GetFailureSummary(ctx *gin.Context) (api.HttpResponse
 
 	return result, nil
 }
+
+// GetPipelineTree godoc
+//
+//	@Summary	全链路树形聚合（tar包→event解析→event落库，看分流去哪了）
+//	@Tags		ReconcileDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		date		query		string	false	"日期，不传默认今天"
+//	@Param		project		query		string	false	"可选，过滤到单个项目"
+//	@Param		module_name	query		string	false	"可选，只影响 event 解析/落库分支"
+//	@Param		md5			query		string	false	"可选，单包下钻模式"
+//	@Success	200			{object}	dashboard_api.ReconcilePipelineTreeResponse
+//	@Router		/dashboard/v1/reconcile/pipeline_tree [GET]
+func (s *ReconcileService) GetPipelineTree(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.ReconcilePipelineTreeResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.ReconcilePipelineTreeRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetPipelineTree(ctx, &req)
+	if err != nil {
+		log.Errorf("ReconcileGetPipelineTree error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+
+	return result, nil
+}

@@ -3,6 +3,8 @@ package biz
 import (
 	"context"
 	"errors"
+	"math"
+	"strconv"
 	"time"
 
 	dashboard_api "fdi_data_board/api/dashboard"
@@ -10,7 +12,7 @@ import (
 
 var ErrInvalidMd5Type = errors.New("type must be missing, convert_failed, landing_failed or decode_failed")
 var ErrMd5Required = errors.New("md5 is required")
-var ErrInvalidEventType = errors.New("type must be missing, extra, send_failed, convert_failed, landing_failed or mismatched")
+var ErrInvalidEventType = errors.New("type must be missing, extra, send_failed, parse_failed, convert_failed, landing_failed or mismatched")
 var ErrInvalidOrderBy = errors.New("order_by must be missing or expected")
 
 const defaultMd5ListLimit = 20
@@ -30,6 +32,7 @@ type ReconcileRepo interface {
 	GetRecordConsistency(ctx context.Context, date string, limit int) ([]*ReconcileRecordConsistencyItem, error)
 	GetUuidSource(ctx context.Context, date string) ([]*ReconcileUuidSourceItem, error)
 	GetFailureSummary(ctx context.Context, date string) (*ReconcileFailureSummaryData, error)
+	GetPipelineTree(ctx context.Context, date, project, moduleName, md5 string) (*ReconcilePipelineTreeData, error)
 }
 
 // ReconcileOverviewBag L1 bag 级解码健康度
@@ -43,9 +46,11 @@ type ReconcileOverviewBag struct {
 
 // ReconcileOverviewEventParse L2 event 级解析/发送健康度
 type ReconcileOverviewEventParse struct {
-	Expected       int64
-	SendFailed     int64
-	SendFailedRate float64
+	Expected        int64
+	SendFailed      int64
+	SendFailedRate  float64
+	ParseFailed     int64
+	ParseFailedRate float64
 }
 
 // ReconcileOverviewEventLand L3 event 级落库健康度
@@ -90,6 +95,7 @@ type ReconcileModuleItem struct {
 	LandingFailed int64
 	Missing       int64
 	SendFailed    int64
+	ParseFailed   int64
 	MatchRate     float64
 }
 
@@ -178,6 +184,13 @@ type ReconcileSendFailedItem struct {
 	Count      int64
 }
 
+// ReconcileParseFailedItem L2 未解析出可对账event按 module_name+err_detail 聚合单条
+type ReconcileParseFailedItem struct {
+	ModuleName string
+	ErrDetail  string
+	Count      int64
+}
+
 // ReconcileConvertFailedItem L3 转换失败按 module_name+err_detail 聚合单条
 type ReconcileConvertFailedItem struct {
 	ModuleName string
@@ -196,8 +209,49 @@ type ReconcileLandingFailedItem struct {
 type ReconcileFailureSummaryData struct {
 	DecodeFailed  []*ReconcileDecodeFailedItem
 	SendFailed    []*ReconcileSendFailedItem
+	ParseFailed   []*ReconcileParseFailedItem
 	ConvertFailed []*ReconcileConvertFailedItem
 	LandingFailed []*ReconcileLandingFailedItem
+}
+
+// ReconcilePipelineBagData 全链路树 L1 tar 包层聚合结果
+type ReconcilePipelineBagData struct {
+	Total           int64
+	ParseSuccess    int64
+	DecodeSuccess   int64
+	DecodePartial   int64
+	DecodeFailed    int64
+	StatusLineCount int64
+	SkipLineCount   int64
+	ParsedLineCount int64
+}
+
+// ReconcilePipelineEventParseData 全链路树 L2 event 解析层聚合结果
+type ReconcilePipelineEventParseData struct {
+	ParseSuccess int64
+	ParseFailed  int64
+	SendSuccess  int64
+	SendFailed   int64
+}
+
+// ReconcilePipelineEventLandData 全链路树 L3 event 落库层聚合结果（仅 send_status=1 的 event）
+type ReconcilePipelineEventLandData struct {
+	Matched       int64
+	ConvertFailed int64
+	LandingFailed int64
+	Missing       int64
+}
+
+// ReconcilePipelineTreeData 全链路树形聚合的原始数据，由 use case 组装成前端可渲染的树
+type ReconcilePipelineTreeData struct {
+	Bag                      ReconcilePipelineBagData
+	BagFailureReasons        []*ReconcileDecodeFailedItem
+	EventParse               ReconcilePipelineEventParseData
+	EventParseFailureReasons []*ReconcileParseFailedItem
+	EventSendFailureReasons  []*ReconcileSendFailedItem
+	EventLand                ReconcilePipelineEventLandData
+	ConvertFailedReasons     []*ReconcileConvertFailedItem
+	LandingFailedReasons     []*ReconcileLandingFailedItem
 }
 
 // reconcileStageDesc stage → 描述枚举映射，后端硬编码，不让前端猜数字
@@ -244,9 +298,11 @@ func (uc *ReconcileUseCase) GetOverview(ctx context.Context, req *dashboard_api.
 			DecodeSuccessRate: data.Bag.DecodeSuccessRate,
 		},
 		EventParse: dashboard_api.ReconcileOverviewEventParse{
-			Expected:       data.EventParse.Expected,
-			SendFailed:     data.EventParse.SendFailed,
-			SendFailedRate: data.EventParse.SendFailedRate,
+			Expected:        data.EventParse.Expected,
+			SendFailed:      data.EventParse.SendFailed,
+			SendFailedRate:  data.EventParse.SendFailedRate,
+			ParseFailed:     data.EventParse.ParseFailed,
+			ParseFailedRate: data.EventParse.ParseFailedRate,
 		},
 		EventLand: dashboard_api.ReconcileOverviewEventLand{
 			Matched:       data.EventLand.Matched,
@@ -381,7 +437,7 @@ func (uc *ReconcileUseCase) ListEventList(ctx context.Context, req *dashboard_ap
 		eventType = "missing"
 	}
 	switch eventType {
-	case "missing", "extra", "send_failed", "convert_failed", "landing_failed", "mismatched":
+	case "missing", "extra", "send_failed", "parse_failed", "convert_failed", "landing_failed", "mismatched":
 	default:
 		return nil, ErrInvalidEventType
 	}
@@ -452,8 +508,23 @@ func (uc *ReconcileUseCase) GetFailureSummary(ctx context.Context, req *dashboar
 		Date:          date,
 		DecodeFailed:  toApiReconcileDecodeFailedItems(data.DecodeFailed),
 		SendFailed:    toApiReconcileSendFailedItems(data.SendFailed),
+		ParseFailed:   toApiReconcileParseFailedItems(data.ParseFailed),
 		ConvertFailed: toApiReconcileConvertFailedItems(data.ConvertFailed),
 		LandingFailed: toApiReconcileLandingFailedItems(data.LandingFailed),
+	}, nil
+}
+
+func (uc *ReconcileUseCase) GetPipelineTree(ctx context.Context, req *dashboard_api.ReconcilePipelineTreeRequest) (*dashboard_api.ReconcilePipelineTreeResponse, error) {
+	date := defaultReconcileDate(req.Date)
+	data, err := uc.repo.GetPipelineTree(ctx, date, req.Project, req.ModuleName, req.Md5)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.ReconcilePipelineTreeResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		Date:         date,
+		Filters:      toApiReconcilePipelineTreeFilters(req),
+		Tree:         buildReconcilePipelineTree(data),
 	}, nil
 }
 
@@ -486,6 +557,7 @@ func toApiReconcileModuleItems(list []*ReconcileModuleItem) []*dashboard_api.Rec
 			LandingFailed: v.LandingFailed,
 			Missing:       v.Missing,
 			SendFailed:    v.SendFailed,
+			ParseFailed:   v.ParseFailed,
 			MatchRate:     v.MatchRate,
 		})
 	}
@@ -623,6 +695,18 @@ func toApiReconcileSendFailedItems(list []*ReconcileSendFailedItem) []*dashboard
 	return out
 }
 
+func toApiReconcileParseFailedItems(list []*ReconcileParseFailedItem) []*dashboard_api.ReconcileParseFailedItem {
+	out := make([]*dashboard_api.ReconcileParseFailedItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.ReconcileParseFailedItem{
+			ModuleName: v.ModuleName,
+			ErrDetail:  v.ErrDetail,
+			Count:      v.Count,
+		})
+	}
+	return out
+}
+
 func toApiReconcileConvertFailedItems(list []*ReconcileConvertFailedItem) []*dashboard_api.ReconcileConvertFailedItem {
 	out := make([]*dashboard_api.ReconcileConvertFailedItem, 0, len(list))
 	for _, v := range list {
@@ -645,4 +729,218 @@ func toApiReconcileLandingFailedItems(list []*ReconcileLandingFailedItem) []*das
 		})
 	}
 	return out
+}
+
+func toApiReconcilePipelineTreeFilters(req *dashboard_api.ReconcilePipelineTreeRequest) dashboard_api.ReconcilePipelineTreeFilters {
+	f := dashboard_api.ReconcilePipelineTreeFilters{}
+	if req.Project != "" {
+		project := req.Project
+		f.Project = &project
+	}
+	if req.ModuleName != "" {
+		moduleName := req.ModuleName
+		f.ModuleName = &moduleName
+	}
+	if req.Md5 != "" {
+		md5 := req.Md5
+		f.Md5 = &md5
+	}
+	return f
+}
+
+// reconcilePipelineRate 计算子节点相对于同一分支总量的占比，分母为 0 时返回 0
+func reconcilePipelineRate(a, b int64) *float64 {
+	rate := 0.0
+	if b != 0 {
+		rate = math.Round(float64(a)/float64(b)*10000) / 10000
+	}
+	return &rate
+}
+
+func toApiReconcilePipelineReasonsFromDecodeFailed(list []*ReconcileDecodeFailedItem) []*dashboard_api.ReconcileFailureReason {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]*dashboard_api.ReconcileFailureReason, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.ReconcileFailureReason{
+			Code:   strconv.Itoa(int(v.Stage)),
+			Desc:   reconcileStageDesc[v.Stage],
+			Sample: v.SampleErrorMsg,
+			Count:  v.Count,
+		})
+	}
+	return out
+}
+
+func toApiReconcilePipelineReasonsFromSendFailed(list []*ReconcileSendFailedItem) []*dashboard_api.ReconcileFailureReason {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]*dashboard_api.ReconcileFailureReason, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.ReconcileFailureReason{
+			Code:       "5",
+			Desc:       "发送下游Kafka失败",
+			ModuleName: v.ModuleName,
+			Sample:     v.ErrDetail,
+			Count:      v.Count,
+		})
+	}
+	return out
+}
+
+func toApiReconcilePipelineReasonsFromParseFailed(list []*ReconcileParseFailedItem) []*dashboard_api.ReconcileFailureReason {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]*dashboard_api.ReconcileFailureReason, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.ReconcileFailureReason{
+			Code:       "4",
+			Desc:       "未解析出可对账event",
+			ModuleName: v.ModuleName,
+			Sample:     v.ErrDetail,
+			Count:      v.Count,
+		})
+	}
+	return out
+}
+
+func toApiReconcilePipelineReasonsFromConvertFailed(list []*ReconcileConvertFailedItem) []*dashboard_api.ReconcileFailureReason {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]*dashboard_api.ReconcileFailureReason, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.ReconcileFailureReason{
+			Code:       "3",
+			Desc:       "下游转换失败",
+			ModuleName: v.ModuleName,
+			Sample:     v.ErrDetail,
+			Count:      v.Count,
+		})
+	}
+	return out
+}
+
+func toApiReconcilePipelineReasonsFromLandingFailed(list []*ReconcileLandingFailedItem) []*dashboard_api.ReconcileFailureReason {
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]*dashboard_api.ReconcileFailureReason, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.ReconcileFailureReason{
+			Code:       "6",
+			Desc:       "落库失败(DLQ/丢弃)",
+			ModuleName: v.ModuleName,
+			Sample:     v.ErrDetail,
+			Count:      v.Count,
+		})
+	}
+	return out
+}
+
+// buildReconcilePipelineTree 把 L1/L2/L3 三层的扁平聚合数据组装成前端可直接渲染的树形结构。
+// tar 包（L1）与 event（L2/L3）是不同粒度的统计单位，event 分支的 rate 相对其自身分支总量计算，
+// 而不是相对父节点 tar_parse_success.count（两者数值不可比，仅用于视觉分组）。
+func buildReconcilePipelineTree(data *ReconcilePipelineTreeData) *dashboard_api.ReconcilePipelineNode {
+	eventTotal := data.EventParse.ParseSuccess + data.EventParse.ParseFailed
+
+	eventLandMatched := &dashboard_api.ReconcilePipelineNode{
+		Key:    "event_land_matched",
+		Label:  "落库成功",
+		Status: "success",
+		Count:  data.EventLand.Matched,
+		Rate:   reconcilePipelineRate(data.EventLand.Matched, data.EventParse.SendSuccess),
+	}
+	eventLandConvertFailed := &dashboard_api.ReconcilePipelineNode{
+		Key:            "event_land_convert_failed",
+		Label:          "转换失败",
+		Status:         "failed",
+		Count:          data.EventLand.ConvertFailed,
+		Rate:           reconcilePipelineRate(data.EventLand.ConvertFailed, data.EventParse.SendSuccess),
+		FailureReasons: toApiReconcilePipelineReasonsFromConvertFailed(data.ConvertFailedReasons),
+	}
+	eventLandLandingFailed := &dashboard_api.ReconcilePipelineNode{
+		Key:            "event_land_landing_failed",
+		Label:          "落库失败",
+		Status:         "failed",
+		Count:          data.EventLand.LandingFailed,
+		Rate:           reconcilePipelineRate(data.EventLand.LandingFailed, data.EventParse.SendSuccess),
+		FailureReasons: toApiReconcilePipelineReasonsFromLandingFailed(data.LandingFailedReasons),
+	}
+	eventLandMissing := &dashboard_api.ReconcilePipelineNode{
+		Key:    "event_land_missing",
+		Label:  "待落库/丢库",
+		Status: "unknown",
+		Count:  data.EventLand.Missing,
+		Rate:   reconcilePipelineRate(data.EventLand.Missing, data.EventParse.SendSuccess),
+	}
+
+	eventSendSuccess := &dashboard_api.ReconcilePipelineNode{
+		Key:      "event_send_success",
+		Label:    "发送kafka成功",
+		Status:   "success",
+		Count:    data.EventParse.SendSuccess,
+		Rate:     reconcilePipelineRate(data.EventParse.SendSuccess, data.EventParse.ParseSuccess),
+		Children: []*dashboard_api.ReconcilePipelineNode{eventLandMatched, eventLandConvertFailed, eventLandLandingFailed, eventLandMissing},
+	}
+	eventSendFailed := &dashboard_api.ReconcilePipelineNode{
+		Key:            "event_send_failed",
+		Label:          "发送kafka失败",
+		Status:         "failed",
+		Count:          data.EventParse.SendFailed,
+		Rate:           reconcilePipelineRate(data.EventParse.SendFailed, data.EventParse.ParseSuccess),
+		FailureReasons: toApiReconcilePipelineReasonsFromSendFailed(data.EventSendFailureReasons),
+	}
+
+	eventParseSuccess := &dashboard_api.ReconcilePipelineNode{
+		Key:      "event_parse_success",
+		Label:    "解析成功event",
+		Status:   "success",
+		Count:    data.EventParse.ParseSuccess,
+		Rate:     reconcilePipelineRate(data.EventParse.ParseSuccess, eventTotal),
+		Children: []*dashboard_api.ReconcilePipelineNode{eventSendSuccess, eventSendFailed},
+	}
+	eventParseFailed := &dashboard_api.ReconcilePipelineNode{
+		Key:            "event_parse_failed",
+		Label:          "解析失败event",
+		Status:         "failed",
+		Count:          data.EventParse.ParseFailed,
+		Rate:           reconcilePipelineRate(data.EventParse.ParseFailed, eventTotal),
+		FailureReasons: toApiReconcilePipelineReasonsFromParseFailed(data.EventParseFailureReasons),
+	}
+
+	tarParseSuccess := &dashboard_api.ReconcilePipelineNode{
+		Key:    "tar_parse_success",
+		Label:  "解析成功tar包",
+		Status: "success",
+		Count:  data.Bag.ParseSuccess,
+		Rate:   reconcilePipelineRate(data.Bag.ParseSuccess, data.Bag.Total),
+		Meta: map[string]int64{
+			"decode_success":    data.Bag.DecodeSuccess,
+			"decode_partial":    data.Bag.DecodePartial,
+			"status_line_count": data.Bag.StatusLineCount,
+			"skip_line_count":   data.Bag.SkipLineCount,
+			"parsed_line_count": data.Bag.ParsedLineCount,
+		},
+		Children: []*dashboard_api.ReconcilePipelineNode{eventParseSuccess, eventParseFailed},
+	}
+	tarParseFailed := &dashboard_api.ReconcilePipelineNode{
+		Key:            "tar_parse_failed",
+		Label:          "解析失败tar包",
+		Status:         "failed",
+		Count:          data.Bag.DecodeFailed,
+		Rate:           reconcilePipelineRate(data.Bag.DecodeFailed, data.Bag.Total),
+		FailureReasons: toApiReconcilePipelineReasonsFromDecodeFailed(data.BagFailureReasons),
+	}
+
+	return &dashboard_api.ReconcilePipelineNode{
+		Key:      "tar_received",
+		Label:    "收到的tar包",
+		Status:   "root",
+		Count:    data.Bag.Total,
+		Children: []*dashboard_api.ReconcilePipelineNode{tarParseSuccess, tarParseFailed},
+	}
 }

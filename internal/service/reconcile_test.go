@@ -50,6 +50,9 @@ type fakeReconcileRepo struct {
 
 	failureSummaryData *biz.ReconcileFailureSummaryData
 	failureSummaryErr  error
+
+	pipelineTreeData *biz.ReconcilePipelineTreeData
+	pipelineTreeErr  error
 }
 
 func (f *fakeReconcileRepo) GetOverview(ctx context.Context, date string) (*biz.ReconcileOverviewData, error) {
@@ -94,6 +97,10 @@ func (f *fakeReconcileRepo) GetUuidSource(ctx context.Context, date string) ([]*
 
 func (f *fakeReconcileRepo) GetFailureSummary(ctx context.Context, date string) (*biz.ReconcileFailureSummaryData, error) {
 	return f.failureSummaryData, f.failureSummaryErr
+}
+
+func (f *fakeReconcileRepo) GetPipelineTree(ctx context.Context, date, project, moduleName, md5 string) (*biz.ReconcilePipelineTreeData, error) {
+	return f.pipelineTreeData, f.pipelineTreeErr
 }
 
 func newTestGinContext(target string) *gin.Context {
@@ -407,4 +414,60 @@ func TestReconcileService_GetFailureSummary(t *testing.T) {
 	if len(got.DecodeFailed) != 1 || len(got.SendFailed) != 1 || len(got.ConvertFailed) != 1 || len(got.LandingFailed) != 1 {
 		t.Errorf("unexpected response: %+v", got)
 	}
+}
+
+func TestReconcileService_GetPipelineTree(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		repo := &fakeReconcileRepo{pipelineTreeData: &biz.ReconcilePipelineTreeData{
+			Bag: biz.ReconcilePipelineBagData{
+				Total:           100,
+				ParseSuccess:    95,
+				DecodeSuccess:   90,
+				DecodePartial:   5,
+				DecodeFailed:    5,
+				StatusLineCount: 100,
+				SkipLineCount:   2,
+				ParsedLineCount: 200,
+			},
+			EventParse: biz.ReconcilePipelineEventParseData{ParseSuccess: 190, ParseFailed: 10},
+			EventLand: biz.ReconcilePipelineEventLandData{
+				Matched:       180,
+				ConvertFailed: 5,
+				LandingFailed: 3,
+				Missing:       2,
+			},
+		}}
+		svc := NewReconcileService(biz.NewReconcileUseCase(repo))
+
+		resp, err := svc.GetPipelineTree(newTestGinContext("/dashboard/v1/reconcile/pipeline_tree?date=2026-07-01&project=proj-a"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got, ok := resp.(*dashboard_api.ReconcilePipelineTreeResponse)
+		if !ok {
+			t.Fatalf("unexpected response type %T", resp)
+		}
+		if got.Date != "2026-07-01" {
+			t.Errorf("got.Date = %q, want 2026-07-01", got.Date)
+		}
+		if got.Filters.Project == nil || *got.Filters.Project != "proj-a" {
+			t.Errorf("got.Filters.Project = %v, want proj-a", got.Filters.Project)
+		}
+		if got.Tree == nil || got.Tree.Key != "tar_received" || got.Tree.Count != 100 {
+			t.Errorf("unexpected tree: %+v", got.Tree)
+		}
+	})
+
+	t.Run("repo error maps to internal error code", func(t *testing.T) {
+		repo := &fakeReconcileRepo{pipelineTreeErr: errors.New("doris down")}
+		svc := NewReconcileService(biz.NewReconcileUseCase(repo))
+
+		resp, err := svc.GetPipelineTree(newTestGinContext("/dashboard/v1/reconcile/pipeline_tree"))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.GetCode() != int32(gcode.CodeInternalError.Code()) {
+			t.Errorf("code = %d, want %d", resp.GetCode(), gcode.CodeInternalError.Code())
+		}
+	})
 }

@@ -58,6 +58,7 @@ type reconcileBagRow struct {
 type reconcileEventParseLandRow struct {
 	Expected      int64 `gorm:"column:expected"`
 	SendFailed    int64 `gorm:"column:send_failed"`
+	ParseFailed   int64 `gorm:"column:parse_failed"`
 	Matched       int64 `gorm:"column:matched"`
 	ConvertFailed int64 `gorm:"column:convert_failed"`
 	LandingFailed int64 `gorm:"column:landing_failed"`
@@ -82,7 +83,8 @@ func (r *reconcileRepo) GetOverview(ctx context.Context, date string) (*biz.Reco
 
 	eventSql := `SELECT
 		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS expected,
-		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed,` + eventLandSelect + eventLandJoin + `
+		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed,
+		SUM(CASE WHEN d.send_status=3 THEN 1 ELSE 0 END) AS parse_failed,` + eventLandSelect + eventLandJoin + `
 	WHERE d.dt = ?`
 
 	extraConsumeSql := `SELECT COUNT(*) AS extra_consume
@@ -127,9 +129,11 @@ func (r *reconcileRepo) GetOverview(ctx context.Context, date string) (*biz.Reco
 			DecodeSuccessRate: reconcilePct(bagRow.DecodeSuccess, bagRow.Total),
 		},
 		EventParse: biz.ReconcileOverviewEventParse{
-			Expected:       eventRow.Expected,
-			SendFailed:     eventRow.SendFailed,
-			SendFailedRate: reconcilePct(eventRow.SendFailed, eventRow.Expected+eventRow.SendFailed),
+			Expected:        eventRow.Expected,
+			SendFailed:      eventRow.SendFailed,
+			ParseFailed:     eventRow.ParseFailed,
+			SendFailedRate:  reconcilePct(eventRow.SendFailed, eventRow.Expected+eventRow.SendFailed+eventRow.ParseFailed),
+			ParseFailedRate: reconcilePct(eventRow.ParseFailed, eventRow.Expected+eventRow.SendFailed+eventRow.ParseFailed),
 		},
 		EventLand: biz.ReconcileOverviewEventLand{
 			Matched:       eventRow.Matched,
@@ -189,6 +193,7 @@ type reconcileModuleRow struct {
 	LandingFailed int64  `gorm:"column:landing_failed"`
 	Missing       int64  `gorm:"column:missing"`
 	SendFailed    int64  `gorm:"column:send_failed"`
+	ParseFailed   int64  `gorm:"column:parse_failed"`
 }
 
 func (r *reconcileRepo) GetModule(ctx context.Context, date, project string) ([]*biz.ReconcileModuleItem, error) {
@@ -204,7 +209,8 @@ func (r *reconcileRepo) GetModule(ctx context.Context, date, project string) ([]
 
 	sql := `SELECT d.module_name,
 		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS expected,` + eventLandSelect + `,
-		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed` + eventLandJoin + `
+		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed,
+		SUM(CASE WHEN d.send_status=3 THEN 1 ELSE 0 END) AS parse_failed` + eventLandJoin + `
 	WHERE ` + strings.Join(conds, " AND ") + `
 	GROUP BY d.module_name
 	ORDER BY missing DESC`
@@ -224,6 +230,7 @@ func (r *reconcileRepo) GetModule(ctx context.Context, date, project string) ([]
 			LandingFailed: row.LandingFailed,
 			Missing:       row.Missing,
 			SendFailed:    row.SendFailed,
+			ParseFailed:   row.ParseFailed,
 			MatchRate:     reconcilePct(row.Matched, row.Expected),
 		})
 	}
@@ -495,6 +502,8 @@ func (r *reconcileRepo) ListEventList(ctx context.Context, date, moduleName, pro
 		return r.listExtraEvents(db, date, moduleName, project, pageSize, offset)
 	case "send_failed":
 		return r.listSendFailedEvents(db, date, moduleName, project, pageSize, offset)
+	case "parse_failed":
+		return r.listParseFailedEvents(db, date, moduleName, project, pageSize, offset)
 	case "convert_failed":
 		return r.listConvertFailedEvents(db, date, moduleName, project, pageSize, offset)
 	case "landing_failed":
@@ -589,6 +598,42 @@ func (r *reconcileRepo) listExtraEvents(db *gorm.DB, date, moduleName, project s
 // listSendFailedEvents: 上游发送下游失败（fis_decode_detail.send_status=2）
 func (r *reconcileRepo) listSendFailedEvents(db *gorm.DB, date, moduleName, project string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
 	conds := []string{"dt = ?", "send_status = 2"}
+	args := []interface{}{date}
+	if moduleName != "" {
+		conds = append(conds, "module_name = ?")
+		args = append(args, moduleName)
+	}
+	if project != "" {
+		conds = append(conds, "project = ?")
+		args = append(args, project)
+	}
+	where := strings.Join(conds, " AND ")
+
+	countSql := `SELECT COUNT(*) AS cnt FROM fis_decode_detail WHERE ` + where
+	var countRow reconcileCountRow
+	if err := db.Raw(countSql, args...).Scan(&countRow).Error; err != nil {
+		return nil, 0, err
+	}
+	if countRow.Cnt == 0 {
+		return []*biz.ReconcileEventItem{}, 0, nil
+	}
+
+	listSql := `SELECT md5, uuid, module_name, project, send_status AS status, err_detail
+	FROM fis_decode_detail
+	WHERE ` + where + `
+	ORDER BY md5, uuid
+	LIMIT ? OFFSET ?`
+	listArgs := append(append([]interface{}{}, args...), limit, offset)
+	var rows []*reconcileEventRow
+	if err := db.Raw(listSql, listArgs...).Scan(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	return toBizReconcileEventItems(rows), countRow.Cnt, nil
+}
+
+// listParseFailedEvents: 未解析出可对账event（fis_decode_detail.send_status=3）
+func (r *reconcileRepo) listParseFailedEvents(db *gorm.DB, date, moduleName, project string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
+	conds := []string{"dt = ?", "send_status = 3"}
 	args := []interface{}{date}
 	if moduleName != "" {
 		conds = append(conds, "module_name = ?")
@@ -816,6 +861,13 @@ func (r *reconcileRepo) GetFailureSummary(ctx context.Context, date string) (*bi
 	ORDER BY count DESC
 	LIMIT 50`
 
+	parseFailedSql := `SELECT module_name, err_detail, COUNT(*) AS count
+	FROM fis_decode_detail
+	WHERE dt = ? AND send_status = 3
+	GROUP BY module_name, err_detail
+	ORDER BY count DESC
+	LIMIT 50`
+
 	convertFailedSql := `SELECT module_name, err_detail, COUNT(*) AS count
 	FROM fis_consume_record
 	WHERE dt = ? AND status = 2 AND err_detail LIKE '3:%'
@@ -833,12 +885,13 @@ func (r *reconcileRepo) GetFailureSummary(ctx context.Context, date string) (*bi
 	var (
 		decodeFailedRows  []*reconcileDecodeFailedRow
 		sendFailedRows    []*reconcileModuleErrDetailRow
+		parseFailedRows   []*reconcileModuleErrDetailRow
 		convertFailedRows []*reconcileModuleErrDetailRow
 		landingFailedRows []*reconcileModuleErrDetailRow
-		errs              [4]error
+		errs              [5]error
 	)
 	var wg sync.WaitGroup
-	wg.Add(4)
+	wg.Add(5)
 	go func() {
 		defer wg.Done()
 		errs[0] = db.Raw(decodeFailedSql, date).Scan(&decodeFailedRows).Error
@@ -855,6 +908,10 @@ func (r *reconcileRepo) GetFailureSummary(ctx context.Context, date string) (*bi
 		defer wg.Done()
 		errs[3] = db.Raw(landingFailedSql, date).Scan(&landingFailedRows).Error
 	}()
+	go func() {
+		defer wg.Done()
+		errs[4] = db.Raw(parseFailedSql, date).Scan(&parseFailedRows).Error
+	}()
 	wg.Wait()
 	for _, err := range errs {
 		if err != nil {
@@ -865,6 +922,7 @@ func (r *reconcileRepo) GetFailureSummary(ctx context.Context, date string) (*bi
 	data := &biz.ReconcileFailureSummaryData{
 		DecodeFailed:  make([]*biz.ReconcileDecodeFailedItem, 0, len(decodeFailedRows)),
 		SendFailed:    make([]*biz.ReconcileSendFailedItem, 0, len(sendFailedRows)),
+		ParseFailed:   make([]*biz.ReconcileParseFailedItem, 0, len(parseFailedRows)),
 		ConvertFailed: make([]*biz.ReconcileConvertFailedItem, 0, len(convertFailedRows)),
 		LandingFailed: make([]*biz.ReconcileLandingFailedItem, 0, len(landingFailedRows)),
 	}
@@ -877,6 +935,13 @@ func (r *reconcileRepo) GetFailureSummary(ctx context.Context, date string) (*bi
 	}
 	for _, row := range sendFailedRows {
 		data.SendFailed = append(data.SendFailed, &biz.ReconcileSendFailedItem{
+			ModuleName: row.ModuleName,
+			ErrDetail:  row.ErrDetail,
+			Count:      row.Count,
+		})
+	}
+	for _, row := range parseFailedRows {
+		data.ParseFailed = append(data.ParseFailed, &biz.ReconcileParseFailedItem{
 			ModuleName: row.ModuleName,
 			ErrDetail:  row.ErrDetail,
 			Count:      row.Count,
@@ -896,5 +961,272 @@ func (r *reconcileRepo) GetFailureSummary(ctx context.Context, date string) (*bi
 			Count:      row.Count,
 		})
 	}
+	return data, nil
+}
+
+type reconcilePipelineBagRow struct {
+	Total           int64 `gorm:"column:total"`
+	ParseSuccess    int64 `gorm:"column:parse_success"`
+	DecodeSuccess   int64 `gorm:"column:decode_success"`
+	DecodePartial   int64 `gorm:"column:decode_partial"`
+	DecodeFailed    int64 `gorm:"column:decode_failed"`
+	StatusLineCount int64 `gorm:"column:status_line_count"`
+	SkipLineCount   int64 `gorm:"column:skip_line_count"`
+	ParsedLineCount int64 `gorm:"column:parsed_line_count"`
+}
+
+type reconcilePipelineEventParseRow struct {
+	ParseSuccess int64 `gorm:"column:parse_success"`
+	ParseFailed  int64 `gorm:"column:parse_failed"`
+	SendSuccess  int64 `gorm:"column:send_success"`
+	SendFailed   int64 `gorm:"column:send_failed"`
+}
+
+type reconcilePipelineEventLandRow struct {
+	Matched       int64 `gorm:"column:matched"`
+	ConvertFailed int64 `gorm:"column:convert_failed"`
+	LandingFailed int64 `gorm:"column:landing_failed"`
+	Missing       int64 `gorm:"column:missing"`
+}
+
+// reconcilePipelineBagConds 构造 fis_decode_record（bag 级，无 module_name 列）的过滤条件
+func reconcilePipelineBagConds(date, project, md5 string) ([]string, []interface{}) {
+	conds := []string{"dt = ?"}
+	args := []interface{}{date}
+	if project != "" {
+		conds = append(conds, "project = ?")
+		args = append(args, project)
+	}
+	if md5 != "" {
+		conds = append(conds, "md5 = ?")
+		args = append(args, md5)
+	}
+	return conds, args
+}
+
+// reconcilePipelineEventConds 构造 fis_decode_detail/fis_consume_record（event 级）的过滤条件，
+// prefix 用于区分是否要给列名加表别名（如 JOIN 查询里的 "d."）
+func reconcilePipelineEventConds(prefix, date, project, moduleName, md5 string) ([]string, []interface{}) {
+	conds := []string{prefix + "dt = ?"}
+	args := []interface{}{date}
+	if project != "" {
+		conds = append(conds, prefix+"project = ?")
+		args = append(args, project)
+	}
+	if moduleName != "" {
+		conds = append(conds, prefix+"module_name = ?")
+		args = append(args, moduleName)
+	}
+	if md5 != "" {
+		conds = append(conds, prefix+"md5 = ?")
+		args = append(args, md5)
+	}
+	return conds, args
+}
+
+func (r *reconcileRepo) GetPipelineTree(ctx context.Context, date, project, moduleName, md5 string) (*biz.ReconcilePipelineTreeData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+
+	bagConds, bagArgs := reconcilePipelineBagConds(date, project, md5)
+	bagWhere := strings.Join(bagConds, " AND ")
+
+	eventConds, eventArgs := reconcilePipelineEventConds("d.", date, project, moduleName, md5)
+	eventWhere := strings.Join(eventConds, " AND ")
+
+	plainConds, plainArgs := reconcilePipelineEventConds("", date, project, moduleName, md5)
+	plainWhere := strings.Join(plainConds, " AND ")
+
+	bagSql := `SELECT
+		COUNT(*) AS total,
+		SUM(CASE WHEN status IN (1,3) THEN 1 ELSE 0 END) AS parse_success,
+		SUM(CASE WHEN status=1 THEN 1 ELSE 0 END) AS decode_success,
+		SUM(CASE WHEN status=3 THEN 1 ELSE 0 END) AS decode_partial,
+		SUM(CASE WHEN status=2 THEN 1 ELSE 0 END) AS decode_failed,
+		SUM(status_line_count) AS status_line_count,
+		SUM(skip_line_count) AS skip_line_count,
+		SUM(parsed_line_count) AS parsed_line_count
+	FROM fis_decode_record
+	WHERE ` + bagWhere
+
+	eventParseSql := `SELECT
+		SUM(CASE WHEN d.send_status IN (1,2) THEN 1 ELSE 0 END) AS parse_success,
+		SUM(CASE WHEN d.send_status=3 THEN 1 ELSE 0 END) AS parse_failed,
+		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS send_success,
+		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed
+	FROM fis_decode_detail d
+	WHERE ` + eventWhere
+
+	eventLandSql := `SELECT` + eventLandSelect + eventLandJoin + `
+	WHERE ` + eventWhere
+
+	var (
+		bagRow   reconcilePipelineBagRow
+		eventRow reconcilePipelineEventParseRow
+		landRow  reconcilePipelineEventLandRow
+		errs     [3]error
+	)
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		errs[0] = db.Raw(bagSql, bagArgs...).Scan(&bagRow).Error
+	}()
+	go func() {
+		defer wg.Done()
+		errs[1] = db.Raw(eventParseSql, eventArgs...).Scan(&eventRow).Error
+	}()
+	go func() {
+		defer wg.Done()
+		errs[2] = db.Raw(eventLandSql, eventArgs...).Scan(&landRow).Error
+	}()
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	data := &biz.ReconcilePipelineTreeData{
+		Bag: biz.ReconcilePipelineBagData{
+			Total:           bagRow.Total,
+			ParseSuccess:    bagRow.ParseSuccess,
+			DecodeSuccess:   bagRow.DecodeSuccess,
+			DecodePartial:   bagRow.DecodePartial,
+			DecodeFailed:    bagRow.DecodeFailed,
+			StatusLineCount: bagRow.StatusLineCount,
+			SkipLineCount:   bagRow.SkipLineCount,
+			ParsedLineCount: bagRow.ParsedLineCount,
+		},
+		EventParse: biz.ReconcilePipelineEventParseData{
+			ParseSuccess: eventRow.ParseSuccess,
+			ParseFailed:  eventRow.ParseFailed,
+			SendSuccess:  eventRow.SendSuccess,
+			SendFailed:   eventRow.SendFailed,
+		},
+		EventLand: biz.ReconcilePipelineEventLandData{
+			Matched:       landRow.Matched,
+			ConvertFailed: landRow.ConvertFailed,
+			LandingFailed: landRow.LandingFailed,
+			Missing:       landRow.Missing,
+		},
+	}
+
+	var (
+		bagFailureRows    []*reconcileDecodeFailedRow
+		parseFailedRows   []*reconcileModuleErrDetailRow
+		sendFailedRows    []*reconcileModuleErrDetailRow
+		convertFailedRows []*reconcileModuleErrDetailRow
+		landingFailedRows []*reconcileModuleErrDetailRow
+		failureErrs       [5]error
+	)
+	var fwg sync.WaitGroup
+	if bagRow.DecodeFailed > 0 {
+		fwg.Add(1)
+		go func() {
+			defer fwg.Done()
+			sql := `SELECT stage, COUNT(*) AS count, ANY_VALUE(error_msg) AS sample_error_msg
+			FROM fis_decode_record
+			WHERE ` + bagWhere + ` AND status = 2
+			GROUP BY stage
+			ORDER BY count DESC`
+			failureErrs[0] = db.Raw(sql, bagArgs...).Scan(&bagFailureRows).Error
+		}()
+	}
+	if eventRow.ParseFailed > 0 {
+		fwg.Add(1)
+		go func() {
+			defer fwg.Done()
+			sql := `SELECT module_name, err_detail, COUNT(*) AS count
+			FROM fis_decode_detail
+			WHERE ` + plainWhere + ` AND send_status = 3
+			GROUP BY module_name, err_detail
+			ORDER BY count DESC
+			LIMIT 50`
+			failureErrs[1] = db.Raw(sql, plainArgs...).Scan(&parseFailedRows).Error
+		}()
+	}
+	if eventRow.SendFailed > 0 {
+		fwg.Add(1)
+		go func() {
+			defer fwg.Done()
+			sql := `SELECT module_name, err_detail, COUNT(*) AS count
+			FROM fis_decode_detail
+			WHERE ` + plainWhere + ` AND send_status = 2
+			GROUP BY module_name, err_detail
+			ORDER BY count DESC
+			LIMIT 50`
+			failureErrs[2] = db.Raw(sql, plainArgs...).Scan(&sendFailedRows).Error
+		}()
+	}
+	if landRow.ConvertFailed > 0 {
+		fwg.Add(1)
+		go func() {
+			defer fwg.Done()
+			sql := `SELECT module_name, err_detail, COUNT(*) AS count
+			FROM fis_consume_record
+			WHERE ` + plainWhere + ` AND status = 2 AND err_detail LIKE '3:%'
+			GROUP BY module_name, err_detail
+			ORDER BY count DESC
+			LIMIT 50`
+			failureErrs[3] = db.Raw(sql, plainArgs...).Scan(&convertFailedRows).Error
+		}()
+	}
+	if landRow.LandingFailed > 0 {
+		fwg.Add(1)
+		go func() {
+			defer fwg.Done()
+			sql := `SELECT module_name, err_detail, COUNT(*) AS count
+			FROM fis_consume_record
+			WHERE ` + plainWhere + ` AND status = 2 AND err_detail LIKE '6:%'
+			GROUP BY module_name, err_detail
+			ORDER BY count DESC
+			LIMIT 50`
+			failureErrs[4] = db.Raw(sql, plainArgs...).Scan(&landingFailedRows).Error
+		}()
+	}
+	fwg.Wait()
+	for _, err := range failureErrs {
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	for _, row := range bagFailureRows {
+		data.BagFailureReasons = append(data.BagFailureReasons, &biz.ReconcileDecodeFailedItem{
+			Stage:          row.Stage,
+			Count:          row.Count,
+			SampleErrorMsg: row.SampleErrorMsg,
+		})
+	}
+	for _, row := range parseFailedRows {
+		data.EventParseFailureReasons = append(data.EventParseFailureReasons, &biz.ReconcileParseFailedItem{
+			ModuleName: row.ModuleName,
+			ErrDetail:  row.ErrDetail,
+			Count:      row.Count,
+		})
+	}
+	for _, row := range sendFailedRows {
+		data.EventSendFailureReasons = append(data.EventSendFailureReasons, &biz.ReconcileSendFailedItem{
+			ModuleName: row.ModuleName,
+			ErrDetail:  row.ErrDetail,
+			Count:      row.Count,
+		})
+	}
+	for _, row := range convertFailedRows {
+		data.ConvertFailedReasons = append(data.ConvertFailedReasons, &biz.ReconcileConvertFailedItem{
+			ModuleName: row.ModuleName,
+			ErrDetail:  row.ErrDetail,
+			Count:      row.Count,
+		})
+	}
+	for _, row := range landingFailedRows {
+		data.LandingFailedReasons = append(data.LandingFailedReasons, &biz.ReconcileLandingFailedItem{
+			ModuleName: row.ModuleName,
+			ErrDetail:  row.ErrDetail,
+			Count:      row.Count,
+		})
+	}
+
 	return data, nil
 }
