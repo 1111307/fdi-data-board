@@ -46,6 +46,8 @@ data:
   runtime:
     env: ${RUN_MODE:prd}
     domain: ${FUNC_SCOPE:fdi_cloud}
+  feishu:
+    webhook_url: ${FEISHU_WEBHOOK_URL:}
   etl:
     on: ${ETL_ON:true}
     backfill_on: ${ETL_BACKFILL_ON:true}
