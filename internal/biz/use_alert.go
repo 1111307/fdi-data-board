@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -141,7 +142,10 @@ func (uc *AlertUseCase) buildWebhookPayload(payload *GrafanaAlertPayload) feishu
 		// 如果 message 不为空，说明 Grafana 已经把详情都带上了，不用再重复输出各字段
 		if payload.Message == "" {
 			if alert.ValueString != "" {
-				rows = append(rows, []feishuEl{{Tag: "text", Text: "Value: " + alert.ValueString}})
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Value:"}})
+				for _, line := range formatValueString(alert.ValueString) {
+					rows = append(rows, []feishuEl{{Tag: "text", Text: "  " + line}})
+				}
 			}
 			if len(alert.Labels) > 0 {
 				rows = append(rows, []feishuEl{{Tag: "text", Text: "Labels:"}})
@@ -198,4 +202,44 @@ func formatStartsAt(ts string) string {
 		return ts // 解析失败原样返回
 	}
 	return t.In(shanghaiLoc).Format("2006-01-02 15:04:05")
+}
+
+var valueRegex = regexp.MustCompile(`\{([^}]*)\}\s+value=([\d.eE+-]+)`)
+
+// formatValueString 将 Grafana 原始 valueString 拆成可读的行
+// 输入: [ var='B0' metric='Value' labels={key1=val1, key2=val2} value=123 ], [...]
+// 输出: ["pod=data-collection-normal-788b67c849-f7stb, value=2", ...]
+func formatValueString(raw string) []string {
+	matches := valueRegex.FindAllStringSubmatch(raw, -1)
+	if len(matches) == 0 {
+		return []string{raw} // 正则匹配失败时原样返回
+	}
+
+	var lines []string
+	for _, m := range matches {
+		labelsStr := m[1] // key1=val1, key2=val2
+		value := m[2]
+
+		parts := strings.Split(labelsStr, ",")
+		podName := ""
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if strings.HasPrefix(p, "pod=") {
+				podName = p
+				break
+			}
+		}
+		if podName == "" {
+			// 没有 pod 字段时取第一个非空的 label
+			for _, p := range parts {
+				p = strings.TrimSpace(p)
+				if p != "" {
+					podName = p
+					break
+				}
+			}
+		}
+		lines = append(lines, podName+", value="+value)
+	}
+	return lines
 }
