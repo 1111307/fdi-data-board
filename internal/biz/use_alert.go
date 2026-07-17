@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 
@@ -14,6 +15,11 @@ import (
 )
 
 const defaultWebhookURL = "https://open.feishu.cn/open-apis/bot/v2/hook/c3f49363-67bb-421f-966c-a7bcf132c104"
+
+var shanghaiLoc = func() *time.Location {
+	loc, _ := time.LoadLocation("Asia/Shanghai")
+	return loc
+}()
 
 // GrafanaAlertPayload Grafana webhook 告警结构（兼容 Grafana 9+ unified alerting 格式）
 type GrafanaAlertPayload struct {
@@ -149,8 +155,9 @@ func (uc *AlertUseCase) buildWebhookPayload(payload *GrafanaAlertPayload) feishu
 					rows = append(rows, []feishuEl{{Tag: "text", Text: fmt.Sprintf(" - %s = %s", k, v)}})
 				}
 			}
+			// formatStartsAt 将 UTC 时间转为 Asia/Shanghai
 			if alert.StartsAt != "" {
-				rows = append(rows, []feishuEl{{Tag: "text", Text: "触发时间：" + alert.StartsAt}})
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "触发时间：" + formatStartsAt(alert.StartsAt)}})
 			}
 			if alert.GeneratorURL != "" {
 				rows = append(rows, []feishuEl{{Tag: "text", Text: "Source: " + alert.GeneratorURL}})
@@ -166,7 +173,7 @@ func (uc *AlertUseCase) buildWebhookPayload(payload *GrafanaAlertPayload) feishu
 			}
 		} else {
 			if alert.StartsAt != "" {
-				rows = append(rows, []feishuEl{{Tag: "text", Text: "触发时间：" + alert.StartsAt}})
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "触发时间：" + formatStartsAt(alert.StartsAt)}})
 			}
 		}
 	}
@@ -182,4 +189,13 @@ func (uc *AlertUseCase) buildWebhookPayload(payload *GrafanaAlertPayload) feishu
 			},
 		},
 	}
+}
+
+// formatStartsAt 将 Grafana UTC 时间字符串转为 Asia/Shanghai 本地时间
+func formatStartsAt(ts string) string {
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return ts // 解析失败原样返回
+	}
+	return t.In(shanghaiLoc).Format("2006-01-02 15:04:05")
 }
