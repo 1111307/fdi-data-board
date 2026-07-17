@@ -132,38 +132,42 @@ func (uc *AlertUseCase) buildWebhookPayload(payload *GrafanaAlertPayload) feishu
 
 		rows = append(rows, []feishuEl{{Tag: "text", Text: fmt.Sprintf("[%s] %s", alertName, alert.Status)}})
 
-		if alert.ValueString != "" {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "Value: " + alert.ValueString}})
-		}
-
-		if len(alert.Labels) > 0 {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "Labels:"}})
-			for k, v := range alert.Labels {
-				rows = append(rows, []feishuEl{{Tag: "text", Text: fmt.Sprintf(" - %s = %s", k, v)}})
+		// 如果 message 不为空，说明 Grafana 已经把详情都带上了，不用再重复输出各字段
+		if payload.Message == "" {
+			if alert.ValueString != "" {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Value: " + alert.ValueString}})
 			}
-		}
-
-		if len(alert.Annotations) > 0 {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "Annotations:"}})
-			for k, v := range alert.Annotations {
-				rows = append(rows, []feishuEl{{Tag: "text", Text: fmt.Sprintf(" - %s = %s", k, v)}})
+			if len(alert.Labels) > 0 {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Labels:"}})
+				for k, v := range alert.Labels {
+					rows = append(rows, []feishuEl{{Tag: "text", Text: fmt.Sprintf(" - %s = %s", k, v)}})
+				}
 			}
-		}
-
-		if alert.StartsAt != "" {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "触发时间：" + alert.StartsAt}})
-		}
-		if alert.GeneratorURL != "" {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "Source: " + alert.GeneratorURL}})
-		}
-		if alert.SilenceURL != "" {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "Silence: " + alert.SilenceURL}})
-		}
-		if alert.DashboardURL != "" {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "Dashboard: " + alert.DashboardURL}})
-		}
-		if alert.PanelURL != "" {
-			rows = append(rows, []feishuEl{{Tag: "text", Text: "Panel: " + alert.PanelURL}})
+			if len(alert.Annotations) > 0 {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Annotations:"}})
+				for k, v := range alert.Annotations {
+					rows = append(rows, []feishuEl{{Tag: "text", Text: fmt.Sprintf(" - %s = %s", k, v)}})
+				}
+			}
+			if alert.StartsAt != "" {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "触发时间：" + alert.StartsAt}})
+			}
+			if alert.GeneratorURL != "" {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Source: " + alert.GeneratorURL}})
+			}
+			if alert.SilenceURL != "" {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Silence: " + alert.SilenceURL}})
+			}
+			if alert.DashboardURL != "" {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Dashboard: " + alert.DashboardURL}})
+			}
+			if alert.PanelURL != "" {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "Panel: " + alert.PanelURL}})
+			}
+		} else {
+			if alert.StartsAt != "" {
+				rows = append(rows, []feishuEl{{Tag: "text", Text: "触发时间：" + alert.StartsAt}})
+			}
 		}
 	}
 
