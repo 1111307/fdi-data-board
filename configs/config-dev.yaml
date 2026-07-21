@@ -31,17 +31,20 @@ data:
     token_tpl: ${KEYCLOAK_URL:http://10.9.60.88:8080/}auth/realms/${KEYCLOAK_REALM:master}/protocol/openid-connect/token
   grpc_client:
     timeout: 5s
-    um_endpoint: ${UM_ENDPOINT:10.9.60.88:9000}
+    um_endpoint: ${UM_ENDPOINT:10.21.15.143:9000}
     any_endpoint: 127.0.0.1:9000
 
   doris:
     on: ${DORIS_ON:true}
     host: ${DORIS_HOST:10.18.77.243}
     port: ${DORIS_PORT:9030}
+    # username: ${DORIS_USERNAME:fdi_dev}
+    # password: ${DORIS_PASSWORD:fdiDev@20260313}
+    # database: ${DORIS_DATABASE:fdi_dev}
+    # query_timeout: 120s
     username: ${DORIS_USERNAME:dataInfra_read}
     password: ${DORIS_PASSWORD:dataInfra_read@@20260709}
     database: ${DORIS_DATABASE:fdi}
-    query_timeout: 120s
     max_idl: 10
     max_open: 100
     conn_max_lift: 3600s
@@ -50,7 +53,7 @@ data:
     env: ${RUN_MODE:dev}
     domain: ${FUNC_SCOPE:fdi_cloud}
   etl:
-    on: ${ETL_ON:true}
+    on: ${ETL_ON:false}
     backfill_on: ${ETL_BACKFILL_ON:true}
     backfill_days: ${ETL_BACKFILL_DAYS:180}
     refresh_days: ${ETL_REFRESH_DAYS:7}
