@@ -34,25 +34,17 @@ func reconcilePct(a, b int64) float64 {
 	return math.Round(float64(a)/float64(b)*10000) / 10000
 }
 
-// eventLandSelect L2+L3 四段 JOIN 里 matched/convert_failed/landing_failed/missing 的公共表达式。
-// matched 必须用 c.status=1 而不是 COUNT(c.uuid)，否则会把 convert_failed/landing_failed
-// （consume 有行但 status=2）误算成 matched。
+// eventLandSelect 是 L3 落库层 matched/convert_failed/landing_failed/missing 的公共表达式。
+// 合表后 decode_* 与 consume_* 列在同一行，不再需要 JOIN：同一 (dt,md5,uuid,module_name)
+// 的两侧由 AGGREGATE KEY + REPLACE_IF_NOT_NULL 自动合并到一行，直接在行内判断即可。
+// matched 必须用 consume_status=1 而不是 consume_status IS NOT NULL，否则会把
+// convert_failed/landing_failed（consume_status=2）误算成 matched。
+// 四项都以 decode_send_status=1 为前提：只有上游发送成功的 event 才会真正到达下游落库。
 const eventLandSelect = `
-	SUM(CASE WHEN d.send_status=1 AND c.status=1 THEN 1 ELSE 0 END) AS matched,
-	SUM(CASE WHEN d.send_status=1 AND c.status=2 AND c.err_detail LIKE '3:%' THEN 1 ELSE 0 END) AS convert_failed,
-	SUM(CASE WHEN d.send_status=1 AND c.status=2 AND c.err_detail LIKE '6:%' THEN 1 ELSE 0 END) AS landing_failed,
-	SUM(CASE WHEN d.send_status=1 AND c.uuid IS NULL THEN 1 ELSE 0 END) AS missing`
-
-const eventLandJoin = `
-	FROM fis_decode_event d
-	LEFT JOIN fis_consume_record c
-		ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name AND c.dt = ?`
-
-// eventLandJoinRange 同 eventLandJoin，用于按日期范围（而非单日）过滤的查询（如 GetTrend）。
-const eventLandJoinRange = `
-	FROM fis_decode_event d
-	LEFT JOIN fis_consume_record c
-		ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name AND c.dt BETWEEN ? AND ?`
+		SUM(CASE WHEN decode_send_status=1 AND consume_status=1 THEN 1 ELSE 0 END) AS matched,
+		SUM(CASE WHEN decode_send_status=1 AND consume_status=2 AND consume_err_detail LIKE '3:%' THEN 1 ELSE 0 END) AS convert_failed,
+		SUM(CASE WHEN decode_send_status=1 AND consume_status=2 AND consume_err_detail LIKE '6:%' THEN 1 ELSE 0 END) AS landing_failed,
+		SUM(CASE WHEN decode_send_status=1 AND consume_status IS NULL THEN 1 ELSE 0 END) AS missing`
 
 type reconcileBagRow struct {
 	Total         int64 `gorm:"column:total"`
@@ -79,25 +71,27 @@ func (r *reconcileRepo) GetOverview(ctx context.Context, date string) (*biz.Reco
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 
+	// L1 bag 层：uuid='' 的哨兵行，record_* 列由 decode 侧写入。
 	bagSql := `SELECT
-		COUNT(*) AS total,
-		SUM(CASE WHEN record_status=1 THEN 1 ELSE 0 END) AS decode_success,
-		SUM(CASE WHEN record_status=2 THEN 1 ELSE 0 END) AS decode_failed,
-		SUM(CASE WHEN record_status=3 THEN 1 ELSE 0 END) AS decode_partial
-	FROM fis_decode_event
-	WHERE dt = ? AND uuid = ''`
+			COUNT(*) AS total,
+			SUM(CASE WHEN record_status=1 THEN 1 ELSE 0 END) AS decode_success,
+			SUM(CASE WHEN record_status=2 THEN 1 ELSE 0 END) AS decode_failed,
+			SUM(CASE WHEN record_status=3 THEN 1 ELSE 0 END) AS decode_partial
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid = ''`
 
+	// L2+L3：event 行（uuid<>''），decode_send_status/expected 与 consume_* 落库结果同行统计。
 	eventSql := `SELECT
-		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS expected,
-		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed,
-		SUM(CASE WHEN d.send_status=3 THEN 1 ELSE 0 END) AS parse_failed,` + eventLandSelect + eventLandJoin + `
-	WHERE d.dt = ?`
+			SUM(CASE WHEN decode_send_status=1 THEN 1 ELSE 0 END) AS expected,
+			SUM(CASE WHEN decode_send_status=2 THEN 1 ELSE 0 END) AS send_failed,
+			SUM(CASE WHEN decode_send_status=3 THEN 1 ELSE 0 END) AS parse_failed,` + eventLandSelect + `
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> ''`
 
+	// extra：consume 侧写了行（consume_status 非空）但 decode 侧没有对应记录（decode_send_status 为空）。
 	extraConsumeSql := `SELECT COUNT(*) AS extra_consume
-	FROM fis_consume_record c
-	LEFT JOIN fis_decode_event d
-		ON c.dt = d.dt AND c.md5 = d.md5 AND c.uuid = d.uuid AND c.module_name = d.module_name AND d.dt = ?
-	WHERE c.dt = ? AND d.uuid IS NULL`
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> '' AND consume_status IS NOT NULL AND decode_send_status IS NULL`
 
 	var (
 		bagRow   reconcileBagRow
@@ -113,11 +107,11 @@ func (r *reconcileRepo) GetOverview(ctx context.Context, date string) (*biz.Reco
 	}()
 	go func() {
 		defer wg.Done()
-		errs[1] = db.Raw(eventSql, date, date).Scan(&eventRow).Error
+		errs[1] = db.Raw(eventSql, date).Scan(&eventRow).Error
 	}()
 	go func() {
 		defer wg.Done()
-		errs[2] = db.Raw(extraConsumeSql, date, date).Scan(&extraRow).Error
+		errs[2] = db.Raw(extraConsumeSql, date).Scan(&extraRow).Error
 	}()
 	wg.Wait()
 	for _, err := range errs {
@@ -165,14 +159,15 @@ func (r *reconcileRepo) GetTrend(ctx context.Context, startDt, endDt string) (*b
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 
-	sql := `SELECT d.dt,
-		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS expected,` + eventLandSelect + eventLandJoinRange + `
-	WHERE d.dt BETWEEN ? AND ?
-	GROUP BY d.dt
-	ORDER BY d.dt`
+	sql := `SELECT dt,
+		SUM(CASE WHEN decode_send_status=1 THEN 1 ELSE 0 END) AS expected,` + eventLandSelect + `
+		FROM fis_reconcile_record
+		WHERE dt BETWEEN ? AND ? AND uuid <> ''
+		GROUP BY dt
+		ORDER BY dt`
 
 	var rows []*reconcileTrendRow
-	if err := db.Raw(sql, startDt, endDt, startDt, endDt).Scan(&rows).Error; err != nil {
+	if err := db.Raw(sql, startDt, endDt).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -206,23 +201,25 @@ func (r *reconcileRepo) GetModule(ctx context.Context, date, project string) ([]
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 
-	conds := []string{"d.dt = ?", "d.uuid <> ''"}
+	conds := []string{"dt = ?", "uuid <> ''"}
 	args := []interface{}{date}
 	if project != "" {
-		conds = append(conds, "d.project = ?")
+		// event 行的 project 来自 decode 侧（与 decode_send_status 同源），用 decode_project。
+		conds = append(conds, "decode_project = ?")
 		args = append(args, project)
 	}
 
-	sql := `SELECT d.module_name,
-		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS expected,` + eventLandSelect + `,
-		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed,
-		SUM(CASE WHEN d.send_status=3 THEN 1 ELSE 0 END) AS parse_failed` + eventLandJoin + `
-	WHERE ` + strings.Join(conds, " AND ") + `
-	GROUP BY d.module_name
-	ORDER BY missing DESC`
+	sql := `SELECT module_name,
+		SUM(CASE WHEN decode_send_status=1 THEN 1 ELSE 0 END) AS expected,` + eventLandSelect + `,
+		SUM(CASE WHEN decode_send_status=2 THEN 1 ELSE 0 END) AS send_failed,
+		SUM(CASE WHEN decode_send_status=3 THEN 1 ELSE 0 END) AS parse_failed
+		FROM fis_reconcile_record
+		WHERE ` + strings.Join(conds, " AND ") + `
+		GROUP BY module_name
+		ORDER BY missing DESC`
 
 	var rows []*reconcileModuleRow
-	if err := db.Raw(sql, append([]interface{}{date}, args...)...).Scan(&rows).Error; err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -261,15 +258,16 @@ func (r *reconcileRepo) GetProject(ctx context.Context, date, orderBy string, li
 		orderCol = "expected"
 	}
 
-	sql := `SELECT d.project,
-		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS expected,` + eventLandSelect + eventLandJoin + `
-	WHERE d.dt = ? AND d.uuid <> ''
-	GROUP BY d.project
-	ORDER BY ` + orderCol + ` DESC
-	LIMIT ?`
+	sql := `SELECT decode_project AS project,
+		SUM(CASE WHEN decode_send_status=1 THEN 1 ELSE 0 END) AS expected,` + eventLandSelect + `
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> ''
+		GROUP BY decode_project
+		ORDER BY ` + orderCol + ` DESC
+		LIMIT ?`
 
 	var rows []*reconcileProjectRow
-	if err := db.Raw(sql, date, date, limit).Scan(&rows).Error; err != nil {
+	if err := db.Raw(sql, date, limit).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -299,10 +297,10 @@ func (r *reconcileRepo) GetDecodeStatus(ctx context.Context, date string) ([]*bi
 	defer cancel()
 
 	sql := `SELECT record_status AS status, record_stage AS stage, COUNT(*) AS cnt
-	FROM fis_decode_event
-	WHERE dt = ? AND uuid = ''
-	GROUP BY record_status, record_stage
-	ORDER BY record_status, record_stage`
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid = ''
+		GROUP BY record_status, record_stage
+		ORDER BY record_status, record_stage`
 
 	var rows []*reconcileDecodeStatusRow
 	if err := db.Raw(sql, date).Scan(&rows).Error; err != nil {
@@ -341,10 +339,10 @@ func (r *reconcileRepo) ListDiffMd5(ctx context.Context, date, diffType string, 
 	switch diffType {
 	case "decode_failed":
 		sql := `SELECT md5, record_status AS status, record_stage AS stage, record_error_msg AS error_msg, record_parsed_line_count AS parsed_line_count
-		FROM fis_decode_event
-		WHERE dt = ? AND record_status IN (2, 3)
-		ORDER BY record_updated_at DESC
-		LIMIT ?`
+			FROM fis_reconcile_record
+			WHERE dt = ? AND uuid = '' AND record_status IN (2, 3)
+			ORDER BY record_updated_at DESC
+			LIMIT ?`
 		var rows []*reconcileDecodeFailedMd5Row
 		if err := db.Raw(sql, date, limit).Scan(&rows).Error; err != nil {
 			return nil, err
@@ -366,14 +364,14 @@ func (r *reconcileRepo) ListDiffMd5(ctx context.Context, date, diffType string, 
 		if diffType == "landing_failed" {
 			prefix = "6:%"
 		}
-		sql := `SELECT c.md5,
-			ANY_VALUE(c.module_name) AS module_name,
+		sql := `SELECT md5,
+			ANY_VALUE(module_name) AS module_name,
 			COUNT(*) AS count
-		FROM fis_consume_record c
-		WHERE c.dt = ? AND c.status = 2 AND c.err_detail LIKE ?
-		GROUP BY c.md5
-		ORDER BY count DESC
-		LIMIT ?`
+			FROM fis_reconcile_record
+			WHERE dt = ? AND uuid <> '' AND consume_status = 2 AND consume_err_detail LIKE ?
+			GROUP BY md5
+			ORDER BY count DESC
+			LIMIT ?`
 		var rows []*reconcileMd5CountRow
 		if err := db.Raw(sql, date, prefix, limit).Scan(&rows).Error; err != nil {
 			return nil, err
@@ -389,19 +387,19 @@ func (r *reconcileRepo) ListDiffMd5(ctx context.Context, date, diffType string, 
 		return list, nil
 
 	default: // "missing"
-		sql := `SELECT d.md5,
-			ANY_VALUE(d.module_name) AS module_name,
-			SUM(CASE WHEN d.send_status=1 AND c.uuid IS NULL THEN 1 ELSE 0 END) AS count
-		FROM fis_decode_event d
-		LEFT JOIN fis_consume_record c
-			ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name AND c.dt = ?
-		WHERE d.dt = ?
-		GROUP BY d.md5
-		HAVING count > 0
-		ORDER BY count DESC
-		LIMIT ?`
+		// decode 发送成功（decode_send_status=1）但 consume 侧还没写到这行（consume_status IS NULL）。
+		// 每行即一条 missing，COUNT(*) 直接是 missing 条数。
+		sql := `SELECT md5,
+			ANY_VALUE(module_name) AS module_name,
+			COUNT(*) AS count
+			FROM fis_reconcile_record
+			WHERE dt = ? AND uuid <> '' AND decode_send_status = 1 AND consume_status IS NULL
+			GROUP BY md5
+			HAVING count > 0
+			ORDER BY count DESC
+			LIMIT ?`
 		var rows []*reconcileMd5CountRow
-		if err := db.Raw(sql, date, date, limit).Scan(&rows).Error; err != nil {
+		if err := db.Raw(sql, date, limit).Scan(&rows).Error; err != nil {
 			return nil, err
 		}
 		list := make([]*biz.ReconcileMd5Item, 0, len(rows))
@@ -430,18 +428,17 @@ func (r *reconcileRepo) GetMd5Detail(ctx context.Context, date, md5 string) ([]*
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 
+	// 同一 event 行里 decode_* 与 consume_* 并存：consume_status 非空即代表下游已消费到。
 	sql := `SELECT
-		d.uuid, d.module_name, d.send_status, d.err_detail,
-		CASE WHEN c.uuid IS NOT NULL THEN 1 ELSE 0 END AS consumed,
-		c.status AS consume_status, c.err_detail AS consume_err
-	FROM fis_decode_event d
-	LEFT JOIN fis_consume_record c
-		ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name AND c.dt = ?
-	WHERE d.dt = ? AND d.md5 = ? AND d.uuid <> ''
-	ORDER BY d.module_name, d.uuid`
+			uuid, module_name, decode_send_status AS send_status, decode_err_detail AS err_detail,
+			CASE WHEN consume_status IS NOT NULL THEN 1 ELSE 0 END AS consumed,
+			consume_status, consume_err_detail AS consume_err
+		FROM fis_reconcile_record
+		WHERE dt = ? AND md5 = ? AND uuid <> ''
+		ORDER BY module_name, uuid`
 
 	var rows []*reconcileMd5DetailRow
-	if err := db.Raw(sql, date, date, md5).Scan(&rows).Error; err != nil {
+	if err := db.Raw(sql, date, md5).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -521,101 +518,94 @@ func (r *reconcileRepo) ListEventList(ctx context.Context, date, moduleName, pro
 	}
 }
 
-// listMissingEvents: detail 有、consume 没有
+// listMissingEvents: decode 发送成功但 consume 侧尚未写入（consume_status IS NULL）。
 func (r *reconcileRepo) listMissingEvents(db *gorm.DB, date, moduleName, project string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
-	conds := []string{"d.dt = ?", "d.send_status = 1", "c.uuid IS NULL"}
+	conds := []string{"dt = ?", "uuid <> ''", "decode_send_status = 1", "consume_status IS NULL"}
 	args := []interface{}{date}
 	if moduleName != "" {
-		conds = append(conds, "d.module_name = ?")
+		conds = append(conds, "module_name = ?")
 		args = append(args, moduleName)
 	}
 	if project != "" {
-		conds = append(conds, "d.project = ?")
+		conds = append(conds, "decode_project = ?")
 		args = append(args, project)
 	}
 	where := strings.Join(conds, " AND ")
 
-	countSql := `SELECT COUNT(*) AS cnt
-	FROM fis_decode_event d
-	LEFT JOIN fis_consume_record c ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name AND c.dt = ?
-	WHERE ` + where
+	countSql := `SELECT COUNT(*) AS cnt FROM fis_reconcile_record WHERE ` + where
 	var countRow reconcileCountRow
-	if err := db.Raw(countSql, append([]interface{}{date}, args...)...).Scan(&countRow).Error; err != nil {
+	if err := db.Raw(countSql, args...).Scan(&countRow).Error; err != nil {
 		return nil, 0, err
 	}
 	if countRow.Cnt == 0 {
 		return []*biz.ReconcileEventItem{}, 0, nil
 	}
 
-	listSql := `SELECT d.md5, d.uuid, d.module_name, d.project, d.send_status AS status, d.err_detail
-	FROM fis_decode_event d
-	LEFT JOIN fis_consume_record c ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name AND c.dt = ?
-	WHERE ` + where + `
-	ORDER BY d.md5, d.uuid
-	LIMIT ? OFFSET ?`
+	listSql := `SELECT md5, uuid, module_name, decode_project AS project, decode_send_status AS status, decode_err_detail AS err_detail
+		FROM fis_reconcile_record
+		WHERE ` + where + `
+		ORDER BY md5, uuid
+		LIMIT ? OFFSET ?`
 	listArgs := append(append([]interface{}{}, args...), limit, offset)
 	var rows []*reconcileEventRow
-	if err := db.Raw(listSql, append([]interface{}{date}, listArgs...)...).Scan(&rows).Error; err != nil {
+	if err := db.Raw(listSql, listArgs...).Scan(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	return toBizReconcileEventItems(rows), countRow.Cnt, nil
 }
 
-// listExtraEvents: consume 有、detail 没有
+// listExtraEvents: consume 侧有记录但 decode 侧无对应行（consume_status 非空、decode_send_status 为空）。
+// extra 行的 project 取 consume_project（decode 列此时为空）。
 func (r *reconcileRepo) listExtraEvents(db *gorm.DB, date, moduleName, project string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
-	conds := []string{"c.dt = ?", "d.uuid IS NULL"}
+	conds := []string{"dt = ?", "uuid <> ''", "consume_status IS NOT NULL", "decode_send_status IS NULL"}
 	args := []interface{}{date}
 	if moduleName != "" {
-		conds = append(conds, "c.module_name = ?")
+		conds = append(conds, "module_name = ?")
 		args = append(args, moduleName)
 	}
 	if project != "" {
-		conds = append(conds, "c.project = ?")
+		conds = append(conds, "consume_project = ?")
 		args = append(args, project)
 	}
 	where := strings.Join(conds, " AND ")
 
-	countSql := `SELECT COUNT(*) AS cnt
-	FROM fis_consume_record c
-	LEFT JOIN fis_decode_event d ON c.dt = d.dt AND c.md5 = d.md5 AND c.uuid = d.uuid AND c.module_name = d.module_name AND d.dt = ?
-	WHERE ` + where
+	countSql := `SELECT COUNT(*) AS cnt FROM fis_reconcile_record WHERE ` + where
 	var countRow reconcileCountRow
-	if err := db.Raw(countSql, append([]interface{}{date}, args...)...).Scan(&countRow).Error; err != nil {
+	if err := db.Raw(countSql, args...).Scan(&countRow).Error; err != nil {
 		return nil, 0, err
 	}
 	if countRow.Cnt == 0 {
 		return []*biz.ReconcileEventItem{}, 0, nil
 	}
 
-	listSql := `SELECT c.md5, c.uuid, c.module_name, c.project, c.status, c.err_detail
-	FROM fis_consume_record c
-	LEFT JOIN fis_decode_event d ON c.dt = d.dt AND c.md5 = d.md5 AND c.uuid = d.uuid AND c.module_name = d.module_name AND d.dt = ?
-	WHERE ` + where + `
-	ORDER BY c.md5, c.uuid
-	LIMIT ? OFFSET ?`
+	listSql := `SELECT md5, uuid, module_name, consume_project AS project, consume_status AS status, consume_err_detail AS err_detail
+		FROM fis_reconcile_record
+		WHERE ` + where + `
+		ORDER BY md5, uuid
+		LIMIT ? OFFSET ?`
 	listArgs := append(append([]interface{}{}, args...), limit, offset)
 	var rows []*reconcileEventRow
-	if err := db.Raw(listSql, append([]interface{}{date}, listArgs...)...).Scan(&rows).Error; err != nil {
+	if err := db.Raw(listSql, listArgs...).Scan(&rows).Error; err != nil {
 		return nil, 0, err
 	}
 	return toBizReconcileEventItems(rows), countRow.Cnt, nil
 }
 
-// listSendFailedEvents: 上游发送下游失败（fis_decode_event.send_status=2）
+// listSendFailedEvents: 上游发送下游失败（decode_send_status=2）。
 func (r *reconcileRepo) listSendFailedEvents(db *gorm.DB, date, moduleName, project string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
-	conds := []string{"dt = ?", "send_status = 2"}
+	conds := []string{"dt = ?", "uuid <> ''", "decode_send_status = 2"}
 	args := []interface{}{date}
 	if moduleName != "" {
 		conds = append(conds, "module_name = ?")
 		args = append(args, moduleName)
 	}
 	if project != "" {
-		conds = append(conds, "project = ?")
+		conds = append(conds, "decode_project = ?")
 		args = append(args, project)
 	}
 	where := strings.Join(conds, " AND ")
 
-	countSql := `SELECT COUNT(*) AS cnt FROM fis_decode_event WHERE ` + where
+	countSql := `SELECT COUNT(*) AS cnt FROM fis_reconcile_record WHERE ` + where
 	var countRow reconcileCountRow
 	if err := db.Raw(countSql, args...).Scan(&countRow).Error; err != nil {
 		return nil, 0, err
@@ -624,11 +614,11 @@ func (r *reconcileRepo) listSendFailedEvents(db *gorm.DB, date, moduleName, proj
 		return []*biz.ReconcileEventItem{}, 0, nil
 	}
 
-	listSql := `SELECT md5, uuid, module_name, project, send_status AS status, err_detail
-	FROM fis_decode_event
-	WHERE ` + where + `
-	ORDER BY md5, uuid
-	LIMIT ? OFFSET ?`
+	listSql := `SELECT md5, uuid, module_name, decode_project AS project, decode_send_status AS status, decode_err_detail AS err_detail
+		FROM fis_reconcile_record
+		WHERE ` + where + `
+		ORDER BY md5, uuid
+		LIMIT ? OFFSET ?`
 	listArgs := append(append([]interface{}{}, args...), limit, offset)
 	var rows []*reconcileEventRow
 	if err := db.Raw(listSql, listArgs...).Scan(&rows).Error; err != nil {
@@ -637,21 +627,21 @@ func (r *reconcileRepo) listSendFailedEvents(db *gorm.DB, date, moduleName, proj
 	return toBizReconcileEventItems(rows), countRow.Cnt, nil
 }
 
-// listParseFailedEvents: 未解析出可对账event（fis_decode_event.send_status=3）
+// listParseFailedEvents: 未解析出可对账 event（decode_send_status=3）。
 func (r *reconcileRepo) listParseFailedEvents(db *gorm.DB, date, moduleName, project string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
-	conds := []string{"dt = ?", "send_status = 3"}
+	conds := []string{"dt = ?", "uuid <> ''", "decode_send_status = 3"}
 	args := []interface{}{date}
 	if moduleName != "" {
 		conds = append(conds, "module_name = ?")
 		args = append(args, moduleName)
 	}
 	if project != "" {
-		conds = append(conds, "project = ?")
+		conds = append(conds, "decode_project = ?")
 		args = append(args, project)
 	}
 	where := strings.Join(conds, " AND ")
 
-	countSql := `SELECT COUNT(*) AS cnt FROM fis_decode_event WHERE ` + where
+	countSql := `SELECT COUNT(*) AS cnt FROM fis_reconcile_record WHERE ` + where
 	var countRow reconcileCountRow
 	if err := db.Raw(countSql, args...).Scan(&countRow).Error; err != nil {
 		return nil, 0, err
@@ -660,11 +650,11 @@ func (r *reconcileRepo) listParseFailedEvents(db *gorm.DB, date, moduleName, pro
 		return []*biz.ReconcileEventItem{}, 0, nil
 	}
 
-	listSql := `SELECT md5, uuid, module_name, project, send_status AS status, err_detail
-	FROM fis_decode_event
-	WHERE ` + where + `
-	ORDER BY md5, uuid
-	LIMIT ? OFFSET ?`
+	listSql := `SELECT md5, uuid, module_name, decode_project AS project, decode_send_status AS status, decode_err_detail AS err_detail
+		FROM fis_reconcile_record
+		WHERE ` + where + `
+		ORDER BY md5, uuid
+		LIMIT ? OFFSET ?`
 	listArgs := append(append([]interface{}{}, args...), limit, offset)
 	var rows []*reconcileEventRow
 	if err := db.Raw(listSql, listArgs...).Scan(&rows).Error; err != nil {
@@ -673,21 +663,21 @@ func (r *reconcileRepo) listParseFailedEvents(db *gorm.DB, date, moduleName, pro
 	return toBizReconcileEventItems(rows), countRow.Cnt, nil
 }
 
-// listConsumeFailedEvents: fis_consume_record.status=2 按 err_detail 前缀过滤（转换失败/落库失败共用）
+// listConsumeFailedEvents: consume_status=2 按 consume_err_detail 前缀过滤（转换失败/落库失败共用）。
 func (r *reconcileRepo) listConsumeFailedEvents(db *gorm.DB, date, moduleName, project, errDetailPrefix string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
-	conds := []string{"dt = ?", "status = 2", "err_detail LIKE ?"}
+	conds := []string{"dt = ?", "uuid <> ''", "consume_status = 2", "consume_err_detail LIKE ?"}
 	args := []interface{}{date, errDetailPrefix}
 	if moduleName != "" {
 		conds = append(conds, "module_name = ?")
 		args = append(args, moduleName)
 	}
 	if project != "" {
-		conds = append(conds, "project = ?")
+		conds = append(conds, "consume_project = ?")
 		args = append(args, project)
 	}
 	where := strings.Join(conds, " AND ")
 
-	countSql := `SELECT COUNT(*) AS cnt FROM fis_consume_record WHERE ` + where
+	countSql := `SELECT COUNT(*) AS cnt FROM fis_reconcile_record WHERE ` + where
 	var countRow reconcileCountRow
 	if err := db.Raw(countSql, args...).Scan(&countRow).Error; err != nil {
 		return nil, 0, err
@@ -696,11 +686,11 @@ func (r *reconcileRepo) listConsumeFailedEvents(db *gorm.DB, date, moduleName, p
 		return []*biz.ReconcileEventItem{}, 0, nil
 	}
 
-	listSql := `SELECT md5, uuid, module_name, project, status, err_detail
-	FROM fis_consume_record
-	WHERE ` + where + `
-	ORDER BY md5, uuid
-	LIMIT ? OFFSET ?`
+	listSql := `SELECT md5, uuid, module_name, consume_project AS project, consume_status AS status, consume_err_detail AS err_detail
+		FROM fis_reconcile_record
+		WHERE ` + where + `
+		ORDER BY md5, uuid
+		LIMIT ? OFFSET ?`
 	listArgs := append(append([]interface{}{}, args...), limit, offset)
 	var rows []*reconcileEventRow
 	if err := db.Raw(listSql, listArgs...).Scan(&rows).Error; err != nil {
@@ -717,24 +707,21 @@ func (r *reconcileRepo) listLandingFailedEvents(db *gorm.DB, date, moduleName, p
 	return r.listConsumeFailedEvents(db, date, moduleName, project, "6:%", limit, offset)
 }
 
-// listMismatchedEvents: 解码明细与消费记录都存在，但 project 不一致（module_name 已经是 JOIN 等值条件）
+// listMismatchedEvents: decode 与 consume 同行但 project 不一致（module_name 是 AGGREGATE KEY 的一部分，同行必然相等，无需比对）。
 func (r *reconcileRepo) listMismatchedEvents(db *gorm.DB, date, moduleName, project string, limit, offset int) ([]*biz.ReconcileEventItem, int64, error) {
-	conds := []string{"d.dt = ?", "c.dt = ?", "d.project <> c.project"}
-	args := []interface{}{date, date}
+	conds := []string{"dt = ?", "uuid <> ''", "decode_project <> consume_project"}
+	args := []interface{}{date}
 	if moduleName != "" {
-		conds = append(conds, "d.module_name = ?")
+		conds = append(conds, "module_name = ?")
 		args = append(args, moduleName)
 	}
 	if project != "" {
-		conds = append(conds, "d.project = ?")
+		conds = append(conds, "decode_project = ?")
 		args = append(args, project)
 	}
 	where := strings.Join(conds, " AND ")
 
-	countSql := `SELECT COUNT(*) AS cnt
-	FROM fis_decode_event d
-	JOIN fis_consume_record c ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name
-	WHERE ` + where
+	countSql := `SELECT COUNT(*) AS cnt FROM fis_reconcile_record WHERE ` + where
 	var countRow reconcileCountRow
 	if err := db.Raw(countSql, args...).Scan(&countRow).Error; err != nil {
 		return nil, 0, err
@@ -743,13 +730,12 @@ func (r *reconcileRepo) listMismatchedEvents(db *gorm.DB, date, moduleName, proj
 		return []*biz.ReconcileEventItem{}, 0, nil
 	}
 
-	listSql := `SELECT d.md5, d.uuid, d.module_name AS detail_module, c.module_name AS consume_module,
-		d.project AS detail_project, c.project AS consume_project
-	FROM fis_decode_event d
-	JOIN fis_consume_record c ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name
-	WHERE ` + where + `
-	ORDER BY d.md5, d.uuid
-	LIMIT ? OFFSET ?`
+	listSql := `SELECT md5, uuid, module_name AS detail_module, module_name AS consume_module,
+			decode_project AS detail_project, consume_project AS consume_project
+		FROM fis_reconcile_record
+		WHERE ` + where + `
+		ORDER BY md5, uuid
+		LIMIT ? OFFSET ?`
 	listArgs := append(append([]interface{}{}, args...), limit, offset)
 	var rows []*reconcileEventRow
 	if err := db.Raw(listSql, listArgs...).Scan(&rows).Error; err != nil {
@@ -769,18 +755,20 @@ func (r *reconcileRepo) GetRecordConsistency(ctx context.Context, date string, l
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 
-	sql := `SELECT r.md5, r.record_parsed_line_count AS parsed_line_count, COUNT(d.send_status) AS detail_count,
-		r.record_parsed_line_count - COUNT(d.send_status) AS diff
-	FROM fis_decode_event r
-	LEFT JOIN fis_decode_event d ON r.dt = d.dt AND r.md5 = d.md5 AND d.dt = ?
-	WHERE r.dt = ? AND r.uuid = '' AND r.record_status IN (1, 3)
-	GROUP BY r.md5, r.record_parsed_line_count
-	HAVING diff <> 0
-	ORDER BY ABS(diff) DESC
-	LIMIT ?`
+	// bag 哨兵行（r, uuid=''）与同 dt+md5 的 event 行（d, uuid<>''）仍是不同行，
+	// 需要同表自 JOIN 关联；COUNT(d.decode_send_status) 只计 event 行（bag 行该列为 NULL 不计）。
+	sql := `SELECT r.md5, r.record_parsed_line_count AS parsed_line_count, COUNT(d.decode_send_status) AS detail_count,
+			r.record_parsed_line_count - COUNT(d.decode_send_status) AS diff
+		FROM fis_reconcile_record r
+		LEFT JOIN fis_reconcile_record d ON r.dt = d.dt AND r.md5 = d.md5
+		WHERE r.dt = ? AND r.uuid = '' AND r.record_status IN (1, 3)
+		GROUP BY r.md5, r.record_parsed_line_count
+		HAVING diff <> 0
+		ORDER BY ABS(diff) DESC
+		LIMIT ?`
 
 	var rows []*reconcileRecordConsistencyRow
-	if err := db.Raw(sql, date, date, limit).Scan(&rows).Error; err != nil {
+	if err := db.Raw(sql, date, limit).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*biz.ReconcileRecordConsistencyItem, 0, len(rows))
@@ -806,20 +794,19 @@ func (r *reconcileRepo) GetUuidSource(ctx context.Context, date string) ([]*biz.
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 
-	// matched 用 c.status=1 而不是 COUNT(c.uuid)，理由同 eventLandSelect：不能把
-	// convert_failed/landing_failed 的 consume 行误算成 matched。
+	// matched 用 consume_status=1 而不是 consume_status IS NOT NULL，理由同 eventLandSelect：
+	// 不能把 convert_failed/landing_failed（consume_status=2）误算成 matched。
 	sql := `SELECT
-		CASE WHEN d.uuid LIKE 'gen:%' THEN 'gen_fallback' ELSE 'real' END AS uuid_source,
-		COUNT(*) AS expected,
-		SUM(CASE WHEN c.status=1 THEN 1 ELSE 0 END) AS matched,
-		SUM(CASE WHEN c.uuid IS NULL THEN 1 ELSE 0 END) AS missing
-	FROM fis_decode_event d
-	LEFT JOIN fis_consume_record c ON d.dt = c.dt AND d.md5 = c.md5 AND d.uuid = c.uuid AND d.module_name = c.module_name AND c.dt = ?
-	WHERE d.dt = ? AND d.send_status = 1
-	GROUP BY uuid_source`
+			CASE WHEN uuid LIKE 'gen:%' THEN 'gen_fallback' ELSE 'real' END AS uuid_source,
+			COUNT(*) AS expected,
+			SUM(CASE WHEN consume_status=1 THEN 1 ELSE 0 END) AS matched,
+			SUM(CASE WHEN consume_status IS NULL THEN 1 ELSE 0 END) AS missing
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> '' AND decode_send_status = 1
+		GROUP BY uuid_source`
 
 	var rows []*reconcileUuidSourceRow
-	if err := db.Raw(sql, date, date).Scan(&rows).Error; err != nil {
+	if err := db.Raw(sql, date).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 	list := make([]*biz.ReconcileUuidSourceItem, 0, len(rows))
@@ -856,38 +843,38 @@ func (r *reconcileRepo) GetFailureSummary(ctx context.Context, date string) (*bi
 	defer cancel()
 
 	decodeFailedSql := `SELECT record_stage AS stage, COUNT(*) AS count, ANY_VALUE(record_error_msg) AS sample_error_msg
-	FROM fis_decode_event
-	WHERE dt = ? AND uuid = '' AND record_status IN (2, 3)
-	GROUP BY record_stage
-	ORDER BY count DESC`
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid = '' AND record_status IN (2, 3)
+		GROUP BY record_stage
+		ORDER BY count DESC`
 
-	sendFailedSql := `SELECT module_name, err_detail, COUNT(*) AS count
-	FROM fis_decode_event
-	WHERE dt = ? AND send_status = 2
-	GROUP BY module_name, err_detail
-	ORDER BY count DESC
-	LIMIT 50`
+	sendFailedSql := `SELECT module_name, decode_err_detail AS err_detail, COUNT(*) AS count
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> '' AND decode_send_status = 2
+		GROUP BY module_name, decode_err_detail
+		ORDER BY count DESC
+		LIMIT 50`
 
-	parseFailedSql := `SELECT module_name, err_detail, COUNT(*) AS count
-	FROM fis_decode_event
-	WHERE dt = ? AND send_status = 3
-	GROUP BY module_name, err_detail
-	ORDER BY count DESC
-	LIMIT 50`
+	parseFailedSql := `SELECT module_name, decode_err_detail AS err_detail, COUNT(*) AS count
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> '' AND decode_send_status = 3
+		GROUP BY module_name, decode_err_detail
+		ORDER BY count DESC
+		LIMIT 50`
 
-	convertFailedSql := `SELECT module_name, err_detail, COUNT(*) AS count
-	FROM fis_consume_record
-	WHERE dt = ? AND status = 2 AND err_detail LIKE '3:%'
-	GROUP BY module_name, err_detail
-	ORDER BY count DESC
-	LIMIT 50`
+	convertFailedSql := `SELECT module_name, consume_err_detail AS err_detail, COUNT(*) AS count
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> '' AND consume_status = 2 AND consume_err_detail LIKE '3:%'
+		GROUP BY module_name, consume_err_detail
+		ORDER BY count DESC
+		LIMIT 50`
 
-	landingFailedSql := `SELECT module_name, err_detail, COUNT(*) AS count
-	FROM fis_consume_record
-	WHERE dt = ? AND status = 2 AND err_detail LIKE '6:%'
-	GROUP BY module_name, err_detail
-	ORDER BY count DESC
-	LIMIT 50`
+	landingFailedSql := `SELECT module_name, consume_err_detail AS err_detail, COUNT(*) AS count
+		FROM fis_reconcile_record
+		WHERE dt = ? AND uuid <> '' AND consume_status = 2 AND consume_err_detail LIKE '6:%'
+		GROUP BY module_name, consume_err_detail
+		ORDER BY count DESC
+		LIMIT 50`
 
 	var (
 		decodeFailedRows  []*reconcileDecodeFailedRow
@@ -996,7 +983,7 @@ type reconcilePipelineEventLandRow struct {
 	Missing       int64 `gorm:"column:missing"`
 }
 
-// reconcilePipelineBagConds 构造 fis_decode_event 中 bag 级哨兵行（uuid=''）的过滤条件
+// reconcilePipelineBagConds 构造 bag 级哨兵行（uuid=''）的过滤条件，project 用 record_project。
 func reconcilePipelineBagConds(date, project, md5 string) ([]string, []interface{}) {
 	conds := []string{"dt = ?", "uuid = ''"}
 	args := []interface{}{date}
@@ -1011,21 +998,21 @@ func reconcilePipelineBagConds(date, project, md5 string) ([]string, []interface
 	return conds, args
 }
 
-// reconcilePipelineEventConds 构造 fis_decode_event/fis_consume_record（event 级）的过滤条件，
-// prefix 用于区分是否要给列名加表别名（如 JOIN 查询里的 "d."）
-func reconcilePipelineEventConds(prefix, date, project, moduleName, md5 string) ([]string, []interface{}) {
-	conds := []string{prefix + "dt = ?"}
+// reconcilePipelineEventConds 构造 event 级行（uuid<>''）的过滤条件。
+// 合表后单表查询无需表别名前缀；project 用 decode_project（与 decode_send_status 同源）。
+func reconcilePipelineEventConds(date, project, moduleName, md5 string) ([]string, []interface{}) {
+	conds := []string{"dt = ?", "uuid <> ''"}
 	args := []interface{}{date}
 	if project != "" {
-		conds = append(conds, prefix+"project = ?")
+		conds = append(conds, "decode_project = ?")
 		args = append(args, project)
 	}
 	if moduleName != "" {
-		conds = append(conds, prefix+"module_name = ?")
+		conds = append(conds, "module_name = ?")
 		args = append(args, moduleName)
 	}
 	if md5 != "" {
-		conds = append(conds, prefix+"md5 = ?")
+		conds = append(conds, "md5 = ?")
 		args = append(args, md5)
 	}
 	return conds, args
@@ -1038,34 +1025,32 @@ func (r *reconcileRepo) GetPipelineTree(ctx context.Context, date, project, modu
 	bagConds, bagArgs := reconcilePipelineBagConds(date, project, md5)
 	bagWhere := strings.Join(bagConds, " AND ")
 
-	eventConds, eventArgs := reconcilePipelineEventConds("d.", date, project, moduleName, md5)
+	eventConds, eventArgs := reconcilePipelineEventConds(date, project, moduleName, md5)
 	eventWhere := strings.Join(eventConds, " AND ")
 
-	plainConds, plainArgs := reconcilePipelineEventConds("", date, project, moduleName, md5)
-	plainWhere := strings.Join(plainConds, " AND ")
-
 	bagSql := `SELECT
-		COUNT(*) AS total,
-		SUM(CASE WHEN record_status IN (1,3) THEN 1 ELSE 0 END) AS parse_success,
-		SUM(CASE WHEN record_status=1 THEN 1 ELSE 0 END) AS decode_success,
-		SUM(CASE WHEN record_status=3 THEN 1 ELSE 0 END) AS decode_partial,
-		SUM(CASE WHEN record_status=2 THEN 1 ELSE 0 END) AS decode_failed,
-		SUM(record_status_line_count) AS status_line_count,
-		SUM(record_skip_line_count) AS skip_line_count,
-		SUM(record_parsed_line_count) AS parsed_line_count
-	FROM fis_decode_event
-	WHERE ` + bagWhere
+			COUNT(*) AS total,
+			SUM(CASE WHEN record_status IN (1,3) THEN 1 ELSE 0 END) AS parse_success,
+			SUM(CASE WHEN record_status=1 THEN 1 ELSE 0 END) AS decode_success,
+			SUM(CASE WHEN record_status=3 THEN 1 ELSE 0 END) AS decode_partial,
+			SUM(CASE WHEN record_status=2 THEN 1 ELSE 0 END) AS decode_failed,
+			SUM(record_status_line_count) AS status_line_count,
+			SUM(record_skip_line_count) AS skip_line_count,
+			SUM(record_parsed_line_count) AS parsed_line_count
+		FROM fis_reconcile_record
+		WHERE ` + bagWhere
 
 	eventParseSql := `SELECT
-		SUM(CASE WHEN d.send_status IN (1,2) THEN 1 ELSE 0 END) AS parse_success,
-		SUM(CASE WHEN d.send_status=3 THEN 1 ELSE 0 END) AS parse_failed,
-		SUM(CASE WHEN d.send_status=1 THEN 1 ELSE 0 END) AS send_success,
-		SUM(CASE WHEN d.send_status=2 THEN 1 ELSE 0 END) AS send_failed
-	FROM fis_decode_event d
-	WHERE ` + eventWhere
+			SUM(CASE WHEN decode_send_status IN (1,2) THEN 1 ELSE 0 END) AS parse_success,
+			SUM(CASE WHEN decode_send_status=3 THEN 1 ELSE 0 END) AS parse_failed,
+			SUM(CASE WHEN decode_send_status=1 THEN 1 ELSE 0 END) AS send_success,
+			SUM(CASE WHEN decode_send_status=2 THEN 1 ELSE 0 END) AS send_failed
+		FROM fis_reconcile_record
+		WHERE ` + eventWhere
 
-	eventLandSql := `SELECT` + eventLandSelect + eventLandJoin + `
-	WHERE ` + eventWhere
+	eventLandSql := `SELECT` + eventLandSelect + `
+		FROM fis_reconcile_record
+		WHERE ` + eventWhere
 
 	var (
 		bagRow   reconcilePipelineBagRow
@@ -1085,7 +1070,7 @@ func (r *reconcileRepo) GetPipelineTree(ctx context.Context, date, project, modu
 	}()
 	go func() {
 		defer wg.Done()
-		errs[2] = db.Raw(eventLandSql, append([]interface{}{date}, eventArgs...)...).Scan(&landRow).Error
+		errs[2] = db.Raw(eventLandSql, eventArgs...).Scan(&landRow).Error
 	}()
 	wg.Wait()
 	for _, err := range errs {
@@ -1133,10 +1118,10 @@ func (r *reconcileRepo) GetPipelineTree(ctx context.Context, date, project, modu
 		go func() {
 			defer fwg.Done()
 			sql := `SELECT record_stage AS stage, COUNT(*) AS count, ANY_VALUE(record_error_msg) AS sample_error_msg
-			FROM fis_decode_event
-			WHERE ` + bagWhere + ` AND record_status = 2
-			GROUP BY record_stage
-			ORDER BY count DESC`
+				FROM fis_reconcile_record
+				WHERE ` + bagWhere + ` AND record_status = 2
+				GROUP BY record_stage
+				ORDER BY count DESC`
 			failureErrs[0] = db.Raw(sql, bagArgs...).Scan(&bagFailureRows).Error
 		}()
 	}
@@ -1144,52 +1129,52 @@ func (r *reconcileRepo) GetPipelineTree(ctx context.Context, date, project, modu
 		fwg.Add(1)
 		go func() {
 			defer fwg.Done()
-			sql := `SELECT module_name, err_detail, COUNT(*) AS count
-			FROM fis_decode_event
-			WHERE ` + plainWhere + ` AND send_status = 3
-			GROUP BY module_name, err_detail
-			ORDER BY count DESC
-			LIMIT 50`
-			failureErrs[1] = db.Raw(sql, plainArgs...).Scan(&parseFailedRows).Error
+			sql := `SELECT module_name, decode_err_detail AS err_detail, COUNT(*) AS count
+				FROM fis_reconcile_record
+				WHERE ` + eventWhere + ` AND decode_send_status = 3
+				GROUP BY module_name, decode_err_detail
+				ORDER BY count DESC
+				LIMIT 50`
+			failureErrs[1] = db.Raw(sql, eventArgs...).Scan(&parseFailedRows).Error
 		}()
 	}
 	if eventRow.SendFailed > 0 {
 		fwg.Add(1)
 		go func() {
 			defer fwg.Done()
-			sql := `SELECT module_name, err_detail, COUNT(*) AS count
-			FROM fis_decode_event
-			WHERE ` + plainWhere + ` AND send_status = 2
-			GROUP BY module_name, err_detail
-			ORDER BY count DESC
-			LIMIT 50`
-			failureErrs[2] = db.Raw(sql, plainArgs...).Scan(&sendFailedRows).Error
+			sql := `SELECT module_name, decode_err_detail AS err_detail, COUNT(*) AS count
+				FROM fis_reconcile_record
+				WHERE ` + eventWhere + ` AND decode_send_status = 2
+				GROUP BY module_name, decode_err_detail
+				ORDER BY count DESC
+				LIMIT 50`
+			failureErrs[2] = db.Raw(sql, eventArgs...).Scan(&sendFailedRows).Error
 		}()
 	}
 	if landRow.ConvertFailed > 0 {
 		fwg.Add(1)
 		go func() {
 			defer fwg.Done()
-			sql := `SELECT module_name, err_detail, COUNT(*) AS count
-			FROM fis_consume_record
-			WHERE ` + plainWhere + ` AND status = 2 AND err_detail LIKE '3:%'
-			GROUP BY module_name, err_detail
-			ORDER BY count DESC
-			LIMIT 50`
-			failureErrs[3] = db.Raw(sql, plainArgs...).Scan(&convertFailedRows).Error
+			sql := `SELECT module_name, consume_err_detail AS err_detail, COUNT(*) AS count
+				FROM fis_reconcile_record
+				WHERE ` + eventWhere + ` AND consume_status = 2 AND consume_err_detail LIKE '3:%'
+				GROUP BY module_name, consume_err_detail
+				ORDER BY count DESC
+				LIMIT 50`
+			failureErrs[3] = db.Raw(sql, eventArgs...).Scan(&convertFailedRows).Error
 		}()
 	}
 	if landRow.LandingFailed > 0 {
 		fwg.Add(1)
 		go func() {
 			defer fwg.Done()
-			sql := `SELECT module_name, err_detail, COUNT(*) AS count
-			FROM fis_consume_record
-			WHERE ` + plainWhere + ` AND status = 2 AND err_detail LIKE '6:%'
-			GROUP BY module_name, err_detail
-			ORDER BY count DESC
-			LIMIT 50`
-			failureErrs[4] = db.Raw(sql, plainArgs...).Scan(&landingFailedRows).Error
+			sql := `SELECT module_name, consume_err_detail AS err_detail, COUNT(*) AS count
+				FROM fis_reconcile_record
+				WHERE ` + eventWhere + ` AND consume_status = 2 AND consume_err_detail LIKE '6:%'
+				GROUP BY module_name, consume_err_detail
+				ORDER BY count DESC
+				LIMIT 50`
+			failureErrs[4] = db.Raw(sql, eventArgs...).Scan(&landingFailedRows).Error
 		}()
 	}
 	fwg.Wait()
