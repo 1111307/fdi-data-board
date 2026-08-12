@@ -66,7 +66,7 @@ SELECT
     END AS fcl_detail_tag,
     COUNT(*) AS cnt
 FROM fdi.dwd_cfdi_status_monitor_analysis
-WHERE dt = ? AND event_name != 'Forever_log'
+WHERE dt = ? AND event_name != 'forever_log'
 GROUP BY
     dt, event_name, filter_name, car_type, project_name,
     fff_sw_version, fff_status, fdr_status, fcl_status,
