@@ -3132,6 +3132,8 @@ components:
                     items:
                         type: string
                     description: 申请文档
+                changeDesc:
+                    type: string
             description: 创建算子请求
         api.stress_test_config.v1.CreateScriptResponse:
             type: object
@@ -3203,6 +3205,8 @@ components:
                     type: number
                     description: 最大负载
                     format: double
+                changeDesc:
+                    type: string
             description: 算子压测信息配置
         api.stress_test_config.v1.UpdateScriptRequest:
             type: object
@@ -3267,6 +3271,8 @@ components:
                     items:
                         type: string
                     description: 申请文档
+                changeDesc:
+                    type: string
             description: 更新算子基础信息请求
         api.stress_test_config.v1.UpdateScriptResponse:
             type: object
@@ -3355,6 +3361,8 @@ components:
                 uuid:
                     type: string
                 bagName:
+                    type: string
+                md5:
                     type: string
         data_catch.CatchTaskDetailData:
             type: object

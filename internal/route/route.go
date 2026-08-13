@@ -16,6 +16,7 @@ func RegisterHttpService(
 	doDashboardService *service.DoDashboardService,
 	etlService *service.EtlService,
 	alertService *service.AlertService,
+	issueReportService *service.IssueReportService,
 ) []GroupUrl {
 
 	var routes []GroupUrl
@@ -24,6 +25,7 @@ func RegisterHttpService(
 	routes = append(routes, RegisterDoDashboardService(doDashboardService, cd)...)
 	routes = append(routes, RegisterEtlService(etlService)...)
 	routes = append(routes, RegisterAlertService(alertService)...)
+	routes = append(routes, RegisterIssueReportService(issueReportService)...)
 
 	return routes
 }

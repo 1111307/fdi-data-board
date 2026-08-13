@@ -25,7 +25,7 @@ func NewAlertService(uc *biz.AlertUseCase) *AlertService {
 //	@Tags		Alert
 //	@Accept		json
 //	@Produce	json
-//	@Param		payload	body		biz.GrafanaAlertPayload	true	"Grafana 告警内容"
+//	@Param		payload	body		object	true	"Grafana 告警内容"
 //	@Success	200		{object}	dashboard_api.BaseResponse
 //	@Router		/alert/grafana/webhook [POST]
 func (s *AlertService) GrafanaWebhook(c *gin.Context) (api.HttpResponse, error) {
