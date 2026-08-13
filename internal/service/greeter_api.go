@@ -1,10 +1,11 @@
 package service
 
 import (
-	"devops.momenta.works/Momenta/FDI/_git/gerr.git/gcode"
 	"fdi_data_board/api"
-	"fdi_data_board/api/greeter"
+	greeter_api "fdi_data_board/api/greeter"
 	"fdi_data_board/internal/biz"
+
+	"devops.momenta.works/Momenta/FDI/_git/gerr.git/gcode"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,6 +20,7 @@ func NewGreeterApiService(uc *biz.GreeterUsecase) *GreeterApiService {
 }
 
 // SayHello godoc
+//
 //	@Summary		Greeter
 //	@Description	Greeter
 //	@Tags			Greeter

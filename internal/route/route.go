@@ -17,6 +17,7 @@ func RegisterHttpService(
 	etlService *service.EtlService,
 	alertService *service.AlertService,
 	issueReportService *service.IssueReportService,
+	reconcileService *service.ReconcileService,
 ) []GroupUrl {
 
 	var routes []GroupUrl
@@ -26,6 +27,7 @@ func RegisterHttpService(
 	routes = append(routes, RegisterEtlService(etlService)...)
 	routes = append(routes, RegisterAlertService(alertService)...)
 	routes = append(routes, RegisterIssueReportService(issueReportService)...)
+	routes = append(routes, RegisterReconcileService(reconcileService, cd)...)
 
 	return routes
 }
