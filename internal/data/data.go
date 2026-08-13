@@ -29,6 +29,7 @@ var ProviderSet = wire.NewSet(
 	NewFoDashboardRepo,
 	NewDoDashboardRepo,
 	NewEtlRepo,
+	NewIssueReportRepo,
 	NewReconcileRepo,
 	NewSchedulerRedisClient,
 )
@@ -75,6 +76,7 @@ func newMysqlDB(c *conf.Data) *gorm.DB {
 	if err := db.AutoMigrate(
 		&orm.GreeterDo{},
 		&orm.EtlJobLogDo{},
+		&orm.IssueReportRecordDo{},
 	); err != nil {
 		panic(fmt.Sprintf("Update Table Failed: %+v", err))
 	}

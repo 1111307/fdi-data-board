@@ -91,6 +91,10 @@ message Data {
         google.protobuf.Duration lock_refresh_interval = 7;
     }
 
+    message Feishu {
+        string webhook_url = 2;
+    }
+
     Mysql mysql = 1;
     Redis redis = 2;
     Keycloak keycloak = 3;
@@ -98,4 +102,5 @@ message Data {
     Runtime runtime = 7;
     Doris doris = 8;
     Etl etl = 9;
+    Feishu feishu = 11;
 }
