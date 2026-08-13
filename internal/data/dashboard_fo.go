@@ -1560,3 +1560,76 @@ func buildFffRunningTrendWhere(param *biz.FffRunningTrendParam) (string, []inter
 	}
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
+
+// GetRunningOverview 筛选器运行健康概览（运行记录数/车辆数/开关占比）
+func (r *foDashboardRepo) GetRunningOverview(ctx context.Context, param *biz.FffRunningParam) (*biz.FoRunningOverviewData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	where, args := buildFffRunningWhere(param)
+
+	sql := `SELECT
+		SUM(running_count) AS running_total,
+		SUM(vehicle_count) AS vehicle_total,
+		SUM(switch_on_count) AS switch_on_total,
+		SUM(switch_off_count) AS switch_off_total,
+		SUM(running_success_count) AS running_success,
+		SUM(running_failed_count) AS running_failed,
+		COUNT(DISTINCT filter_name) AS filter_count
+		FROM ` + tableFffRunningDailySummary + where + `
+		AND summary_grain = 'filter'
+		AND filter_name != '` + aggAllValue + `' AND filter_name != ''`
+
+	type scanRow struct {
+		RunningTotal   int64 `gorm:"column:running_total"`
+		VehicleTotal   int64 `gorm:"column:vehicle_total"`
+		SwitchOnTotal  int64 `gorm:"column:switch_on_total"`
+		SwitchOffTotal int64 `gorm:"column:switch_off_total"`
+		RunningSuccess int64 `gorm:"column:running_success"`
+		RunningFailed  int64 `gorm:"column:running_failed"`
+		FilterCount    int64 `gorm:"column:filter_count"`
+	}
+	var sr scanRow
+	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
+		return nil, err
+	}
+	return &biz.FoRunningOverviewData{
+		RunningTotal:   sr.RunningTotal,
+		VehicleTotal:   sr.VehicleTotal,
+		SwitchOnTotal:  sr.SwitchOnTotal,
+		SwitchOffTotal: sr.SwitchOffTotal,
+		RunningSuccess: sr.RunningSuccess,
+		RunningFailed:  sr.RunningFailed,
+		FilterCount:    sr.FilterCount,
+	}, nil
+}
+
+// GetFffOverview FFF 触发概览（触发总数/成功数/成功率）
+func (r *foDashboardRepo) GetFffOverview(ctx context.Context, param *biz.FffTriggerParam) (*biz.FoFffOverviewData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	where, args := buildFffTriggerWhere(param)
+	grain := grainForFilter(param.FilterName)
+
+	sql := `SELECT
+		SUM(event_count) AS trigger_total,
+		SUM(success_count) AS trigger_success,
+		SUM(failed_count) AS trigger_failed
+		FROM ` + tableFffTriggerDailySummary + where + `
+		AND summary_grain = '` + grain + `'
+		AND event_name = '` + aggAllValue + `'`
+
+	type scanRow struct {
+		TriggerTotal   int64 `gorm:"column:trigger_total"`
+		TriggerSuccess int64 `gorm:"column:trigger_success"`
+		TriggerFailed  int64 `gorm:"column:trigger_failed"`
+	}
+	var sr scanRow
+	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
+		return nil, err
+	}
+	return &biz.FoFffOverviewData{
+		TriggerTotal:   sr.TriggerTotal,
+		TriggerSuccess: sr.TriggerSuccess,
+		TriggerFailed:  sr.TriggerFailed,
+	}, nil
+}

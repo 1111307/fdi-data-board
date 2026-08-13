@@ -652,3 +652,52 @@ type FffRunningTrendResponse struct {
 	Dates  []string `json:"dates"`  // 日期列表 YYYY-MM-DD
 	Counts []int64  `json:"counts"` // 对应日期的活跃车辆数（switch_on=1 的去重车辆数）
 }
+
+// DoFdrQualityResponse FDR 质量 P95 响应
+type DoFdrQualityResponse struct {
+	BaseResponse
+	TdMbP95       float64 `json:"td_mb_p95"`        // TD 磁盘大小 P95（MB）
+	TmMbP95       float64 `json:"tm_mb_p95"`        // TM 内存大小 P95（MB）
+	TimeCostMsP95 float64 `json:"time_cost_ms_p95"` // 落盘耗时 P95（ms）
+	FdrTotal      int64   `json:"fdr_total"`        // FDR 落盘总数
+	FdrSuccess    int64   `json:"fdr_success"`      // FDR 成功数
+}
+
+// DoFclQualityResponse FCL Bag 大小质量响应
+type DoFclQualityResponse struct {
+	BaseResponse
+	BagSizeP95  float64 `json:"bag_size_p95"` // Bag 大小 P95（字节）
+	BagSizeAvg  float64 `json:"bag_size_avg"` // Bag 大小均值（字节）
+	BagSizeMax  float64 `json:"bag_size_max"` // Bag 大小最大值（字节）
+	UploadTotal int64   `json:"upload_total"` // 上传总数
+}
+
+// DoFdrFragmentResponse FDR 碎片率响应
+type DoFdrFragmentResponse struct {
+	BaseResponse
+	FragmentP95 float64 `json:"fragment_p95"` // 碎片率 P95
+	FragmentAvg float64 `json:"fragment_avg"` // 碎片率均值
+	FragmentMax float64 `json:"fragment_max"` // 碎片率最大值
+}
+
+// FoRunningOverviewResponse 筛选器运行健康概览响应
+type FoRunningOverviewResponse struct {
+	BaseResponse
+	RunningTotal   int64   `json:"running_total"`    // 运行记录数
+	VehicleTotal   int64   `json:"vehicle_total"`    // 运行车辆数（多天为车辆日口径）
+	SwitchOnTotal  int64   `json:"switch_on_total"`  // 开启次数
+	SwitchOffTotal int64   `json:"switch_off_total"` // 关闭次数
+	SwitchOnRatio  float64 `json:"switch_on_ratio"`  // 开启占比（%）
+	RunningSuccess int64   `json:"running_success"`  // 运行成功数
+	RunningFailed  int64   `json:"running_failed"`   // 运行失败数
+	FilterCount    int64   `json:"filter_count"`     // 运行筛选器数量
+}
+
+// FoFffOverviewResponse FFF 触发概览响应
+type FoFffOverviewResponse struct {
+	BaseResponse
+	TriggerTotal       int64   `json:"trigger_total"`        // 触发总数
+	TriggerSuccess     int64   `json:"trigger_success"`      // 触发成功数
+	TriggerFailed      int64   `json:"trigger_failed"`       // 触发失败数
+	TriggerSuccessRate float64 `json:"trigger_success_rate"` // 触发成功率（%）
+}

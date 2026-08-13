@@ -31,6 +31,8 @@ type FoDashboardRepo interface {
 	GetStageTrend(ctx context.Context, param *StageTrendParam) (*StageTrendData, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
 	GetFffRunningTrend(ctx context.Context, param *FffRunningTrendParam) (*FffRunningTrendData, error)
+	GetRunningOverview(ctx context.Context, param *FffRunningParam) (*FoRunningOverviewData, error)
+	GetFffOverview(ctx context.Context, param *FffTriggerParam) (*FoFffOverviewData, error)
 }
 
 // FunnelParam 数采全链路分析查询参数
@@ -481,6 +483,69 @@ func (uc *FoDashboardUseCase) GetFffRunningTrend(ctx context.Context, req *dashb
 		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
 		Dates:        data.Dates,
 		Counts:       data.Counts,
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashboard_api.FffRunningRequest) (*dashboard_api.FoRunningOverviewResponse, error) {
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	param := &FffRunningParam{
+		FilterName:  req.FilterName,
+		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	data, err := uc.repo.GetRunningOverview(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	switchOnRatio := 0.0
+	if total := data.SwitchOnTotal + data.SwitchOffTotal; total > 0 {
+		switchOnRatio = float64(data.SwitchOnTotal) / float64(total) * 100
+	}
+	return &dashboard_api.FoRunningOverviewResponse{
+		BaseResponse:   dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		RunningTotal:   data.RunningTotal,
+		VehicleTotal:   data.VehicleTotal,
+		SwitchOnTotal:  data.SwitchOnTotal,
+		SwitchOffTotal: data.SwitchOffTotal,
+		SwitchOnRatio:  switchOnRatio,
+		RunningSuccess: data.RunningSuccess,
+		RunningFailed:  data.RunningFailed,
+		FilterCount:    data.FilterCount,
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) GetFffOverview(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FoFffOverviewResponse, error) {
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	param := &FffTriggerParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	data, err := uc.repo.GetFffOverview(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	successRate := 0.0
+	if data.TriggerTotal > 0 {
+		successRate = float64(data.TriggerSuccess) / float64(data.TriggerTotal) * 100
+	}
+	return &dashboard_api.FoFffOverviewResponse{
+		BaseResponse:       dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		TriggerTotal:       data.TriggerTotal,
+		TriggerSuccess:     data.TriggerSuccess,
+		TriggerFailed:      data.TriggerFailed,
+		TriggerSuccessRate: successRate,
 	}, nil
 }
 

@@ -962,3 +962,104 @@ func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonPa
 		FclFail: toReasons(fclFail),
 	}, nil
 }
+
+// GetFdrQuality FDR 质量 P95（TD 磁盘 / TM 内存 / 落盘耗时）
+// P95 不可跨分桶 MAX（小样本脏桶会放大离群值），退化明细表 PERCENTILE 精确计算
+func (r *doDashboardRepo) GetFdrQuality(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFdrQualityData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT
+		ROUND(PERCENTILE(CAST(td_mb AS DOUBLE), 0.95), 2) AS td_mb_p95,
+		ROUND(PERCENTILE(CAST(tm_mb AS DOUBLE), 0.95), 2) AS tm_mb_p95,
+		ROUND(PERCENTILE(time_cost_ms, 0.95), 2) AS time_cost_ms_p95,
+		COUNT(*) AS fdr_total,
+		SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS fdr_success
+		FROM dwd_basic_fdr_trigger` + where + `
+		AND td_mb IS NOT NULL AND td_mb != ''
+		AND tm_mb IS NOT NULL AND tm_mb != ''
+		AND time_cost_ms IS NOT NULL`
+
+	type scanRow struct {
+		TdMbP95       float64 `gorm:"column:td_mb_p95"`
+		TmMbP95       float64 `gorm:"column:tm_mb_p95"`
+		TimeCostMsP95 float64 `gorm:"column:time_cost_ms_p95"`
+		FdrTotal      int64   `gorm:"column:fdr_total"`
+		FdrSuccess    int64   `gorm:"column:fdr_success"`
+	}
+	var sr scanRow
+	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
+		return nil, err
+	}
+	return &biz.DoFdrQualityData{
+		TdMbP95:       sr.TdMbP95,
+		TmMbP95:       sr.TmMbP95,
+		TimeCostMsP95: sr.TimeCostMsP95,
+		FdrTotal:      sr.FdrTotal,
+		FdrSuccess:    sr.FdrSuccess,
+	}, nil
+}
+
+// GetFclQuality FCL Bag 大小质量（P95 / 均值 / 最大值）
+// P95 不可跨分桶 MAX，退化明细表 PERCENTILE 精确计算
+func (r *doDashboardRepo) GetFclQuality(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFclQualityData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT
+		ROUND(PERCENTILE(package_size, 0.95), 2) AS bag_size_p95,
+		ROUND(AVG(package_size), 2) AS bag_size_avg,
+		MAX(package_size) AS bag_size_max,
+		COUNT(*) AS upload_total
+		FROM dwd_cfdi_basic_fcl_uploadinfo` + where + `
+		AND package_size IS NOT NULL AND package_size > 0`
+
+	type scanRow struct {
+		BagSizeP95  float64 `gorm:"column:bag_size_p95"`
+		BagSizeAvg  float64 `gorm:"column:bag_size_avg"`
+		BagSizeMax  float64 `gorm:"column:bag_size_max"`
+		UploadTotal int64   `gorm:"column:upload_total"`
+	}
+	var sr scanRow
+	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
+		return nil, err
+	}
+	return &biz.DoFclQualityData{
+		BagSizeP95:  sr.BagSizeP95,
+		BagSizeAvg:  sr.BagSizeAvg,
+		BagSizeMax:  sr.BagSizeMax,
+		UploadTotal: sr.UploadTotal,
+	}, nil
+}
+
+// GetFdrFragment FDR 碎片率（取 total_fragment 的 P95 / 均值 / 最大值）
+// P95 不可跨分桶 MAX，退化明细表 PERCENTILE 精确计算
+func (r *doDashboardRepo) GetFdrFragment(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFdrFragmentData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT
+		ROUND(PERCENTILE(total_fragment, 0.95), 2) AS fragment_p95,
+		ROUND(AVG(total_fragment), 2) AS fragment_avg,
+		MAX(total_fragment) AS fragment_max
+		FROM dwd_cfdi_basic_fdr_fragment` + where + `
+		AND total_fragment IS NOT NULL`
+
+	type scanRow struct {
+		FragmentP95 float64 `gorm:"column:fragment_p95"`
+		FragmentAvg float64 `gorm:"column:fragment_avg"`
+		FragmentMax float64 `gorm:"column:fragment_max"`
+	}
+	var sr scanRow
+	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
+		return nil, err
+	}
+	return &biz.DoFdrFragmentData{
+		FragmentP95: sr.FragmentP95,
+		FragmentAvg: sr.FragmentAvg,
+		FragmentMax: sr.FragmentMax,
+	}, nil
+}

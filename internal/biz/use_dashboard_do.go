@@ -26,6 +26,9 @@ type DoDashboardRepo interface {
 	GetAnomalyVehicles(ctx context.Context, param *DoAnomalyParam) ([]*DoVehicleItem, error)
 	GetActiveTrend(ctx context.Context, param *DoVehicleParam) (*DoActiveTrendData, error)
 	GetDoFunnel(ctx context.Context, param *DoCommonParam) (*FunnelData, error)
+	GetFdrQuality(ctx context.Context, param *DoCommonParam) (*DoFdrQualityData, error)
+	GetFclQuality(ctx context.Context, param *DoCommonParam) (*DoFclQualityData, error)
+	GetFdrFragment(ctx context.Context, param *DoCommonParam) (*DoFdrFragmentData, error)
 }
 
 // DoVehicleParam 车辆维度分析通用查询参数
@@ -109,8 +112,8 @@ func (uc *DoDashboardUseCase) GetOverview(ctx context.Context, req *dashboard_ap
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	list, err := uc.repo.GetOverview(ctx, param)
 	if err != nil {
@@ -132,8 +135,8 @@ func (uc *DoDashboardUseCase) GetTrend(ctx context.Context, req *dashboard_api.D
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	data, err := uc.repo.GetTrend(ctx, param)
 	if err != nil {
@@ -157,8 +160,8 @@ func (uc *DoDashboardUseCase) GetCoolTop(ctx context.Context, req *dashboard_api
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	list, err := uc.repo.GetCoolTop(ctx, param)
 	if err != nil {
@@ -180,8 +183,8 @@ func (uc *DoDashboardUseCase) GetTriggerRank(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	list, err := uc.repo.GetTriggerRank(ctx, param)
 	if err != nil {
@@ -203,8 +206,8 @@ func (uc *DoDashboardUseCase) GetSwVersion(ctx context.Context, req *dashboard_a
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	list, err := uc.repo.GetSwVersion(ctx, param)
 	if err != nil {
@@ -226,8 +229,8 @@ func (uc *DoDashboardUseCase) GetProjectCar(ctx context.Context, req *dashboard_
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	data, err := uc.repo.GetProjectCar(ctx, param)
 	if err != nil {
@@ -460,8 +463,8 @@ func (uc *DoDashboardUseCase) GetFailReason(ctx context.Context, req *dashboard_
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	list, err := uc.repo.GetFailReason(ctx, param)
 	if err != nil {
@@ -483,8 +486,8 @@ func (uc *DoDashboardUseCase) GetDoFunnel(ctx context.Context, req *dashboard_ap
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		StartDt: startDt,
-		EndDt: endDt,
+		StartDt:     startDt,
+		EndDt:       endDt,
 	}
 	data, err := uc.repo.GetDoFunnel(ctx, param)
 	if err != nil {
@@ -496,6 +499,84 @@ func (uc *DoDashboardUseCase) GetDoFunnel(ctx context.Context, req *dashboard_ap
 		FffFail:      toApiFunnelFailReasons(data.FffFail),
 		FdrFail:      toApiFunnelFailReasons(data.FdrFail),
 		FclFail:      toApiFunnelFailReasons(data.FclFail),
+	}, nil
+}
+
+func (uc *DoDashboardUseCase) GetFdrQuality(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoFdrQualityResponse, error) {
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	param := &DoCommonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	data, err := uc.repo.GetFdrQuality(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoFdrQualityResponse{
+		BaseResponse:  dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		TdMbP95:       data.TdMbP95,
+		TmMbP95:       data.TmMbP95,
+		TimeCostMsP95: data.TimeCostMsP95,
+		FdrTotal:      data.FdrTotal,
+		FdrSuccess:    data.FdrSuccess,
+	}, nil
+}
+
+func (uc *DoDashboardUseCase) GetFclQuality(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoFclQualityResponse, error) {
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	param := &DoCommonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	data, err := uc.repo.GetFclQuality(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoFclQualityResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		BagSizeP95:   data.BagSizeP95,
+		BagSizeAvg:   data.BagSizeAvg,
+		BagSizeMax:   data.BagSizeMax,
+		UploadTotal:  data.UploadTotal,
+	}, nil
+}
+
+func (uc *DoDashboardUseCase) GetFdrFragment(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoFdrFragmentResponse, error) {
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	param := &DoCommonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	data, err := uc.repo.GetFdrFragment(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoFdrFragmentResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		FragmentP95:  data.FragmentP95,
+		FragmentAvg:  data.FragmentAvg,
+		FragmentMax:  data.FragmentMax,
 	}, nil
 }
 

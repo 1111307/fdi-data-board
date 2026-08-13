@@ -86,3 +86,27 @@ type DoActiveTrendData struct {
 	Dates  []string
 	Counts []int64
 }
+
+// DoFdrQualityData FDR 质量 P95（领域对象）
+type DoFdrQualityData struct {
+	TdMbP95       float64
+	TmMbP95       float64
+	TimeCostMsP95 float64
+	FdrTotal      int64
+	FdrSuccess    int64
+}
+
+// DoFclQualityData FCL Bag 大小质量（领域对象）
+type DoFclQualityData struct {
+	BagSizeP95  float64
+	BagSizeAvg  float64
+	BagSizeMax  float64
+	UploadTotal int64
+}
+
+// DoFdrFragmentData FDR 碎片率（领域对象）
+type DoFdrFragmentData struct {
+	FragmentP95 float64
+	FragmentAvg float64
+	FragmentMax float64
+}

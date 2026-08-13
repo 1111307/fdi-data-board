@@ -462,3 +462,82 @@ func (s *FoDashboardService) GetFffRunningTrend(ctx *gin.Context) (api.HttpRespo
 
 	return result, nil
 }
+
+// GetRunningOverview godoc
+//
+//	@Summary	筛选器运行健康概览（运行记录数/车辆数/开关占比）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.FoRunningOverviewResponse
+//	@Router		/dashboard/v1/fo/running/overview [GET]
+func (s *FoDashboardService) GetRunningOverview(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FoRunningOverviewResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffRunningRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetRunningOverview(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("GetRunningOverview error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetFffOverview godoc
+//
+//	@Summary	FFF 触发概览（触发总数/成功数/成功率）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_name		query		string	false	"事件名"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.FoFffOverviewResponse
+//	@Router		/dashboard/v1/fo/fff/overview [GET]
+func (s *FoDashboardService) GetFffOverview(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FoFffOverviewResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffTriggerRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFffOverview(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("GetFffOverview error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}
