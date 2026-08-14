@@ -153,6 +153,7 @@ type FoDimensions struct {
 // FffRunningParam 筛选器运行明细查询参数
 type FffRunningParam struct {
 	FilterName  string
+	EventNames  []string
 	ProjectName string
 	CarTypes    []string
 	StartDt     string
@@ -165,6 +166,7 @@ type FffRunningParam struct {
 type FffRunningTrendParam struct {
 	FilterName  string // 必填：算子名称
 	ProjectName string // 选填：项目名称
+	CarTypes    []string
 	StartDt     string // 必填：开始日期
 	EndDt       string // 必填：结束日期
 }
@@ -436,6 +438,7 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 
 	param := &FffRunningParam{
 		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     startDt,
@@ -473,6 +476,7 @@ func (uc *FoDashboardUseCase) GetFffRunningTrend(ctx context.Context, req *dashb
 	param := &FffRunningTrendParam{
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     startDt,
 		EndDt:       endDt,
 	}
@@ -494,6 +498,7 @@ func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashb
 	}
 	param := &FffRunningParam{
 		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     startDt,

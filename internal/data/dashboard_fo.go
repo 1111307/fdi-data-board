@@ -140,11 +140,52 @@ func buildFffRunningWhere(param *biz.FffRunningParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
 
 	if len(conds) == 0 {
 		return "", args
 	}
 	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func appendFffRunningEventNamesAsFilterNames(conds []string, args []interface{}, rawEventNames []string) ([]string, []interface{}) {
+	eventNames := nonAllValues(rawEventNames)
+	if len(eventNames) == 0 {
+		return conds, args
+	}
+
+	return appendMultiCond(conds, args, "filter_name", eventNames)
+}
+
+func buildFffRunningVehicleWhere(param *biz.FffRunningParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	dateCond, dateArgs := buildAggDateCondition(param.StartDt, param.EndDt, true)
+	conds = append(conds, dateCond)
+	args = append(args, dateArgs...)
+
+	eventCond, eventArgs := buildAggEventCondition(nonAllValues(param.EventNames))
+	conds = append(conds, eventCond)
+	args = append(args, eventArgs...)
+
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func nonAllValues(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != "" && value != aggAllValue {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func toFffRunningItem(row *fffRunningRow) *biz.FffRunningItem {
@@ -1615,12 +1656,7 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 	go func() {
 		defer wg.Done()
 		var rows []strRow
-		errFilter = db.Raw(`SELECT DISTINCT filter_name AS val
-			FROM ` + tableFffRunningDailySummary + `
-			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-			AND summary_grain = 'filter'
-			AND filter_name != '` + aggAllValue + `' AND filter_name != ''
-			ORDER BY val`).Scan(&rows).Error
+		errFilter = db.Raw(buildDimensionFilterNameSQL()).Scan(&rows).Error
 		for _, r := range rows {
 			filterNames = append(filterNames, r.Val)
 		}
@@ -1630,7 +1666,7 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 		defer wg.Done()
 		var rows []strRow
 		errProject = db.Raw(`SELECT DISTINCT project_name AS val
-			FROM ` + tableVehicleDailySummary + `
+			FROM ` + tableVehicleDailySummaryAgg + `
 			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
 			AND project_name IS NOT NULL AND project_name != ''
 			ORDER BY val`).Scan(&rows).Error
@@ -1652,7 +1688,7 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 		defer wg.Done()
 		var rows []strRow
 		errCarType = db.Raw(`SELECT DISTINCT car_type AS val
-			FROM ` + tableVehicleDailySummary + `
+			FROM ` + tableVehicleDailySummaryAgg + `
 			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
 			AND car_type IS NOT NULL AND car_type != ''
 			ORDER BY val`).Scan(&rows).Error
@@ -1682,6 +1718,15 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 		ProjectNames: projectNames,
 		CarTypes:     carTypes,
 	}, nil
+}
+
+func buildDimensionFilterNameSQL() string {
+	return `SELECT DISTINCT filter_name AS val
+		FROM ` + tableFffTriggerDailySummary + `
+		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 360 DAY)
+		AND summary_grain = 'filter'
+		AND filter_name IS NOT NULL AND filter_name != '' AND filter_name != '` + aggAllValue + `'
+		ORDER BY val`
 }
 
 func buildDimensionEventNameSQL() string {
@@ -1733,26 +1778,36 @@ func buildFffRunningTrendWhere(param *biz.FffRunningTrendParam) (string, []inter
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func buildRunningOverviewSQL(param *biz.FffRunningParam) (string, []interface{}) {
+	where, args := buildFffRunningWhere(param)
+	vehicleWhere, vehicleArgs := buildFffRunningVehicleWhere(param)
+	sql := `SELECT
+		COALESCE(SUM(running_count), 0) AS running_total,
+		(
+			SELECT COALESCE(SUM(running_switch_on_vehicle_count), 0)
+			FROM ` + tableVehicleDailySummaryAgg + vehicleWhere + `
+		) AS vehicle_total,
+		COALESCE(SUM(switch_on_count), 0) AS switch_on_total,
+		COALESCE(SUM(switch_off_count), 0) AS switch_off_total,
+		COALESCE(SUM(running_success_count), 0) AS running_success,
+		COALESCE(SUM(running_failed_count), 0) AS running_failed,
+		COUNT(DISTINCT filter_name) AS filter_count
+		FROM ` + tableFffRunningDailySummary + where + `
+		AND summary_grain = 'filter'
+		AND filter_name != '` + aggAllValue + `' AND filter_name != ''`
+	args = append(vehicleArgs, args...)
+	return sql, args
 }
 
 // GetRunningOverview 筛选器运行健康概览（运行记录数/车辆数/开关占比）
 func (r *foDashboardRepo) GetRunningOverview(ctx context.Context, param *biz.FffRunningParam) (*biz.FoRunningOverviewData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildFffRunningWhere(param)
-
-	sql := `SELECT
-		SUM(running_count) AS running_total,
-		SUM(vehicle_count) AS vehicle_total,
-		SUM(switch_on_count) AS switch_on_total,
-		SUM(switch_off_count) AS switch_off_total,
-		SUM(running_success_count) AS running_success,
-		SUM(running_failed_count) AS running_failed,
-		COUNT(DISTINCT filter_name) AS filter_count
-		FROM ` + tableFffRunningDailySummary + where + `
-		AND summary_grain = 'filter'
-		AND filter_name != '` + aggAllValue + `' AND filter_name != ''`
+	sql, args := buildRunningOverviewSQL(param)
 
 	type scanRow struct {
 		RunningTotal   int64 `gorm:"column:running_total"`

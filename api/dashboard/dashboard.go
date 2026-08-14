@@ -34,6 +34,7 @@ type FffRunningItem struct {
 // FffRunningRequest 筛选器运行明细查询请求
 type FffRunningRequest struct {
 	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"`
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
@@ -644,13 +645,14 @@ type FffRunningTrendRequest struct {
 	StartDt     string `form:"start_dt"`     // 必填：开始日期 YYYY-MM-DD
 	EndDt       string `form:"end_dt"`       // 必填：结束日期 YYYY-MM-DD
 	ProjectName string `form:"project_name"` // 选填：项目名称
+	CarTypes    string `form:"car_types"`    // 选填：车型，多选逗号分隔
 }
 
 // FffRunningTrendResponse 算子活跃车辆趋势响应（按天聚合）
 type FffRunningTrendResponse struct {
 	BaseResponse
 	Dates  []string `json:"dates"`  // 日期列表 YYYY-MM-DD
-	Counts []int64  `json:"counts"` // 对应日期的活跃车辆数（switch_on=1 的去重车辆数）
+	Counts []int64  `json:"counts"` // 对应日期的活跃车辆数（switch_on=1 的分组去重车辆数）
 }
 
 // DoFdrQualityResponse FDR 质量 P95 响应
@@ -684,7 +686,7 @@ type DoFdrFragmentResponse struct {
 type FoRunningOverviewResponse struct {
 	BaseResponse
 	RunningTotal   int64   `json:"running_total"`    // 运行记录数
-	VehicleTotal   int64   `json:"vehicle_total"`    // 运行车辆数（多天为车辆日口径）
+	VehicleTotal   int64   `json:"vehicle_total"`    // switch_on=1 运行车辆数（ADS event_name 口径）
 	SwitchOnTotal  int64   `json:"switch_on_total"`  // 开启次数
 	SwitchOffTotal int64   `json:"switch_off_total"` // 关闭次数
 	SwitchOnRatio  float64 `json:"switch_on_ratio"`  // 开启占比（%）

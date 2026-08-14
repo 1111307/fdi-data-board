@@ -433,6 +433,7 @@ func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse,
 //	@Param		start_dt		query		string	true	"开始日期 YYYY-MM-DD（必填）"
 //	@Param		end_dt			query		string	true	"结束日期 YYYY-MM-DD（必填）"
 //	@Param		project_name	query		string	false	"项目名称（选填）"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
 //	@Success	200				{object}	dashboard_api.FffRunningTrendResponse
 //	@Router		/dashboard/v1/fo/running/trend [GET]
 func (s *FoDashboardService) GetFffRunningTrend(ctx *gin.Context) (api.HttpResponse, error) {

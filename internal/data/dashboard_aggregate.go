@@ -19,6 +19,7 @@ const (
 	tableFdrTriggerDailySummary  = "fdi.dwd_basic_fdr_trigger_daily_summary"
 	tableFdrFragmentDailySummary = "fdi.dwd_cfdi_basic_fdr_fragment_daily_summary"
 	tableVehicleDailySummary     = "fdi.ads_cfdi_vehicle_daily_summary"
+	tableVehicleDailySummaryAgg  = "fdi.ads_cfdi_vehicle_daily_summary_agg"
 )
 
 func buildAggEventCondition(eventNames []string) (string, []interface{}) {

@@ -437,13 +437,7 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
-
-	sql := `SELECT filter_name, SUM(close_count) AS cnt
-		FROM ` + tableFffCloseDailySummary + where + `
-		AND summary_grain = 'filter'
-		AND filter_name IS NOT NULL AND filter_name != '' AND filter_name != '` + aggAllValue + `'
-		GROUP BY filter_name ORDER BY cnt DESC LIMIT 20`
+	sql, args := buildCloseTopSQL(param)
 
 	type row struct {
 		FilterName string `gorm:"column:filter_name"`
@@ -458,6 +452,16 @@ func (r *doDashboardRepo) GetCloseTop(ctx context.Context, param *biz.DoCommonPa
 		list = append(list, &biz.DoCoolTopItem{FilterName: r.FilterName, Count: r.Cnt})
 	}
 	return list, nil
+}
+
+func buildCloseTopSQL(param *biz.DoCommonParam) (string, []interface{}) {
+	where, args := buildDoCommonWhere(param.FilterName, nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	sql := `SELECT filter_name, SUM(close_count) AS cnt
+		FROM ` + tableFffCloseDailySummary + where + `
+		AND summary_grain = 'filter'
+		AND filter_name IS NOT NULL AND filter_name != '' AND filter_name != '` + aggAllValue + `'
+		GROUP BY filter_name ORDER BY cnt DESC LIMIT 20`
+	return sql, args
 }
 
 func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoEventTopItem, error) {

@@ -291,6 +291,7 @@ func (uc *DoDashboardUseCase) GetCloseTop(ctx context.Context, req *dashboard_ap
 		return nil, err
 	}
 	param := &DoCommonParam{
+		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName, CarTypes: splitEventNames(req.CarTypes),
 		StartDt: startDt, EndDt: endDt,
 	}
