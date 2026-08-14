@@ -541,3 +541,43 @@ func (s *FoDashboardService) GetFffOverview(ctx *gin.Context) (api.HttpResponse,
 	}
 	return result, nil
 }
+
+// GetFffFailReason godoc
+//
+//	@Summary	FFF 触发失败原因分布
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.DoFailReasonResponse
+//	@Router		/dashboard/v1/fo/fff/fail_reason [GET]
+func (s *FoDashboardService) GetFffFailReason(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoFailReasonResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffTriggerRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFffFailReason(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("GetFffFailReason error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}

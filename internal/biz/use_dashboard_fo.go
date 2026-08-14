@@ -33,6 +33,7 @@ type FoDashboardRepo interface {
 	GetFffRunningTrend(ctx context.Context, param *FffRunningTrendParam) (*FffRunningTrendData, error)
 	GetRunningOverview(ctx context.Context, param *FffRunningParam) (*FoRunningOverviewData, error)
 	GetFffOverview(ctx context.Context, param *FffTriggerParam) (*FoFffOverviewData, error)
+	GetFffFailReason(ctx context.Context, param *FffTriggerParam) ([]*DoFailReasonItem, error)
 }
 
 // FunnelParam 数采全链路分析查询参数
@@ -546,6 +547,29 @@ func (uc *FoDashboardUseCase) GetFffOverview(ctx context.Context, req *dashboard
 		TriggerSuccess:     data.TriggerSuccess,
 		TriggerFailed:      data.TriggerFailed,
 		TriggerSuccessRate: successRate,
+	}, nil
+}
+
+func (uc *FoDashboardUseCase) GetFffFailReason(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.DoFailReasonResponse, error) {
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	param := &FffTriggerParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	list, err := uc.repo.GetFffFailReason(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoFailReasonResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoFailReasonItems(list),
 	}, nil
 }
 

@@ -73,6 +73,7 @@ func RegisterFoDashboardService(s *service.FoDashboardService, cd *conf.Data) []
 				{JsonHandlerFunc: s.GetFffRunningTrend, Path: "running/trend", Method: GET},
 				{JsonHandlerFunc: s.GetRunningOverview, Path: "running/overview", Method: GET},
 				{JsonHandlerFunc: s.GetFffOverview, Path: "fff/overview", Method: GET},
+				{JsonHandlerFunc: s.GetFffFailReason, Path: "fff/fail_reason", Method: GET},
 			},
 		},
 	}
