@@ -1748,8 +1748,8 @@ func (r *foDashboardRepo) GetFffRunningTrend(ctx context.Context, param *biz.Fff
 	defer cancel()
 
 	where, args := buildFffRunningTrendWhere(param)
-	sql := `SELECT dt, SUM(vehicle_count) AS vehicle_count
-		FROM ` + tableFffRunningDailySummary + where + ` GROUP BY dt ORDER BY dt`
+	sql := `SELECT dt, SUM(running_switch_on_vehicle_count) AS vehicle_count
+		FROM ` + tableVehicleDailySummaryAgg + where + ` GROUP BY dt ORDER BY dt`
 
 	var rows []runningTrendRow
 	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
@@ -1765,11 +1765,13 @@ func (r *foDashboardRepo) GetFffRunningTrend(ctx context.Context, param *biz.Fff
 	return &biz.FffRunningTrendData{Dates: dates, Counts: counts}, nil
 }
 
+// buildFffRunningTrendWhere 构建 _agg 车辆汇总表的 WHERE。
+// running/trend 需要的是「去重车辆数」，fff_running 汇总表的 vehicle_count 会因
+// on_autopilot/function_mode 等易变维度重复计数（同车拆多行），改用
+// ads_cfdi_vehicle_daily_summary_agg 的 running_switch_on_vehicle_count（车辆粒度，SUM 不重复）。
 func buildFffRunningTrendWhere(param *biz.FffRunningTrendParam) (string, []interface{}) {
 	conds := []string{
-		"summary_grain = 'filter'",
-		"switch_on = 1",
-		"filter_name = ?",
+		"event_name = ?",
 		"dt BETWEEN ? AND ?",
 	}
 	args := []interface{}{param.FilterName, param.StartDt, param.EndDt}
