@@ -95,7 +95,7 @@ type doTrendRow struct {
 func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam) (*biz.DoTrendData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	grain := grainForFilter(param.FilterName)
 
 	sql := `SELECT dt,
@@ -103,7 +103,6 @@ func (r *doDashboardRepo) GetTrend(ctx context.Context, param *biz.DoTrendParam)
 		SUM(fcl_success_count) AS success
 		FROM ` + tableStatusDailySummary + where + `
 		AND summary_grain = '` + grain + `'
-		AND event_name = '` + aggAllValue + `'
 		GROUP BY dt ORDER BY dt ASC`
 
 	var rows []*doTrendRow
@@ -149,7 +148,7 @@ func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailRe
 		return r.getFailReasonFromDetail(ctx, param)
 	}
 
-	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT stage, detail_tag, SUM(cnt) AS cnt
 	FROM (
@@ -253,7 +252,7 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT filter_name, SUM(event_count) AS cnt
 		FROM ` + tableFffTriggerDailySummary + where + `
@@ -282,7 +281,7 @@ func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommo
 func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoSwVersionItem, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	grain := grainForFilter(param.FilterName)
 
 	sql := `SELECT fff_sw_version AS sw_version, SUM(event_count) AS cnt
@@ -312,7 +311,7 @@ func (r *doDashboardRepo) GetSwVersion(ctx context.Context, param *biz.DoCommonP
 func (r *doDashboardRepo) GetProjectCar(ctx context.Context, param *biz.DoCommonParam) (*biz.DoProjectCarData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	grain := grainForFilter(param.FilterName)
 
 	sql := `SELECT project_name, car_type, SUM(event_count) AS cnt
@@ -748,7 +747,8 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehicleParam) (*biz.DoActiveTrendData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	// 车辆汇总表无 filter_name 列；event 维度强制处理 __ALL__（未传事件只查汇总行，避免翻倍）
+	where, args := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT dt, SUM(vehicle_count) AS active_count
 		FROM ` + tableVehicleDailySummary + where + `
@@ -874,11 +874,10 @@ func appendMultiCond(conds []string, args []interface{}, col string, vals []stri
 func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonParam) (*biz.FunnelData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 	grain := grainForFilter(param.FilterName)
 	base := " FROM " + tableStatusDailySummary + where +
-		" AND summary_grain = '" + grain + "'" +
-		" AND event_name = '" + aggAllValue + "'"
+		" AND summary_grain = '" + grain + "'"
 
 	type statRow struct {
 		FffTotal   int64 `gorm:"column:fff_total"`
@@ -913,10 +912,9 @@ func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonPa
 
 	// 失败原因 Top10 来自 stage_reason 粒度（无 filter_name），仅在未传 filter_name 时查
 	if param.FilterName == "" {
-		whereNoFilter, argsNoFilter := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+		whereNoFilter, argsNoFilter := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 		baseReason := " FROM " + tableStatusDailySummary + whereNoFilter +
-			" AND summary_grain = 'stage_reason'" +
-			" AND event_name = '" + aggAllValue + "'"
+			" AND summary_grain = 'stage_reason'"
 
 		fffFailSQL := `SELECT fff_detail_tag AS name, SUM(fff_failed_count) AS cnt` + baseReason +
 			` AND fff_detail_tag != '` + aggAllValue + `' AND fff_detail_tag != '' GROUP BY fff_detail_tag ORDER BY cnt DESC LIMIT 10`
@@ -968,22 +966,20 @@ func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonPa
 }
 
 // GetFdrQuality FDR 质量 P95（TD 磁盘 / TM 内存 / 落盘耗时）
-// P95 不可跨分桶 MAX（小样本脏桶会放大离群值），退化明细表 PERCENTILE 精确计算
+// 查汇总表，P95 用 count 加权均值（不用 MAX，避免小样本脏桶放大离群值）
 func (r *doDashboardRepo) GetFdrQuality(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFdrQualityData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT
-		ROUND(PERCENTILE(CAST(td_mb AS DOUBLE), 0.95), 2) AS td_mb_p95,
-		ROUND(PERCENTILE(CAST(tm_mb AS DOUBLE), 0.95), 2) AS tm_mb_p95,
-		ROUND(PERCENTILE(time_cost_ms, 0.95), 2) AS time_cost_ms_p95,
-		COUNT(*) AS fdr_total,
-		SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) AS fdr_success
-		FROM dwd_basic_fdr_trigger` + where + `
-		AND td_mb IS NOT NULL AND td_mb != ''
-		AND tm_mb IS NOT NULL AND tm_mb != ''
-		AND time_cost_ms IS NOT NULL`
+		ROUND(SUM(td_mb_p95 * td_mb_count) / NULLIF(SUM(td_mb_count), 0), 2) AS td_mb_p95,
+		ROUND(SUM(tm_mb_p95 * tm_mb_count) / NULLIF(SUM(tm_mb_count), 0), 2) AS tm_mb_p95,
+		ROUND(SUM(time_cost_ms_p95 * time_cost_ms_count) / NULLIF(SUM(time_cost_ms_count), 0), 2) AS time_cost_ms_p95,
+		SUM(event_count) AS fdr_total,
+		SUM(success_count) AS fdr_success
+		FROM ` + tableFdrTriggerDailySummary + where + `
+		AND summary_grain = 'overview'`
 
 	type scanRow struct {
 		TdMbP95       float64 `gorm:"column:td_mb_p95"`
@@ -1006,19 +1002,19 @@ func (r *doDashboardRepo) GetFdrQuality(ctx context.Context, param *biz.DoCommon
 }
 
 // GetFclQuality FCL Bag 大小质量（P95 / 均值 / 最大值）
-// P95 不可跨分桶 MAX，退化明细表 PERCENTILE 精确计算
+// 查汇总表：avg=SUM(sum)/SUM(count)、max=MAX(max) 精确；P95 用 count 加权均值（不用 MAX，避免小样本脏桶放大离群值）
 func (r *doDashboardRepo) GetFclQuality(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFclQualityData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT
-		ROUND(PERCENTILE(package_size, 0.95), 2) AS bag_size_p95,
-		ROUND(AVG(package_size), 2) AS bag_size_avg,
-		MAX(package_size) AS bag_size_max,
-		COUNT(*) AS upload_total
-		FROM dwd_cfdi_basic_fcl_uploadinfo` + where + `
-		AND package_size IS NOT NULL AND package_size > 0`
+		ROUND(SUM(package_size_p95 * package_size_count) / NULLIF(SUM(package_size_count), 0), 2) AS bag_size_p95,
+		ROUND(SUM(package_size_sum) / NULLIF(SUM(package_size_count), 0), 2) AS bag_size_avg,
+		MAX(package_size_max) AS bag_size_max,
+		SUM(upload_count) AS upload_total
+		FROM ` + tableFclUploadDailySummary + where + `
+		AND summary_grain = 'overview'`
 
 	type scanRow struct {
 		BagSizeP95  float64 `gorm:"column:bag_size_p95"`
@@ -1039,18 +1035,20 @@ func (r *doDashboardRepo) GetFclQuality(ctx context.Context, param *biz.DoCommon
 }
 
 // GetFdrFragment FDR 碎片率（取 total_fragment 的 P95 / 均值 / 最大值）
-// P95 不可跨分桶 MAX，退化明细表 PERCENTILE 精确计算
+// 查汇总表：avg=SUM(sum)/SUM(count)、max=MAX(max) 精确；P95 用 count 加权均值（不用 MAX，避免小样本脏桶放大离群值）
 func (r *doDashboardRepo) GetFdrFragment(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFdrFragmentData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT
-		ROUND(PERCENTILE(total_fragment, 0.95), 2) AS fragment_p95,
-		ROUND(AVG(total_fragment), 2) AS fragment_avg,
-		MAX(total_fragment) AS fragment_max
-		FROM dwd_cfdi_basic_fdr_fragment` + where + `
-		AND total_fragment IS NOT NULL`
+		ROUND(SUM(fragment_value_p95 * fragment_value_count) / NULLIF(SUM(fragment_value_count), 0), 2) AS fragment_p95,
+		ROUND(SUM(fragment_value_sum) / NULLIF(SUM(fragment_value_count), 0), 2) AS fragment_avg,
+		MAX(fragment_value_max) AS fragment_max
+		FROM ` + tableFdrFragmentDailySummary + where + `
+		AND summary_grain = 'overview'
+		AND event_name = '` + aggAllValue + `'
+		AND fragment_field = 'total_fragment'`
 
 	type scanRow struct {
 		FragmentP95 float64 `gorm:"column:fragment_p95"`

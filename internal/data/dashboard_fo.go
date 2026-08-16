@@ -1731,9 +1731,10 @@ func buildDimensionFilterNameSQL() string {
 
 func buildDimensionEventNameSQL() string {
 	return `SELECT DISTINCT event_name AS val
-		FROM dwd_cfdi_basic_fff_trigger
-		WHERE dt = DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-		AND event_name IS NOT NULL AND event_name != ''
+		FROM ` + tableFffTriggerDailySummary + `
+		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 360 DAY)
+		AND summary_grain = 'overview'
+		AND event_name IS NOT NULL AND event_name != '' AND event_name != '` + aggAllValue + `'
 		ORDER BY val`
 }
 

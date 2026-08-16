@@ -130,3 +130,32 @@ func buildAggRealEventCondition(eventNames []string) (string, []interface{}) {
 	}
 	return strings.Join(conds, " AND "), args
 }
+
+// buildSummaryCommonWhere 汇总表公共 WHERE（跨事件聚合场景）：
+// 汇总表同一粒度同时写 __ALL__ 汇总行和真实事件行，未传 eventNames 时必须只查 __ALL__ 行，
+// 否则 SUM 会把 __ALL__ 行和真实事件行重复计算（结果翻倍）。传了 eventNames 用 IN。
+func buildSummaryCommonWhere(filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if startDt != "" && endDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, startDt, endDt)
+	} else {
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
+	}
+	if filterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, filterName)
+	}
+	eventCond, eventArgs := buildAggEventCondition(eventNames)
+	conds = append(conds, eventCond)
+	args = append(args, eventArgs...)
+	if projectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, projectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", carTypes)
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
