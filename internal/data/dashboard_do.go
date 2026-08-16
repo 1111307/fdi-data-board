@@ -252,12 +252,10 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 func (r *doDashboardRepo) GetTriggerRank(ctx context.Context, param *biz.DoCommonParam) ([]*biz.DoCoolTopItem, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT filter_name, SUM(event_count) AS cnt
-		FROM ` + tableFffTriggerDailySummary + where + `
-		AND summary_grain = 'filter'
-		AND filter_name != '` + aggAllValue + `' AND filter_name != ''
+	sql := `SELECT filter_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + ` AND filter_name IS NOT NULL
 		GROUP BY filter_name
 		ORDER BY cnt DESC
 		LIMIT 10`
@@ -384,11 +382,11 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 	defer cancel()
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT event_name, SUM(failed_count) AS cnt
-		FROM ` + tableFdrTriggerDailySummary + where + `
-		AND summary_grain = 'reason'
-		AND detail_tag IN ('full_gc', 'mem_pool_water_line')
-		AND event_name != '` + aggAllValue + `' AND event_name != ''
+	sql := `SELECT event_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + `
+		AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
+		AND fdr_detail_tag = 'memory'
+		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
 	type row struct {
@@ -411,11 +409,11 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 	defer cancel()
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT event_name, SUM(failed_count) AS cnt
-		FROM ` + tableFdrTriggerDailySummary + where + `
-		AND summary_grain = 'reason'
-		AND detail_tag IN ('disk_overrun', 'max_files_exceeded')
-		AND event_name != '` + aggAllValue + `' AND event_name != ''
+	sql := `SELECT event_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + `
+		AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
+		AND fdr_detail_tag = 'disk'
+		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
 	type row struct {
@@ -468,11 +466,11 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 	defer cancel()
 	where, args := buildDoCommonWhere("", nil, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT event_name, SUM(failed_count) AS cnt
-		FROM ` + tableFclTriggerDailySummary + where + `
-		AND summary_grain = 'reason'
-		AND detail_tag = 'quota_exceeded'
-		AND event_name != '` + aggAllValue + `' AND event_name != ''
+	sql := `SELECT event_name, SUM(cnt) AS cnt
+		FROM ads_do_cfdi_daily` + where + `
+		AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard'
+		AND fcl_detail_tag = 'quota_exceeded'
+		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
 	type row struct {
