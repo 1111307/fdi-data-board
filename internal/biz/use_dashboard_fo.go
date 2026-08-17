@@ -552,6 +552,8 @@ func (uc *FoDashboardUseCase) GetFffOverview(ctx context.Context, req *dashboard
 		TriggerSuccess:     data.TriggerSuccess,
 		TriggerFailed:      data.TriggerFailed,
 		TriggerSuccessRate: successRate,
+		TriggerFilterCount: data.TriggerFilterCount,
+		CloseFilterCount:   data.CloseFilterCount,
 	}, nil
 }
 

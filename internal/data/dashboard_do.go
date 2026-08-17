@@ -165,6 +165,8 @@ type failReasonRow struct {
 }
 
 func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailReasonParam) ([]*biz.DoFailReasonItem, error) {
+	// FDR/FCL 失败原因用「全链路阶段口径」（过了 FFF 才到 FDR、过了 FDR 才到 FCL），
+	// 与漏斗/趋势一致；查预聚合明细表 ads_do_cfdi_daily（快，避免扫原始大表）。
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
@@ -714,13 +716,11 @@ func (r *doDashboardRepo) GetAnomalyVehicles(ctx context.Context, param *biz.DoA
 func (r *doDashboardRepo) GetActiveTrend(ctx context.Context, param *biz.DoVehicleParam) (*biz.DoActiveTrendData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	// 车辆汇总表无 filter_name 列；event 维度强制处理 __ALL__（未传事件只查汇总行，避免翻倍）
-	// 活跃车辆 = 全链路去重车数 = overall_success + overall_failed（由全链路口径任务写入）
-	where, args := buildSummaryCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	// 活跃车辆 = 当天在 CFDI 链路里出现过的去重车数，直接查全链路明细表（无 status 过滤）
+	where, args := buildVehicleWhere(param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
-	sql := `SELECT dt,
-		COALESCE(SUM(overall_success_vehicle_count), 0) + COALESCE(SUM(overall_failed_vehicle_count), 0) AS active_count
-		FROM ` + tableVehicleDailySummaryAgg + where + `
+	sql := `SELECT dt, COUNT(DISTINCT anonymous_id) AS active_count
+		FROM dwd_cfdi_status_monitor_analysis` + where + `
 		GROUP BY dt ORDER BY dt`
 
 	type row struct {

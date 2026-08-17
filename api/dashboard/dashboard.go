@@ -702,4 +702,6 @@ type FoFffOverviewResponse struct {
 	TriggerSuccess     int64   `json:"trigger_success"`      // 触发成功数
 	TriggerFailed      int64   `json:"trigger_failed"`       // 触发失败数
 	TriggerSuccessRate float64 `json:"trigger_success_rate"` // 触发成功率（%）
+	TriggerFilterCount int64   `json:"trigger_filter_count"` // 触发筛选器去重数
+	CloseFilterCount   int64   `json:"close_filter_count"`   // 关闭筛选器去重数
 }

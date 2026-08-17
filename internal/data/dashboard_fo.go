@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1205,7 +1206,214 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 	}, nil
 }
 
+// stageTrendRow 阶段趋势失败原因行（汇总表 reason 粒度）
+type stageTrendRow struct {
+	Name  string    `gorm:"column:name"`
+	Dt    time.Time `gorm:"column:dt"`
+	Count int64     `gorm:"column:count"`
+}
+
+// fffOverviewRow FFF overview 粒度逐日成功/失败
+type fffOverviewRow struct {
+	Dt         time.Time `gorm:"column:dt"`
+	FffSuccess int64     `gorm:"column:fff_success"`
+	FffFailed  int64     `gorm:"column:fff_failed"`
+}
+
+// stageSuccessFailedRow 阶段 overview 粒度逐日成功/失败（FDR/FCL 趋势）
+type stageSuccessFailedRow struct {
+	Dt      time.Time `gorm:"column:dt"`
+	Success int64     `gorm:"column:success"`
+	Failed  int64     `gorm:"column:failed"`
+}
+
 func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
+	// 专项分析走汇总表；失败原因拆分依赖 reason 粒度（无 filter_name），传了 filter_name 回退明细表
+	if param.FilterName != "" {
+		return r.getStageTrendFromDetail(ctx, param)
+	}
+	return r.getStageTrendFromSummary(ctx, param)
+}
+
+func (r *foDashboardRepo) getStageTrendFromSummary(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+
+	whereFffOverview, argsFffOverview := buildAggCommonWhere("overview", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fffOverviewSQL := `SELECT dt,
+		SUM(success_count) AS fff_success,
+		SUM(failed_count) AS fff_failed
+		FROM ` + tableFffTriggerDailySummary + whereFffOverview + `
+		GROUP BY dt ORDER BY dt ASC`
+
+	whereFffReason, argsFffReason := buildAggCommonWhere("reason", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fffReasonSQL := `SELECT detail_tag AS name, dt, SUM(failed_count) AS count
+		FROM ` + tableFffTriggerDailySummary + whereFffReason + `
+		AND detail_tag != '` + aggAllValue + `' AND detail_tag != ''
+		GROUP BY dt, detail_tag`
+
+	whereFdr, argsFdr := buildAggCommonWhere("overview", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fdrSQL := `SELECT dt, SUM(success_count) AS success, SUM(failed_count) AS failed
+		FROM ` + tableFdrTriggerDailySummary + whereFdr + `
+		GROUP BY dt ORDER BY dt ASC`
+
+	whereFcl, argsFcl := buildAggCommonWhere("overview", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fclSQL := `SELECT dt, SUM(success_count) AS success, SUM(failed_count) AS failed
+		FROM ` + tableFclTriggerDailySummary + whereFcl + `
+		GROUP BY dt ORDER BY dt ASC`
+
+	var (
+		fffOverviewRows []*fffOverviewRow
+		fffReasonRows   []*stageTrendRow
+		fdrRows         []*stageSuccessFailedRow
+		fclRows         []*stageSuccessFailedRow
+		e1, e2, e3, e4  error
+	)
+	var wg sync.WaitGroup
+	wg.Add(4)
+	go func() { defer wg.Done(); e1 = db.Raw(fffOverviewSQL, argsFffOverview...).Scan(&fffOverviewRows).Error }()
+	go func() { defer wg.Done(); e2 = db.Raw(fffReasonSQL, argsFffReason...).Scan(&fffReasonRows).Error }()
+	go func() { defer wg.Done(); e3 = db.Raw(fdrSQL, argsFdr...).Scan(&fdrRows).Error }()
+	go func() { defer wg.Done(); e4 = db.Raw(fclSQL, argsFcl...).Scan(&fclRows).Error }()
+	wg.Wait()
+	for _, e := range []error{e1, e2, e3, e4} {
+		if e != nil {
+			return nil, e
+		}
+	}
+
+	dates := buildTrendDates(param.StartDt, param.EndDt)
+	if len(dates) == 0 {
+		dates = collectTrendDates(fffOverviewRows, fffReasonRows, fdrRows, fclRows)
+	}
+
+	fffSucc := make(map[string]int64, len(fffOverviewRows))
+	fffFailed := make(map[string]int64, len(fffOverviewRows))
+	for _, row := range fffOverviewRows {
+		dt := row.Dt.Format("2006-01-02")
+		fffSucc[dt] = row.FffSuccess
+		fffFailed[dt] = row.FffFailed
+	}
+
+	fffNames := []string{"success", "cooldown", "drm_quota", "acquire_data", "trigger_maximum", "bag_invalid", "event_not_recognized", "tls_error", "quota_exceeded", "event_in_blacklist", "other"}
+	fdrNames := []string{"success", "failed"}
+	fclNames := []string{"success", "failed"}
+
+	return &biz.StageTrendData{
+		Dates: dates,
+		Fff:   buildStageSeries(dates, assembleFffStageVals(dates, fffSucc, fffFailed, fffReasonRows, fffNames), fffNames),
+		Fdr:   buildStageSeries(dates, assembleSuccessFailedVals(dates, fdrRows), fdrNames),
+		Fcl:   buildStageSeries(dates, assembleSuccessFailedVals(dates, fclRows), fclNames),
+	}, nil
+}
+
+func buildTrendDates(startDt, endDt string) []string {
+	if startDt == "" || endDt == "" {
+		return nil
+	}
+	start, err1 := time.Parse("2006-01-02", startDt)
+	end, err2 := time.Parse("2006-01-02", endDt)
+	if err1 != nil || err2 != nil {
+		return nil
+	}
+	if start.After(end) {
+		start, end = end, start
+	}
+	dates := make([]string, 0, int(end.Sub(start).Hours()/24)+1)
+	for dt := start; !dt.After(end); dt = dt.AddDate(0, 0, 1) {
+		dates = append(dates, dt.Format("2006-01-02"))
+	}
+	return dates
+}
+
+func collectTrendDates(fffOverviewRows []*fffOverviewRow, fffReasonRows []*stageTrendRow, fdrRows, fclRows []*stageSuccessFailedRow) []string {
+	seen := map[string]struct{}{}
+	for _, row := range fffOverviewRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	for _, row := range fffReasonRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	for _, row := range fdrRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	for _, row := range fclRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	dates := make([]string, 0, len(seen))
+	for dt := range seen {
+		dates = append(dates, dt)
+	}
+	sort.Strings(dates)
+	return dates
+}
+
+func assembleFffStageVals(dates []string, success map[string]int64, failed map[string]int64, rows []*stageTrendRow, names []string) map[string][]int64 {
+	out := assembleStageVals(dates, success, rows, names)
+	otherIdx := -1
+	for i, name := range names {
+		if name == "other" {
+			otherIdx = i
+			break
+		}
+	}
+	if otherIdx < 0 {
+		return out
+	}
+	for _, dt := range dates {
+		vals := out[dt]
+		var reasonTotal int64
+		for i := 1; i < len(vals); i++ {
+			reasonTotal += vals[i]
+		}
+		if missing := failed[dt] - reasonTotal; missing > 0 {
+			vals[otherIdx] += missing
+		}
+	}
+	return out
+}
+
+// assembleStageVals 把 success 量 + 各 detail_tag 失败量组装成 map[dt][]int64（顺序对齐 names）
+func assembleStageVals(dates []string, succ map[string]int64, rows []*stageTrendRow, names []string) map[string][]int64 {
+	tagDt := make(map[string]map[string]int64, len(rows))
+	for _, r := range rows {
+		dt := r.Dt.Format("2006-01-02")
+		m, ok := tagDt[r.Name]
+		if !ok {
+			m = map[string]int64{}
+			tagDt[r.Name] = m
+		}
+		m[dt] += r.Count
+	}
+	out := make(map[string][]int64, len(dates))
+	for _, dt := range dates {
+		vals := make([]int64, len(names))
+		vals[0] = succ[dt]
+		for j := 1; j < len(names); j++ {
+			if m, ok := tagDt[names[j]]; ok {
+				vals[j] = m[dt]
+			}
+		}
+		out[dt] = vals
+	}
+	return out
+}
+
+func assembleSuccessFailedVals(dates []string, rows []*stageSuccessFailedRow) map[string][]int64 {
+	dtMap := make(map[string][2]int64, len(rows))
+	for _, r := range rows {
+		dtMap[r.Dt.Format("2006-01-02")] = [2]int64{r.Success, r.Failed}
+	}
+	out := make(map[string][]int64, len(dates))
+	for _, dt := range dates {
+		v := dtMap[dt]
+		out[dt] = []int64{v[0], v[1]}
+	}
+	return out
+}
+
+// getStageTrendFromDetail 传了 filter_name 时回退明细表（ads_do_cfdi_daily）
+func (r *foDashboardRepo) getStageTrendFromDetail(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
@@ -1279,7 +1487,7 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard'
 			AND fcl_detail_tag NOT IN ('quota_exceeded','reach_upload_limit','event_in_blacklist','geofence_error','tls_error','bag_missing','upload_error','network_error')
 			THEN cnt ELSE 0 END) AS fcl_other
-		FROM ads_do_cfdi_daily` + where + ` AND event_name != 'Forever_log'
+		FROM ads_do_cfdi_daily` + where + ` AND event_name != '` + aggForeverLogValue + `'
 		GROUP BY dt ORDER BY dt ASC`
 
 	var rows []*stageAllRow
@@ -1398,7 +1606,10 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 	go func() {
 		defer wg.Done()
 		var rows []strRow
-		errFilter = db.Raw(buildDimensionFilterNameSQL()).Scan(&rows).Error
+		errFilter = db.Raw(`SELECT DISTINCT filter_name AS val
+			FROM dwd_cfdi_basic_fff_running
+			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+			ORDER BY val`).Scan(&rows).Error
 		for _, r := range rows {
 			filterNames = append(filterNames, r.Val)
 		}
@@ -1408,9 +1619,9 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 		defer wg.Done()
 		var rows []strRow
 		errProject = db.Raw(`SELECT DISTINCT project_name AS val
-			FROM ` + tableVehicleDailySummaryAgg + `
+			FROM dwd_cfdi_basic_fff_running
 			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-			AND project_name IS NOT NULL AND project_name != ''
+			AND project_name IS NOT NULL
 			ORDER BY val`).Scan(&rows).Error
 		for _, r := range rows {
 			projectNames = append(projectNames, r.Val)
@@ -1420,7 +1631,10 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 	go func() {
 		defer wg.Done()
 		var rows []strRow
-		errEvent = db.Raw(buildDimensionEventNameSQL()).Scan(&rows).Error
+		errEvent = db.Raw(`SELECT DISTINCT event_name AS val
+			FROM dwd_cfdi_basic_fff_trigger
+			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+			ORDER BY val`).Scan(&rows).Error
 		for _, r := range rows {
 			eventNames = append(eventNames, r.Val)
 		}
@@ -1430,9 +1644,9 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 		defer wg.Done()
 		var rows []strRow
 		errCarType = db.Raw(`SELECT DISTINCT car_type AS val
-			FROM ` + tableVehicleDailySummaryAgg + `
+			FROM dwd_cfdi_basic_fff_running
 			WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-			AND car_type IS NOT NULL AND car_type != ''
+			AND car_type IS NOT NULL
 			ORDER BY val`).Scan(&rows).Error
 		for _, r := range rows {
 			carTypes = append(carTypes, r.Val)
@@ -1460,24 +1674,6 @@ func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimension
 		ProjectNames: projectNames,
 		CarTypes:     carTypes,
 	}, nil
-}
-
-func buildDimensionFilterNameSQL() string {
-	return `SELECT DISTINCT filter_name AS val
-		FROM ` + tableFffTriggerDailySummary + `
-		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 360 DAY)
-		AND summary_grain = 'filter'
-		AND filter_name IS NOT NULL AND filter_name != '' AND filter_name != '` + aggAllValue + `'
-		ORDER BY val`
-}
-
-func buildDimensionEventNameSQL() string {
-	return `SELECT DISTINCT event_name AS val
-		FROM ` + tableFffTriggerDailySummary + `
-		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 360 DAY)
-		AND summary_grain = 'overview'
-		AND event_name IS NOT NULL AND event_name != '' AND event_name != '` + aggAllValue + `'
-		ORDER BY val`
 }
 
 // runningTrendRow GetFffRunningTrend 聚合扫描结构
@@ -1585,24 +1781,28 @@ func (r *foDashboardRepo) GetFffOverview(ctx context.Context, param *biz.FffTrig
 	sql, args := buildFffOverviewSQL(param)
 
 	type scanRow struct {
-		TriggerTotal   int64 `gorm:"column:trigger_total"`
-		TriggerSuccess int64 `gorm:"column:trigger_success"`
-		TriggerFailed  int64 `gorm:"column:trigger_failed"`
+		TriggerTotal       int64 `gorm:"column:trigger_total"`
+		TriggerSuccess     int64 `gorm:"column:trigger_success"`
+		TriggerFailed      int64 `gorm:"column:trigger_failed"`
+		TriggerFilterCount int64 `gorm:"column:trigger_filter_count"`
+		CloseFilterCount   int64 `gorm:"column:close_filter_count"`
 	}
 	var sr scanRow
 	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
 		return nil, err
 	}
 	return &biz.FoFffOverviewData{
-		TriggerTotal:   sr.TriggerTotal,
-		TriggerSuccess: sr.TriggerSuccess,
-		TriggerFailed:  sr.TriggerFailed,
+		TriggerTotal:       sr.TriggerTotal,
+		TriggerSuccess:     sr.TriggerSuccess,
+		TriggerFailed:      sr.TriggerFailed,
+		TriggerFilterCount: sr.TriggerFilterCount,
+		CloseFilterCount:   sr.CloseFilterCount,
 	}, nil
 }
 
 func buildFffOverviewSQL(param *biz.FffTriggerParam) (string, []interface{}) {
 	grain := grainForFilter(param.FilterName)
-	where, args := buildAggCommonWhereWithDateDefault(
+	where, mainArgs := buildAggCommonWhereWithDateDefault(
 		grain,
 		param.FilterName,
 		param.EventNames,
@@ -1613,13 +1813,46 @@ func buildFffOverviewSQL(param *biz.FffTriggerParam) (string, []interface{}) {
 		true,
 	)
 
+	triggerFilterWhere, triggerFilterArgs := buildFffFilterCountWhere(param.FilterName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	closeFilterWhere, closeFilterArgs := buildFffFilterCountWhere(param.FilterName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
 	sql := `SELECT
 		SUM(event_count) AS trigger_total,
 		SUM(success_count) AS trigger_success,
-		SUM(failed_count) AS trigger_failed
+		SUM(failed_count) AS trigger_failed,
+		(SELECT COUNT(DISTINCT filter_name) FROM ` + tableFffTriggerDailySummary + triggerFilterWhere + `) AS trigger_filter_count,
+		(SELECT COUNT(DISTINCT filter_name) FROM ` + tableFffCloseDailySummary + closeFilterWhere + `) AS close_filter_count
 		FROM ` + tableFffTriggerDailySummary + where
 
+	args := append(triggerFilterArgs, closeFilterArgs...)
+	args = append(args, mainArgs...)
 	return sql, args
+}
+
+// buildFffFilterCountWhere 汇总表 filter 粒度去重 filter_name 计数的 WHERE（日期/筛选器/项目/车型，与主查询口径一致）
+func buildFffFilterCountWhere(filterName, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if startDt != "" && endDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, startDt, endDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+	conds = append(conds, "summary_grain = 'filter'")
+	conds = append(conds, "filter_name != '"+aggAllValue+"' AND filter_name != ''")
+	if filterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, filterName)
+	}
+	if projectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, projectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", carTypes)
+
+	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
 func (r *foDashboardRepo) GetFffFailReason(ctx context.Context, param *biz.FffTriggerParam) ([]*biz.DoFailReasonItem, error) {

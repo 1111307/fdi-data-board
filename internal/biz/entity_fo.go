@@ -210,7 +210,9 @@ type FoRunningOverviewData struct {
 
 // FoFffOverviewData FFF 触发概览（领域对象）
 type FoFffOverviewData struct {
-	TriggerTotal   int64
-	TriggerSuccess int64
-	TriggerFailed  int64
+	TriggerTotal       int64
+	TriggerSuccess     int64
+	TriggerFailed      int64
+	TriggerFilterCount int64
+	CloseFilterCount   int64
 }
