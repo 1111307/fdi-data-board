@@ -379,6 +379,7 @@ type CloseReasonItem struct {
 // CloseReasonRequest 算子关闭原因分布请求
 type CloseReasonRequest struct {
 	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"`
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`

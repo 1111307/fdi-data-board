@@ -73,8 +73,10 @@ type StageTrendData struct {
 }
 
 // CloseReasonParam 算子关闭原因分布查询参数
+// CloseReasonParam 算子关闭原因分布查询参数
 type CloseReasonParam struct {
 	FilterName  string
+	EventNames  []string
 	ProjectName string
 	CarTypes    []string
 	StartDt     string
@@ -348,6 +350,7 @@ func (uc *FoDashboardUseCase) GetCloseReason(ctx context.Context, req *dashboard
 	}
 	param := &CloseReasonParam{
 		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     startDt,

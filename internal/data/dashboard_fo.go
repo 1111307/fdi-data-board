@@ -371,6 +371,8 @@ func buildFffTriggerReasonWhere(param *biz.FffTriggerParam) (string, []interface
 
 	conds = append(conds, "filter_name = ?")
 	args = append(args, aggAllValue)
+	// 专项分析：event_names 即算子名，映射为 filter_name 过滤
+	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
 
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
@@ -1105,6 +1107,8 @@ func buildCloseReasonWhere(param *biz.CloseReasonParam) (string, []interface{}) 
 		conds = append(conds, "filter_name = ?")
 		args = append(args, param.FilterName)
 	}
+	// close 汇总表只有 filter_name 列，event_names 的值当 filter_name 用
+	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
@@ -1813,8 +1817,8 @@ func buildFffOverviewSQL(param *biz.FffTriggerParam) (string, []interface{}) {
 		true,
 	)
 
-	triggerFilterWhere, triggerFilterArgs := buildFffFilterCountWhere(param.FilterName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
-	closeFilterWhere, closeFilterArgs := buildFffFilterCountWhere(param.FilterName, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	triggerFilterWhere, triggerFilterArgs := buildFffFilterCountWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	closeFilterWhere, closeFilterArgs := buildFffFilterCountWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT
 		SUM(event_count) AS trigger_total,
@@ -1830,7 +1834,7 @@ func buildFffOverviewSQL(param *biz.FffTriggerParam) (string, []interface{}) {
 }
 
 // buildFffFilterCountWhere 汇总表 filter 粒度去重 filter_name 计数的 WHERE（日期/筛选器/项目/车型，与主查询口径一致）
-func buildFffFilterCountWhere(filterName, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
+func buildFffFilterCountWhere(filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
 	var conds []string
 	var args []interface{}
 
@@ -1846,6 +1850,8 @@ func buildFffFilterCountWhere(filterName, projectName string, carTypes []string,
 		conds = append(conds, "filter_name = ?")
 		args = append(args, filterName)
 	}
+	// 专项分析：event_names 即算子名，映射为 filter_name 过滤
+	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, eventNames)
 	if projectName != "" {
 		conds = append(conds, "project_name = ?")
 		args = append(args, projectName)

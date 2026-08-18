@@ -165,29 +165,32 @@ type failReasonRow struct {
 }
 
 func (r *doDashboardRepo) GetFailReason(ctx context.Context, param *biz.DoFailReasonParam) ([]*biz.DoFailReasonItem, error) {
-	// FDR/FCL 失败原因用「全链路阶段口径」（过了 FFF 才到 FDR、过了 FDR 才到 FCL），
-	// 与漏斗/趋势一致；查预聚合明细表 ads_do_cfdi_daily（快，避免扫原始大表）。
+	// 专项分析 FDR/FCL 失败原因用「单模块独立口径」，查各自汇总表 reason 粒度
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
-	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	whereFdr, argsFdr := buildAggCommonWhere("reason", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	whereFcl, argsFcl := buildAggCommonWhere("reason", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT stage, detail_tag, SUM(cnt) AS cnt
 	FROM (
-		SELECT 'FFF' AS stage, fff_detail_tag AS detail_tag, cnt
-		FROM ads_do_cfdi_daily` + where + ` AND fff_status = 'discard' AND fff_detail_tag IS NOT NULL AND fff_detail_tag != ''
+		SELECT 'FDR' AS stage, detail_tag, SUM(failed_count) AS cnt
+		FROM ` + tableFdrTriggerDailySummary + whereFdr + `
+		AND detail_tag != '` + aggAllValue + `' AND detail_tag != ''
+		GROUP BY detail_tag
 		UNION ALL
-		SELECT 'FDR' AS stage, fdr_detail_tag AS detail_tag, cnt
-		FROM ads_do_cfdi_daily` + where + ` AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag IS NOT NULL AND fdr_detail_tag != ''
-		UNION ALL
-		SELECT 'FCL' AS stage, fcl_detail_tag AS detail_tag, cnt
-		FROM ads_do_cfdi_daily` + where + ` AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag IS NOT NULL AND fcl_detail_tag != ''
+		SELECT 'FCL' AS stage, detail_tag, SUM(failed_count) AS cnt
+		FROM ` + tableFclTriggerDailySummary + whereFcl + `
+		AND detail_tag != '` + aggAllValue + `' AND detail_tag != ''
+		GROUP BY detail_tag
 	) t
 	GROUP BY stage, detail_tag
+	HAVING cnt > 0
 	ORDER BY stage, cnt DESC`
 
-	tripleArgs := append(append(append([]interface{}{}, args...), args...), args...)
+	args := append(argsFdr, argsFcl...)
 	var rows []*failReasonRow
-	if err := db.Raw(sql, tripleArgs...).Scan(&rows).Error; err != nil {
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
