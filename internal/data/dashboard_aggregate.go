@@ -37,25 +37,19 @@ func buildAggEventCondition(eventNames []string) (string, []interface{}) {
 	return "event_name IN (" + placeholders + ")", args
 }
 
-func buildAggDateCondition(startDt, endDt string, defaultToday bool) (string, []interface{}) {
+// buildAggDateCondition 日期条件：未传日期时默认近 7 天（含今天）
+func buildAggDateCondition(startDt, endDt string) (string, []interface{}) {
 	if startDt != "" && endDt != "" {
 		return "dt BETWEEN ? AND ?", []interface{}{startDt, endDt}
-	}
-	if defaultToday {
-		return "dt = CURDATE()", nil
 	}
 	return "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)", nil
 }
 
 func buildAggCommonWhere(summaryGrain string, filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
-	return buildAggCommonWhereWithDateDefault(summaryGrain, filterName, eventNames, projectName, carTypes, startDt, endDt, false)
-}
-
-func buildAggCommonWhereWithDateDefault(summaryGrain string, filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string, defaultToday bool) (string, []interface{}) {
 	var conds []string
 	var args []interface{}
 
-	dateCond, dateArgs := buildAggDateCondition(startDt, endDt, defaultToday)
+	dateCond, dateArgs := buildAggDateCondition(startDt, endDt)
 	conds = append(conds, dateCond)
 	args = append(args, dateArgs...)
 
@@ -85,7 +79,7 @@ func buildAggDimensionWhere(summaryGrain string, projectName string, carTypes []
 	var conds []string
 	var args []interface{}
 
-	dateCond, dateArgs := buildAggDateCondition(startDt, endDt, false)
+	dateCond, dateArgs := buildAggDateCondition(startDt, endDt)
 	conds = append(conds, dateCond)
 	args = append(args, dateArgs...)
 

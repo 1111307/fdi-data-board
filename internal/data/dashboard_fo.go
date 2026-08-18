@@ -161,9 +161,13 @@ func buildFffRunningVehicleWhere(param *biz.FffRunningParam) (string, []interfac
 	var conds []string
 	var args []interface{}
 
-	dateCond, dateArgs := buildAggDateCondition(param.StartDt, param.EndDt, true)
-	conds = append(conds, dateCond)
-	args = append(args, dateArgs...)
+	// running 相关查询保留原口径：未传日期时默认今天
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
 
 	eventCond, eventArgs := buildAggEventCondition(nonAllValues(param.EventNames))
 	conds = append(conds, eventCond)
@@ -351,7 +355,8 @@ func buildFffTriggerReasonWhere(param *biz.FffTriggerParam) (string, []interface
 		conds = append(conds, "dt <= ?")
 		args = append(args, param.EndDt)
 	} else {
-		conds = append(conds, "dt = CURDATE()")
+		// 日期默认与全看板一致：未传时近 7 天
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
 	}
 
 	if len(param.EventNames) == 0 {
@@ -1806,7 +1811,8 @@ func (r *foDashboardRepo) GetFffOverview(ctx context.Context, param *biz.FffTrig
 
 func buildFffOverviewSQL(param *biz.FffTriggerParam) (string, []interface{}) {
 	grain := grainForFilter(param.FilterName)
-	where, mainArgs := buildAggCommonWhereWithDateDefault(
+	// 日期默认与全看板一致：未传时近 7 天
+	where, mainArgs := buildAggCommonWhere(
 		grain,
 		param.FilterName,
 		param.EventNames,
@@ -1814,7 +1820,6 @@ func buildFffOverviewSQL(param *biz.FffTriggerParam) (string, []interface{}) {
 		param.CarTypes,
 		param.StartDt,
 		param.EndDt,
-		true,
 	)
 
 	triggerFilterWhere, triggerFilterArgs := buildFffFilterCountWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
@@ -1842,7 +1847,8 @@ func buildFffFilterCountWhere(filterName string, eventNames []string, projectNam
 		conds = append(conds, "dt BETWEEN ? AND ?")
 		args = append(args, startDt, endDt)
 	} else {
-		conds = append(conds, "dt = CURDATE()")
+		// 日期默认与全看板一致：未传时近 7 天
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
 	}
 	conds = append(conds, "summary_grain = 'filter'")
 	conds = append(conds, "filter_name != '"+aggAllValue+"' AND filter_name != ''")
