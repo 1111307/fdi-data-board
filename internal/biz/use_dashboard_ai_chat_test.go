@@ -227,3 +227,36 @@ func TestStreamChatBackfillsMissingToolResult(t *testing.T) {
 		t.Fatalf("placeholder tool_result missing: %s", string(msgsJSON))
 	}
 }
+
+// 用例6:纯续跑——question 为空但历史以 tool_result 结尾时允许,且不追加用户文本
+func TestStreamChatResumeWithEmptyQuestion(t *testing.T) {
+	fake := &chatLlmFake{rounds: []string{
+		`{"id":"m2","type":"message","role":"assistant","model":"k","stop_reason":"end_turn","content":[
+			{"type":"text","text":"已按你的选择查询完成。"}]}`,
+	}}
+	uc := newAiUcForTest(fake)
+
+	history := []AiChatHistoryMessage{
+		{Role: "user", Text: "失败原因?"},
+		{Role: "assistant", ToolCalls: []AiChatToolCall{
+			{ID: "c1", Name: "clarify", Args: map[string]any{"kind": "missing_param", "question": "哪个阶段?"}},
+		}},
+		{Role: "user", ToolResults: []AiChatToolResult{
+			{ID: "c1", Content: "用户选择: stage=fff"},
+		}},
+	}
+
+	events := collectEvents(t, uc, "", history)
+	if last := events[len(events)-1]; last.Type != "done" || last.Stop != "end_turn" {
+		t.Fatalf("resume failed: %s", eventTypes(events))
+	}
+	// 历史重建后消息数 = 3(不再追加第 4 条用户文本)
+	if len(fake.lastReq.Messages) != 3 {
+		t.Fatalf("messages = %d, want 3 (no extra user text)", len(fake.lastReq.Messages))
+	}
+
+	// 空 question 且历史不以 tool_result 结尾 → 仍应报错
+	if err := uc.StreamChat(context.Background(), "", nil, func(ChatEvent) error { return nil }); err == nil {
+		t.Fatal("empty question without pending tool_result should error")
+	}
+}

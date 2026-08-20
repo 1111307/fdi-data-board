@@ -161,7 +161,9 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 // buildAnthropicMessages 校验并重建历史 + 当前提问
 func buildAnthropicMessages(question string, history []AiChatHistoryMessage) ([]anthropic.MessageParam, error) {
 	q := strings.TrimSpace(question)
-	if q == "" {
+	// 纯续跑场景(clarify 确认后):question 可为空,但历史必须以 tool_result 结尾,
+	// 此时不再追加任何用户文本,由历史尾部的 tool_result 驱动模型继续
+	if q == "" && !historyEndsWithToolResult(history) {
 		return nil, fmt.Errorf("question 不能为空")
 	}
 	if len(history) > aiMaxHistory {
@@ -200,8 +202,18 @@ func buildAnthropicMessages(question string, history []AiChatHistoryMessage) ([]
 			return nil, fmt.Errorf("历史消息 role 非法: %s", h.Role)
 		}
 	}
-	msgs = append(msgs, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(q)}})
+	if q != "" {
+		msgs = append(msgs, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(q)}})
+	}
 	return backfillToolResults(msgs), nil
+}
+
+// historyEndsWithToolResult 历史末尾是否为带 tool_result 的 user 消息(即挂起的确认回执)
+func historyEndsWithToolResult(history []AiChatHistoryMessage) bool {
+	if len(history) == 0 || history[len(history)-1].Role != "user" {
+		return false
+	}
+	return len(history[len(history)-1].ToolResults) > 0
 }
 
 // backfillToolResults 协议兜底:assistant 里的每个 tool_use 必须在紧邻的下一条 user 消息里
