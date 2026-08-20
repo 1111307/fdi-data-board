@@ -20,16 +20,17 @@ const aiMaxRounds = 6
 // aiMaxHistory 历史消息条数上限(防 prompt 膨胀)
 const aiMaxHistory = 40
 
-// ChatEvent SSE 下行事件(前端据此渲染:delta 文本/tool_call 工具卡/clarify 确认卡/tool_result 结果摘要)
+// ChatEvent SSE 下行事件(前端据此渲染:delta 文本/tool_call 工具卡/clarify 确认卡/tool_result 结果与图表数据)
 type ChatEvent struct {
-	Type    string         `json:"type"` // delta / tool_call / tool_result / clarify / done / error
-	Text    string         `json:"text,omitempty"`
-	ID      string         `json:"id,omitempty"`
-	Name    string         `json:"name,omitempty"`
-	Args    map[string]any `json:"args,omitempty"`
-	Summary string         `json:"summary,omitempty"`
-	Stop    string         `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / max_rounds
-	Error   string         `json:"error,omitempty"`
+	Type    string          `json:"type"` // delta / tool_call / tool_result / clarify / done / error
+	Text    string          `json:"text,omitempty"`
+	ID      string          `json:"id,omitempty"`
+	Name    string          `json:"name,omitempty"`
+	Args    map[string]any  `json:"args,omitempty"`
+	Summary string          `json:"summary,omitempty"`
+	Data    json.RawMessage `json:"data,omitempty"` // tool_result 的完整 JSON(前端渲染图表)
+	Stop    string          `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / max_rounds
+	Error   string          `json:"error,omitempty"`
 }
 
 // AiChatHistoryMessage 前端回传的会话历史(轻量结构,后端重建为 Anthropic content blocks)
@@ -139,7 +140,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 			if len(summary) > 120 {
 				summary = summary[:120] + "…"
 			}
-			_ = emit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary})
+			_ = emit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary, Data: json.RawMessage(result)})
 			resultBlocks = append(resultBlocks, anthropic.NewToolResultBlock(tu.ID, result, execErr != nil))
 		}
 
