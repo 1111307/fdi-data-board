@@ -190,3 +190,40 @@ func TestStreamChatInvalidInput(t *testing.T) {
 		t.Fatal("invalid role should error")
 	}
 }
+
+// 用例5(线上bug回归):历史里 assistant(tool_use) 缺配对 tool_result 时,
+// backfillToolResults 必须自动补占位结果,否则网关 400
+func TestStreamChatBackfillsMissingToolResult(t *testing.T) {
+	fake := &chatLlmFake{rounds: []string{
+		`{"id":"m2","type":"message","role":"assistant","model":"k","stop_reason":"end_turn","content":[
+			{"type":"text","text":"接上文继续。"}]}`,
+	}}
+	uc := newAiUcForTest(fake)
+
+	// 历史里 assistant 带两个 tool_use,但下一条 user 只有一个 tool_result(另一个缺失)
+	history := []AiChatHistoryMessage{
+		{Role: "user", Text: "失败原因?"},
+		{Role: "assistant", ToolCalls: []AiChatToolCall{
+			{ID: "t1", Name: "get_fail_reason", Args: map[string]any{"stage": "fff"}},
+			{ID: "t2", Name: "get_top", Args: map[string]any{"kind": "trigger"}},
+		}},
+		{Role: "user", ToolResults: []AiChatToolResult{
+			{ID: "t1", Content: "结果略"},
+		}},
+	}
+
+	events := collectEvents(t, uc, "继续", history)
+	last := events[len(events)-1]
+	if last.Type != "done" || last.Stop != "end_turn" {
+		t.Fatalf("stream failed: %s", eventTypes(events))
+	}
+
+	// 校验重建后的消息序列:缺失的 t2 获得占位 tool_result,t1 原结果保留
+	msgsJSON, _ := json.Marshal(fake.lastReq.Messages)
+	if !strings.Contains(string(msgsJSON), `"tool_use_id":"t2"`) {
+		t.Fatalf("missing tool_use t2 not backfilled: %s", string(msgsJSON))
+	}
+	if !strings.Contains(string(msgsJSON), "结果未随历史回传") {
+		t.Fatalf("placeholder tool_result missing: %s", string(msgsJSON))
+	}
+}

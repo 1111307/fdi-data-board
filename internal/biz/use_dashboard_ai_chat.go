@@ -201,7 +201,82 @@ func buildAnthropicMessages(question string, history []AiChatHistoryMessage) ([]
 		}
 	}
 	msgs = append(msgs, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(q)}})
-	return msgs, nil
+	return backfillToolResults(msgs), nil
+}
+
+// backfillToolResults 协议兜底:assistant 里的每个 tool_use 必须在紧邻的下一条 user 消息里
+// 有对应 tool_result,否则网关 400。历史回传缺失时(前端未带、clarify 未回答、暂停丢结果)
+// 自动补占位 tool_result,保证请求永远合法。
+func backfillToolResults(msgs []anthropic.MessageParam) []anthropic.MessageParam {
+	out := make([]anthropic.MessageParam, 0, len(msgs)+4)
+	for i := 0; i < len(msgs); i++ {
+		m := msgs[i]
+		if m.Role != anthropic.MessageParamRoleAssistant {
+			out = append(out, m)
+			continue
+		}
+		missing := missingToolResultIDs(m, msgs, i)
+		if len(missing) == 0 {
+			out = append(out, m)
+			continue
+		}
+		// 缺失的 tool_result 处理:
+		// 下一条是 user 且带 tool_result → 把缺失块并入该消息开头;
+		// 否则在 assistant 后插入一条补齐的 user 消息。
+		next := []anthropic.ContentBlockParamUnion{}
+		for _, id := range missing {
+			next = append(next, anthropic.NewToolResultBlock(id, "(该工具调用在上一轮已完成,结果未随历史回传)", false))
+		}
+		if i+1 < len(msgs) && msgs[i+1].Role == anthropic.MessageParamRoleUser && hasToolResult(msgs[i+1]) {
+			merged := append(next, msgs[i+1].Content...)
+			out = append(out, m, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: merged})
+			i++ // 原下一条已并入
+		} else if i+1 < len(msgs) && msgs[i+1].Role == anthropic.MessageParamRoleUser {
+			// 下一条是纯文本 user → tool_result 块拼在其前(协议允许同一 user 消息混合)
+			merged := append(next, msgs[i+1].Content...)
+			out = append(out, m, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: merged})
+			i++
+		} else {
+			out = append(out, m, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: next})
+		}
+	}
+	return out
+}
+
+func missingToolResultIDs(assistant anthropic.MessageParam, msgs []anthropic.MessageParam, i int) []string {
+	var useIDs []string
+	for _, b := range assistant.Content {
+		if tu := b.OfToolUse; tu != nil {
+			useIDs = append(useIDs, tu.ID)
+		}
+	}
+	if len(useIDs) == 0 {
+		return nil
+	}
+	covered := map[string]bool{}
+	if i+1 < len(msgs) && msgs[i+1].Role == anthropic.MessageParamRoleUser {
+		for _, b := range msgs[i+1].Content {
+			if tr := b.OfToolResult; tr != nil {
+				covered[tr.ToolUseID] = true
+			}
+		}
+	}
+	missing := []string{}
+	for _, id := range useIDs {
+		if !covered[id] {
+			missing = append(missing, id)
+		}
+	}
+	return missing
+}
+
+func hasToolResult(m anthropic.MessageParam) bool {
+	for _, b := range m.Content {
+		if b.OfToolResult != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func rawToArgs(raw json.RawMessage) map[string]any {
