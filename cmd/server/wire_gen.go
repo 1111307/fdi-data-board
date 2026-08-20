@@ -40,7 +40,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger) (*
 	doDashboardRepo := data.NewDoDashboardRepo(dataData)
 	doDashboardUseCase := biz.NewDoDashboardUseCase(doDashboardRepo)
 	doDashboardService := service.NewDoDashboardService(doDashboardUseCase)
-	aiDashboardUseCase := biz.NewAiDashboardUseCase(foDashboardUseCase, doDashboardUseCase, data.NewLlmRepo(confData, logger))
+	aiDashboardUseCase := biz.NewAiDashboardUseCase(foDashboardUseCase, doDashboardUseCase, data.NewLlmRepo(dataData))
 	aiDashboardService := service.NewAiDashboardService(aiDashboardUseCase)
 	etlRepo := data.NewEtlRepo(dataData, logger)
 	etlUseCase := biz.NewETLUseCase(etlRepo, logger)

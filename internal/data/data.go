@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
@@ -40,9 +42,32 @@ type Data struct {
 	mysqlDB *gorm.DB
 	dorisDB *gorm.DB
 	anyConn *grpc.ClientConn
+	// 大模型网关客户端(Anthropic Messages 协议),data.llm 未配置完整时为 nil
+	llmClient *anthropic.Client
 
 	// 维度值缓存，key: "fo_dashboard:dims", value: *foDimsCache (in dashboard_fo.go)
 	dimCache sync.Map
+}
+
+// newLlmClient 构建大模型网关客户端;base_url/api_key/model 任一为空返回 nil,AI 总结降级统计模式
+func newLlmClient(c *conf.Data, logger log.Logger) *anthropic.Client {
+	lc := c.GetLlm()
+	if lc == nil || lc.GetBaseUrl() == "" || lc.GetApiKey() == "" || lc.GetModel() == "" {
+		log.NewHelper(logger).Warn("[llm] base_url/api_key/model 未配置,AI 总结将使用本地统计模式")
+		return nil
+	}
+
+	timeout := 120 * time.Second
+	if lc.GetTimeout() != nil && lc.GetTimeout().AsDuration() > 0 {
+		timeout = lc.GetTimeout().AsDuration()
+	}
+
+	client := anthropic.NewClient(
+		option.WithBaseURL(lc.GetBaseUrl()),
+		option.WithAPIKey(lc.GetApiKey()),
+		option.WithRequestTimeout(timeout),
+	)
+	return &client
 }
 
 func newMysqlDB(c *conf.Data) *gorm.DB {
@@ -184,12 +209,14 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	mysqlDB := newMysqlDB(c)
 	anyConn := anyDialer(c, logger)
 	dorisDB := newDorisDB(c)
+	llmClient := newLlmClient(c, logger)
 
 	d := &Data{
-		conf:    c,
-		mysqlDB: mysqlDB,
-		dorisDB: dorisDB,
-		anyConn: anyConn,
+		conf:      c,
+		mysqlDB:   mysqlDB,
+		dorisDB:   dorisDB,
+		anyConn:   anyConn,
+		llmClient: llmClient,
 	}
 
 	cleanup := func() {
