@@ -10,16 +10,22 @@ import (
 	dashboard_api "fdi_data_board/api/dashboard"
 )
 
+// LlmRepo 大模型流式网关(data 层实现,Anthropic Messages 协议)
+type LlmRepo interface {
+	Enabled() bool
+	ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string)) error
+}
+
 // AiDashboardUseCase 看板 AI 总结用例:复用 FO/DO 用例的聚合结果(口径与页面完全一致),
 // 拼装快照后交给大模型生成解读;未配置 LLM 网关时退化为本地统计模式。
 type AiDashboardUseCase struct {
 	fo  *FoDashboardUseCase
 	do  *DoDashboardUseCase
-	llm *LlmClient
+	llm LlmRepo
 }
 
-func NewAiDashboardUseCase(fo *FoDashboardUseCase, do *DoDashboardUseCase) *AiDashboardUseCase {
-	return &AiDashboardUseCase{fo: fo, do: do, llm: NewLlmClient(LlmConfigFromEnv())}
+func NewAiDashboardUseCase(fo *FoDashboardUseCase, do *DoDashboardUseCase, llm LlmRepo) *AiDashboardUseCase {
+	return &AiDashboardUseCase{fo: fo, do: do, llm: llm}
 }
 
 // aiDashboardSnapshot 交给大模型的数据快照(全部来自现有聚合接口,失败的分项置空跳过)

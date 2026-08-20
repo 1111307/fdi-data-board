@@ -30,6 +30,7 @@ var ProviderSet = wire.NewSet(
 	NewDoDashboardRepo,
 	NewEtlRepo,
 	NewReconcileRepo,
+	NewLlmRepo,
 	NewSchedulerRedisClient,
 )
 

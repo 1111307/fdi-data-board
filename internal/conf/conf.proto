@@ -91,6 +91,14 @@ message Data {
         google.protobuf.Duration lock_refresh_interval = 7;
     }
 
+    message LLM {
+        string base_url = 1;      // Anthropic 协议网关地址
+        string api_key = 2;       // 网关密钥(x-api-key)
+        string model = 3;         // 模型名,如 kimi-k3
+        int64 max_tokens = 4;     // 单次生成上限,默认 4096
+        google.protobuf.Duration timeout = 6; // 单次请求超时
+    }
+
     Mysql mysql = 1;
     Redis redis = 2;
     Keycloak keycloak = 3;
@@ -98,4 +106,5 @@ message Data {
     Runtime runtime = 7;
     Doris doris = 8;
     Etl etl = 9;
+    LLM llm = 10;
 }

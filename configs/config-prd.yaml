@@ -46,6 +46,13 @@ data:
   runtime:
     env: ${RUN_MODE:prd}
     domain: ${FUNC_SCOPE:fdi_cloud}
+  llm:
+    # Anthropic Messages 协议网关;三项任一为空则 AI 总结退化为本地统计模式
+    base_url: ${LLM_BASE_URL:}
+    api_key: ${LLM_API_KEY:}
+    model: ${LLM_MODEL:}
+    max_tokens: ${LLM_MAX_TOKENS:4096}
+    timeout: ${LLM_TIMEOUT:120s}
   etl:
     on: ${ETL_ON:true}
     backfill_on: ${ETL_BACKFILL_ON:true}
