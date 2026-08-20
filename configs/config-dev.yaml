@@ -54,11 +54,11 @@ data:
     domain: ${FUNC_SCOPE:fdi_cloud}
   llm:
     # Anthropic Messages 协议网关;三项任一为空则 AI 总结退化为本地统计模式
-    base_url: ${LLM_BASE_URL:}
-    api_key: ${LLM_API_KEY:}
-    model: ${LLM_MODEL:}
-    max_tokens: ${LLM_MAX_TOKENS:4096}
-    timeout: ${LLM_TIMEOUT:120s}
+    base_url: ${LLM_BASE_URL:https://llm-gateway.momenta.works}
+    api_key: ${LLM_API_KEY:sk-Mwj6z4orGxezS5ZBADXzgQ}
+    model: ${LLM_MODEL:kimi-k3}
+    max_tokens: ${LLM_MAX_TOKENS:8192}
+    timeout: ${LLM_TIMEOUT:360s}
   etl:
     on: ${ETL_ON:false}
     backfill_on: ${ETL_BACKFILL_ON:true}
@@ -67,9 +67,3 @@ data:
     lock_key: ${ETL_LOCK_KEY:fdi_data_board:etl:scheduler}
     lock_ttl: ${ETL_LOCK_TTL:120s}
     lock_refresh_interval: ${ETL_LOCK_REFRESH_INTERVAL:30s}
-
-  llm:
-    base_url: ${BASE_URL:https://llm-gateway.momenta.works}
-    time_out: ${TIME_OUT:360}
-    api_key: ${API_KEY:sk-Mwj6z4orGxezS5ZBADXzgQ}
-    model: ${MODEL:kimi-k3}
