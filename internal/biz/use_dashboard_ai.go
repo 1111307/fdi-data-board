@@ -7,40 +7,56 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anthropics/anthropic-sdk-go"
+
 	dashboard_api "fdi_data_board/api/dashboard"
 )
 
 // LlmRepo 大模型流式网关(data 层实现,Anthropic Messages 协议)
 type LlmRepo interface {
 	Enabled() bool
+	// Model 网关配置的模型名(chat 场景由调用方填入请求参数)
+	Model() string
 	ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string)) error
+	// ChatStreamEx 完整参数流式对话(带 tools/多轮历史),onEvent 逐事件回调,
+	// 返回聚合完成的最终 Message(含 content blocks 与 stop_reason)
+	ChatStreamEx(ctx context.Context, params anthropic.MessageNewParams, onEvent func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error)
 }
 
-// AiDashboardUseCase 看板 AI 总结用例:复用 FO/DO 用例的聚合结果(口径与页面完全一致),
-// 拼装快照后交给大模型生成解读;未配置 LLM 网关时退化为本地统计模式。
+// AiDashboardUseCase 看板 AI 用例:总结(Summary)与问答(StreamChat)。
+// 复用 FO/DO 用例的聚合结果(口径与页面完全一致),未配置 LLM 网关时总结退化为本地统计模式。
 type AiDashboardUseCase struct {
-	fo  *FoDashboardUseCase
-	do  *DoDashboardUseCase
-	llm LlmRepo
+	fo    *FoDashboardUseCase
+	do    *DoDashboardUseCase
+	llm   LlmRepo
+	tools *aiToolRegistry
 }
 
 func NewAiDashboardUseCase(fo *FoDashboardUseCase, do *DoDashboardUseCase, llm LlmRepo) *AiDashboardUseCase {
-	return &AiDashboardUseCase{fo: fo, do: do, llm: llm}
+	return &AiDashboardUseCase{fo: fo, do: do, llm: llm, tools: newAiToolRegistry(fo, do)}
+}
+
+// llmModel 问答场景使用的模型名(总结场景由 data 层自填)
+func (uc *AiDashboardUseCase) llmModel() string {
+	if m := uc.llm.Model(); m != "" {
+		return m
+	}
+	return "kimi-k3"
 }
 
 // aiDashboardSnapshot 交给大模型的数据快照(全部来自现有聚合接口,失败的分项置空跳过)
 type aiDashboardSnapshot struct {
-	QueryRange      *queryRange               `json:"query_range,omitempty"`
-	FffOverview     *dashboard_api.FoFffOverviewResponse   `json:"fff_overview,omitempty"`
+	QueryRange      *queryRange                              `json:"query_range,omitempty"`
+	FffOverview     *dashboard_api.FoFffOverviewResponse     `json:"fff_overview,omitempty"`
 	RunningOverview *dashboard_api.FoRunningOverviewResponse `json:"running_overview,omitempty"`
-	FffFailReason   []*dashboard_api.DoFailReasonItem       `json:"fff_fail_reason,omitempty"`
-	CloseReason     []*dashboard_api.CloseReasonItem        `json:"close_reason,omitempty"`
-	StageTrend      *dashboard_api.StageTrendResponse      `json:"stage_trend,omitempty"`
-	MemTop          []*dashboard_api.DoEventTopItem         `json:"mem_top,omitempty"`
-	DiskTop         []*dashboard_api.DoEventTopItem         `json:"disk_top,omitempty"`
-	QuotaTop        []*dashboard_api.DoEventTopItem         `json:"quota_top,omitempty"`
-	FdrQuality      *dashboard_api.DoFdrQualityResponse     `json:"fdr_quality,omitempty"`
-	FclQuality      *dashboard_api.DoFclQualityResponse     `json:"fcl_quality,omitempty"`
+	FffFailReason   []*dashboard_api.DoFailReasonItem        `json:"fff_fail_reason,omitempty"`
+	CloseReason     []*dashboard_api.CloseReasonItem         `json:"close_reason,omitempty"`
+	StageTrend      *dashboard_api.StageTrendResponse        `json:"stage_trend,omitempty"`
+	MemTop          []*dashboard_api.DoEventTopItem          `json:"mem_top,omitempty"`
+	DiskTop         []*dashboard_api.DoEventTopItem          `json:"disk_top,omitempty"`
+	QuotaTop        []*dashboard_api.DoEventTopItem          `json:"quota_top,omitempty"`
+	FdrQuality      *dashboard_api.DoFdrQualityResponse      `json:"fdr_quality,omitempty"`
+	FclQuality      *dashboard_api.DoFclQualityResponse      `json:"fcl_quality,omitempty"`
 }
 
 type queryRange struct {

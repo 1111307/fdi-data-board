@@ -638,6 +638,32 @@ type AiSummaryRequest struct {
 	EndDt       string `form:"end_dt"`
 }
 
+// AiChatRequest AI 问答请求(SSE 流式响应);历史由前端持有并回传,后端无状态
+type AiChatRequest struct {
+	Question string                     `json:"question"` // 本轮提问
+	Messages []AiChatHistoryMessageView `json:"messages"` // 之前的会话历史(含工具调用/确认结果)
+}
+
+// AiChatHistoryMessageView 会话历史消息(API 视图)
+type AiChatHistoryMessageView struct {
+	Role        string              `json:"role"` // user / assistant
+	Text        string              `json:"text,omitempty"`
+	ToolCalls   []AiChatToolCallView `json:"tool_calls,omitempty"`
+	ToolResults []AiChatToolResultView `json:"tool_results,omitempty"`
+}
+
+type AiChatToolCallView struct {
+	ID   string         `json:"id"`
+	Name string         `json:"name"`
+	Args map[string]any `json:"args"`
+}
+
+type AiChatToolResultView struct {
+	ID      string `json:"id"`
+	Content string `json:"content"`
+	IsError bool   `json:"is_error"`
+}
+
 // DoFailReasonResponse 失败原因分析响应
 type DoFailReasonResponse struct {
 	BaseResponse

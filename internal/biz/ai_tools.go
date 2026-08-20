@@ -1,0 +1,338 @@
+package biz
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
+
+	dashboard_api "fdi_data_board/api/dashboard"
+)
+
+// aiToolDef 工具定义:Anthropic tool schema + 进程内执行适配器(直调 biz 用例,无 HTTP)
+type aiToolDef struct {
+	def  anthropic.ToolParam
+	exec func(ctx context.Context, args map[string]any) (string, error)
+}
+
+// aiToolRegistry 白名单工具注册表;clarify 为保留工具(不执行,触发人工确认暂停)
+type aiToolRegistry struct {
+	tools map[string]*aiToolDef
+	order []string
+}
+
+const aiClarifyToolName = "clarify"
+
+func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRegistry {
+	r := &aiToolRegistry{tools: map[string]*aiToolDef{}}
+
+	add := func(def anthropic.ToolParam, exec func(context.Context, map[string]any) (string, error)) {
+		r.tools[def.Name] = &aiToolDef{def: def, exec: exec}
+		r.order = append(r.order, def.Name)
+	}
+
+	// ---- 保留工具:clarify(参数/意图不确定时向用户求证) ----
+	add(anthropic.ToolParam{
+		Name:        aiClarifyToolName,
+		Description: param.NewOpt("当无法确定调用哪个工具、或关键参数(如 stage/kind/日期范围/事件)缺失或有歧义时,调用此工具向用户提问。payload.kind: missing_param(缺参数,含 param 名与 candidates 候选)/ambiguous_tool(工具歧义,含 options 候选与各自理由)/confirm_params(参数齐了,展示最终参数让用户确认)。question 为给用户看的一句中文提问。"),
+		InputSchema: aiSchema(map[string]any{
+			"kind":       map[string]any{"type": "string", "enum": []string{"missing_param", "ambiguous_tool", "confirm_params"}, "description": "确认类型"},
+			"question":   map[string]any{"type": "string", "description": "向用户提出的问题,一句话"},
+			"param":      map[string]any{"type": "string", "description": "kind=missing_param 时缺的参数名"},
+			"candidates": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "kind=missing_param 时的候选值"},
+			"options": map[string]any{"type": "array", "items": map[string]any{
+				"type": "object", "properties": map[string]any{
+					"tool":   map[string]any{"type": "string"},
+					"reason": map[string]any{"type": "string"},
+				},
+			}, "description": "kind=ambiguous_tool 时的候选工具与理由"},
+			"args": map[string]any{"type": "object", "description": "kind=confirm_params 时的最终参数预览"},
+		}, "kind", "question"),
+	}, nil)
+
+	// ---- 数据工具:全部直调既有用例,口径与看板页面一致 ----
+	commonProps := func() map[string]any {
+		return map[string]any{
+			"start_dt":     map[string]any{"type": "string", "description": "开始日期 YYYY-MM-DD,缺省为近7天"},
+			"end_dt":       map[string]any{"type": "string", "description": "结束日期 YYYY-MM-DD,缺省为近7天"},
+			"event_names":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "事件名过滤,用户点名才传"},
+			"project_name": map[string]any{"type": "string", "description": "项目名过滤"},
+			"car_types":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "车型过滤"},
+		}
+	}
+
+	add(anthropic.ToolParam{
+		Name:        "get_fail_reason",
+		Description: param.NewOpt("查询某阶段的失败原因分布(低基数 detail_tag 聚合,Top 榜单)。适用:失败原因/为什么失败/失败分布。stage=fff 查筛选器触发失败,fdr 查落盘失败,fcl 查上传失败。"),
+		InputSchema: aiSchemaWith(commonProps(), map[string]any{
+			"stage": map[string]any{"type": "string", "enum": []string{"fff", "fdr", "fcl"}, "description": "链路阶段,必填"},
+		}, "stage"),
+	}, execStageQuery(fo, do, "fail_reason"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_stage_trend",
+		Description: param.NewOpt("查询某阶段按日的成功/失败趋势序列。适用:趋势/每日变化/环比。stage=fff/fdr/fcl。"),
+		InputSchema: aiSchemaWith(commonProps(), map[string]any{
+			"stage": map[string]any{"type": "string", "enum": []string{"fff", "fdr", "fcl"}, "description": "链路阶段,必填"},
+		}, "stage"),
+	}, execStageQuery(fo, do, "trend"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_overview",
+		Description: param.NewOpt("查询整体概览:FFF 触发总数/成功率/失败数,FDR 落盘质量,FCL 上传质量。适用:概览/整体情况/成功率。"),
+		InputSchema: aiSchema(commonProps()),
+	}, execStageQuery(fo, do, "overview"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_top",
+		Description: param.NewOpt("查询 Top 榜单。kind=trigger 触发次数 Top 事件/mem 内存不足 Top/disk 磁盘不足 Top/quota 配额超限 Top/close 关闭次数 Top 筛选器。"),
+		InputSchema: aiSchemaWith(commonProps(), map[string]any{
+			"kind": map[string]any{"type": "string", "enum": []string{"trigger", "mem", "disk", "quota", "close"}, "description": "榜单类型,必填"},
+		}, "kind"),
+	}, execStageQuery(fo, do, "top"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_quality",
+		Description: param.NewOpt("查询阶段质量 P95 指标。stage=fdr:落盘耗时/磁盘/内存 P95、碎片率;fcl:Bag 大小 P95、上传量。"),
+		InputSchema: aiSchemaWith(commonProps(), map[string]any{
+			"stage": map[string]any{"type": "string", "enum": []string{"fdr", "fcl"}, "description": "链路阶段,必填"},
+		}, "stage"),
+	}, execStageQuery(fo, do, "quality"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_dimensions",
+		Description: param.NewOpt("查询可选维度枚举:事件名/项目/车型/筛选器列表。适用:用户问有哪些可选值,或 clarify 前需要候选列表。"),
+		InputSchema: aiSchema(map[string]any{}, ""),
+	}, func(ctx context.Context, _ map[string]any) (string, error) {
+		res, err := fo.GetDimensions(ctx)
+		if err != nil {
+			return "", err
+		}
+		// 截断防 prompt 膨胀
+		out := map[string]any{
+			"event_names": truncate(res.EventNames, 50),
+			"projects":    truncate(res.ProjectNames, 50),
+			"car_types":   truncate(res.CarTypes, 50),
+			"filters":     truncate(res.FilterNames, 50),
+		}
+		return marshalToolResult(out)
+	})
+
+	return r
+}
+
+// Params 导出给 Anthropic 请求的 tools 定义(保持注册顺序)
+func (r *aiToolRegistry) Params() []anthropic.ToolUnionParam {
+	out := make([]anthropic.ToolUnionParam, 0, len(r.order))
+	for _, name := range r.order {
+		def := r.tools[name].def
+		out = append(out, anthropic.ToolUnionParam{OfTool: &def})
+	}
+	return out
+}
+
+// Exec 执行白名单工具,返回 tool_result 内容(JSON 字符串)
+func (r *aiToolRegistry) Exec(ctx context.Context, name string, args map[string]any) (string, error) {
+	t, ok := r.tools[name]
+	if !ok || t.exec == nil {
+		return "", fmt.Errorf("unknown tool: %s", name)
+	}
+	return t.exec(ctx, args)
+}
+
+// ---- 参数提取工具 ----
+
+func argString(args map[string]any, key string) string {
+	if v, ok := args[key].(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
+func argStringSlice(args map[string]any, key string) []string {
+	raw, ok := args[key].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, v := range raw {
+		if s, ok := v.(string); ok && strings.TrimSpace(s) != "" {
+			out = append(out, strings.TrimSpace(s))
+		}
+	}
+	return out
+}
+
+// defaultDateRange 补齐缺省日期:近 7 天(含今天)
+func defaultDateRange(args map[string]any) (string, string) {
+	start, end := argString(args, "start_dt"), argString(args, "end_dt")
+	if start == "" || end == "" {
+		today := time.Now()
+		start = today.AddDate(0, 0, -6).Format("2006-01-02")
+		end = today.Format("2006-01-02")
+	}
+	return start, end
+}
+
+// execStageQuery 生成"公共查询参数 → 既有用例方法"的适配器
+func execStageQuery(fo *FoDashboardUseCase, do *DoDashboardUseCase, kind string) func(context.Context, map[string]any) (string, error) {
+	return func(ctx context.Context, args map[string]any) (string, error) {
+		start, end := defaultDateRange(args)
+		events := argStringSlice(args, "event_names")
+		cars := argStringSlice(args, "car_types")
+		project := argString(args, "project_name")
+		eventStr := strings.Join(events, ",")
+		carStr := strings.Join(cars, ",")
+
+		triggerReq := &dashboard_api.FffTriggerRequest{EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end}
+		trendReq := &dashboard_api.StageTrendRequest{EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end}
+		doReq := &dashboard_api.DoCoolTopRequest{EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end}
+
+		switch kind {
+		case "fail_reason":
+			switch argString(args, "stage") {
+			case "fff":
+				res, err := fo.GetFffFailReason(ctx, triggerReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15), "note": "name 形如 FFF-<reason>"})
+			case "fdr", "fcl":
+				res, err := do.GetFailReason(ctx, &dashboard_api.DoFailReasonRequest{EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end})
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15), "note": "仅含 " + argString(args, "stage") + " 阶段条目"})
+			default:
+				return "", fmt.Errorf("stage 必须为 fff/fdr/fcl")
+			}
+		case "trend":
+			res, err := fo.GetStageTrend(ctx, trendReq)
+			if err != nil {
+				return "", err
+			}
+			stage := argString(args, "stage")
+			series := res.Fff
+			if stage == "fdr" {
+				series = res.Fdr
+			} else if stage == "fcl" {
+				series = res.Fcl
+			}
+			return marshalToolResult(map[string]any{"dates": res.Dates, "series": series})
+		case "overview":
+			fo_, err := fo.GetFffOverview(ctx, triggerReq)
+			if err != nil {
+				return "", err
+			}
+			fdrQ, err1 := do.GetFdrQuality(ctx, doReq)
+			fclQ, err2 := do.GetFclQuality(ctx, doReq)
+			out := map[string]any{"fff_overview": fo_}
+			if err1 == nil {
+				out["fdr_quality"] = fdrQ
+			}
+			if err2 == nil {
+				out["fcl_quality"] = fclQ
+			}
+			return marshalToolResult(out)
+		case "top":
+			switch argString(args, "kind") {
+			case "trigger":
+				res, err := do.GetTriggerRank(ctx, doReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 10)})
+			case "mem":
+				res, err := do.GetMemTop(ctx, doReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 10)})
+			case "disk":
+				res, err := do.GetDiskTop(ctx, doReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 10)})
+			case "quota":
+				res, err := do.GetQuotaTop(ctx, doReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 10)})
+			case "close":
+				res, err := do.GetCloseTop(ctx, doReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 10), "note": "关闭次数 Top 筛选器"})
+			default:
+				return "", fmt.Errorf("kind 必须为 trigger/mem/disk/quota/close")
+			}
+		case "quality":
+			switch argString(args, "stage") {
+			case "fdr":
+				res, err := do.GetFdrQuality(ctx, doReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"fdr_quality": res})
+			case "fcl":
+				res, err := do.GetFclQuality(ctx, doReq)
+				if err != nil {
+					return "", err
+				}
+				return marshalToolResult(map[string]any{"fcl_quality": res})
+			default:
+				return "", fmt.Errorf("stage 必须为 fdr 或 fcl")
+			}
+		}
+		return "", fmt.Errorf("unknown query kind: %s", kind)
+	}
+}
+
+// ---- schema/result 小工具 ----
+
+func aiSchema(props map[string]any, required ...string) anthropic.ToolInputSchemaParam {
+	req := []string{}
+	for _, r := range required {
+		if r != "" {
+			req = append(req, r)
+		}
+	}
+	return anthropic.ToolInputSchemaParam{Type: "object", Properties: props, Required: req}
+}
+
+func aiSchemaWith(base, extra map[string]any, required ...string) anthropic.ToolInputSchemaParam {
+	for k, v := range extra {
+		base[k] = v
+	}
+	return aiSchema(base, required...)
+}
+
+func marshalToolResult(v any) (string, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func truncate(list []string, n int) []string {
+	if len(list) > n {
+		return list[:n]
+	}
+	return list
+}
+
+// truncateItems 泛型截断任意指针切片(Top 榜单防膨胀)
+func truncateItems[T any](list []T, n int) []T {
+	if len(list) > n {
+		return list[:n]
+	}
+	return list
+}

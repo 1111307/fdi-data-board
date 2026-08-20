@@ -19,6 +19,7 @@ func RegisterAiDashboardService(s *service.AiDashboardService, cd *conf.Data) []
 			Urls: []Url{
 				// SSE 流式接口,需要直接写 gin.Context,走 EmptyHandlerFunc
 				{EmptyHandlerFunc: s.StreamSummary, Path: "summary", Method: GET},
+				{EmptyHandlerFunc: s.StreamChat, Path: "chat", Method: POST},
 			},
 		},
 	}

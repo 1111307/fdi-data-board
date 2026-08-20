@@ -2,8 +2,11 @@ package biz
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/anthropics/anthropic-sdk-go"
 
 	dashboard_api "fdi_data_board/api/dashboard"
 )
@@ -69,6 +72,12 @@ type fakeLlmRepo struct {
 
 func (f *fakeLlmRepo) Enabled() bool { return true }
 
+func (f *fakeLlmRepo) Model() string { return "kimi-k3-test" }
+
+func (f *fakeLlmRepo) ChatStreamEx(_ context.Context, params anthropic.MessageNewParams, onEvent func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error) {
+	return nil, fmt.Errorf("not implemented in summary fake")
+}
+
 func (f *fakeLlmRepo) ChatStream(_ context.Context, _, _ string, onDelta func(string)) error {
 	for _, d := range f.deltas {
 		onDelta(d)
@@ -79,8 +88,12 @@ func (f *fakeLlmRepo) ChatStream(_ context.Context, _, _ string, onDelta func(st
 type disabledLlmRepo struct{}
 
 func (disabledLlmRepo) Enabled() bool { return false }
+func (disabledLlmRepo) Model() string { return "" }
 func (disabledLlmRepo) ChatStream(context.Context, string, string, func(string)) error {
 	return nil
+}
+func (disabledLlmRepo) ChatStreamEx(context.Context, anthropic.MessageNewParams, func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error) {
+	return nil, fmt.Errorf("disabled")
 }
 
 func newAiUcForTest(llm LlmRepo) *AiDashboardUseCase {
