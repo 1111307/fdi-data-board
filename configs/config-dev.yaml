@@ -7,7 +7,8 @@ server:
     timeout: 35s
   gin:
     addr: 0.0.0.0:8081
-    timeout: 35s
+    # AI 总结 SSE 长流(thinking 模型生成 40~90s)需要更长上限;kratos Timeout 为 server 级,无法按路由豁免
+    timeout: 360s
     run_mode: ${RUN_MODE:dev}
 data:
   mysql:

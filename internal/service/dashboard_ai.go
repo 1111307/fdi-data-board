@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-kratos/kratos/v2/log"
 
 	dashboard_api "fdi_data_board/api/dashboard"
 	"fdi_data_board/internal/biz"
@@ -51,7 +52,8 @@ func (s *AiDashboardService) StreamSummary(c *gin.Context) {
 		return writeSseDelta(c.Writer, delta)
 	})
 	if err != nil {
-		writeSseError(c.Writer, 500, "AI 总结生成失败")
+		log.Errorf("StreamSummary error: %v, req: %+v", err, req)
+		writeSseError(c.Writer, 500, "AI 总结生成失败: "+err.Error())
 		return
 	}
 	writeSseDone(c.Writer)
