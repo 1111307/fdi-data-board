@@ -1,5 +1,7 @@
 package dashboard_api
 
+import "encoding/json"
+
 // BaseResponse 统一响应基础结构，实现 api.HttpResponse 接口
 type BaseResponse struct {
 	Code    int32  `json:"code"`
@@ -659,9 +661,24 @@ type AiChatToolCallView struct {
 }
 
 type AiChatToolResultView struct {
-	ID      string `json:"id"`
-	Content string `json:"content"`
-	IsError bool   `json:"is_error"`
+	ID string `json:"id"`
+	// Content 兼容字符串或任意 JSON 对象(前端可能直接透传结构化结果)
+	Content json.RawMessage `json:"content"`
+	IsError bool            `json:"is_error"`
+}
+
+// StringContent 返回文本形态的 content(对象则序列化为 JSON 字符串)
+func (v AiChatToolResultView) StringContent() string {
+	if len(v.Content) == 0 {
+		return ""
+	}
+	if v.Content[0] == '"' {
+		var s string
+		if err := json.Unmarshal(v.Content, &s); err == nil {
+			return s
+		}
+	}
+	return string(v.Content)
 }
 
 // DoFailReasonResponse 失败原因分析响应

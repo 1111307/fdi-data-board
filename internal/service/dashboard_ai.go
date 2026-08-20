@@ -90,7 +90,7 @@ func (s *AiDashboardService) StreamChat(c *gin.Context) {
 			msg.ToolCalls = append(msg.ToolCalls, biz.AiChatToolCall{ID: tc.ID, Name: tc.Name, Args: tc.Args})
 		}
 		for _, tr := range m.ToolResults {
-			msg.ToolResults = append(msg.ToolResults, biz.AiChatToolResult{ID: tr.ID, Content: tr.Content, IsError: tr.IsError})
+			msg.ToolResults = append(msg.ToolResults, biz.AiChatToolResult{ID: tr.ID, Content: tr.StringContent(), IsError: tr.IsError})
 		}
 		history = append(history, msg)
 	}
