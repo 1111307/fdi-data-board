@@ -628,6 +628,16 @@ type DoFailReasonRequest struct {
 	EndDt       string `form:"end_dt"`
 }
 
+// AiSummaryRequest AI 看板总结请求(SSE 流式响应),参数与其他看板接口一致
+type AiSummaryRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"` // 多选，逗号分隔
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
 // DoFailReasonResponse 失败原因分析响应
 type DoFailReasonResponse struct {
 	BaseResponse
