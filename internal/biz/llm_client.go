@@ -1,29 +1,29 @@
 package biz
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
 // LlmConfig 大模型接入配置,来源环境变量(不进 conf.proto,避免改 proto 重新生成)
-//   LLM_BASE_URL  OpenAI 兼容网关地址,如 http://llm-gateway:8000/v1
-//   LLM_API_KEY   网关密钥
-//   LLM_MODEL     模型名
+//   LLM_BASE_URL  Anthropic 协议网关地址,如 http://llm-gateway:8000
+//   LLM_API_KEY   网关密钥(请求头 x-api-key)
+//   LLM_MODEL     模型名,如 kimi-k3
+//   LLM_MAX_TOKENS 单次生成上限,默认 4096
 //   LLM_TIMEOUT   单次请求超时,默认 120s
 // 全部未配置时客户端处于禁用状态,AI 总结接口退化为本地统计模式。
 type LlmConfig struct {
-	BaseURL string
-	APIKey  string
-	Model   string
-	Timeout time.Duration
+	BaseURL   string
+	APIKey    string
+	Model     string
+	MaxTokens int64
+	Timeout   time.Duration
 }
 
 func LlmConfigFromEnv() *LlmConfig {
@@ -33,11 +33,19 @@ func LlmConfigFromEnv() *LlmConfig {
 			timeout = d
 		}
 	}
+	maxTokens := int64(4096)
+	if raw := strings.TrimSpace(os.Getenv("LLM_MAX_TOKENS")); raw != "" {
+		var v int64
+		if _, err := fmt.Sscanf(raw, "%d", &v); err == nil && v > 0 {
+			maxTokens = v
+		}
+	}
 	return &LlmConfig{
-		BaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("LLM_BASE_URL")), "/"),
-		APIKey:  strings.TrimSpace(os.Getenv("LLM_API_KEY")),
-		Model:   strings.TrimSpace(os.Getenv("LLM_MODEL")),
-		Timeout: timeout,
+		BaseURL:   strings.TrimRight(strings.TrimSpace(os.Getenv("LLM_BASE_URL")), "/"),
+		APIKey:    strings.TrimSpace(os.Getenv("LLM_API_KEY")),
+		Model:     strings.TrimSpace(os.Getenv("LLM_MODEL")),
+		MaxTokens: maxTokens,
+		Timeout:   timeout,
 	}
 }
 
@@ -45,17 +53,22 @@ func (c *LlmConfig) Enabled() bool {
 	return c != nil && c.BaseURL != "" && c.APIKey != "" && c.Model != ""
 }
 
-// LlmClient 最小 OpenAI 兼容 Chat Completions 流式客户端
+// LlmClient 基于 anthropic-sdk-go 的流式客户端(供应商为 Anthropic Messages 协议)
 type LlmClient struct {
 	cfg    *LlmConfig
-	client *http.Client
+	client *anthropic.Client
 }
 
 func NewLlmClient(cfg *LlmConfig) *LlmClient {
-	return &LlmClient{
-		cfg:    cfg,
-		client: &http.Client{Timeout: cfg.Timeout},
+	if !cfg.Enabled() {
+		return &LlmClient{cfg: cfg}
 	}
+	client := anthropic.NewClient(
+		option.WithBaseURL(cfg.BaseURL),
+		option.WithAPIKey(cfg.APIKey),
+		option.WithRequestTimeout(cfg.Timeout),
+	)
+	return &LlmClient{cfg: cfg, client: &client}
 }
 
 // Enabled 是否已配置可用的大模型网关
@@ -67,67 +80,30 @@ func (c *LlmClient) ChatStream(ctx context.Context, systemPrompt, userPrompt str
 		return fmt.Errorf("llm client disabled")
 	}
 
-	reqBody := map[string]interface{}{
-		"model": c.cfg.Model,
-		"stream": true,
-		"messages": []map[string]string{
-			{"role": "system", "content": systemPrompt},
-			{"role": "user", "content": userPrompt},
+	stream := c.client.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
+		Model:     c.cfg.Model,
+		MaxTokens: c.cfg.MaxTokens,
+		System: []anthropic.TextBlockParam{
+			{Text: systemPrompt},
 		},
-	}
-	raw, err := json.Marshal(reqBody)
-	if err != nil {
-		return err
-	}
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
+		},
+	})
+	defer stream.Close()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.BaseURL+"/chat/completions", bytes.NewReader(raw))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Authorization", "Bearer "+c.cfg.APIKey)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return fmt.Errorf("llm gateway status %d: %s", resp.StatusCode, string(body))
-	}
-
-	return scanLlmSse(resp.Body, onDelta)
-}
-
-// scanLlmSse 解析 SSE 流,提取 choices[0].delta.content
-func scanLlmSse(r io.Reader, onDelta func(string)) error {
-	scanner := bufio.NewScanner(r)
-	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if !strings.HasPrefix(line, "data:") {
+	for stream.Next() {
+		event := stream.Current()
+		if event.Type != "content_block_delta" {
 			continue
 		}
-		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		if payload == "" || payload == "[DONE]" {
-			continue
-		}
-		var chunk struct {
-			Choices []struct {
-				Delta struct {
-					Content string `json:"content"`
-				} `json:"delta"`
-			} `json:"choices"`
-		}
-		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
-			continue // 跳过无法解析的心跳/备注帧
-		}
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			onDelta(chunk.Choices[0].Delta.Content)
+		delta := event.AsContentBlockDelta()
+		if text := delta.Delta.AsTextDelta().Text; text != "" {
+			onDelta(text)
 		}
 	}
-	return scanner.Err()
+	if err := stream.Err(); err != nil {
+		return fmt.Errorf("llm stream: %w", err)
+	}
+	return nil
 }
