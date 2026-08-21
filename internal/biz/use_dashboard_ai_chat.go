@@ -35,10 +35,10 @@ type ChatEvent struct {
 
 // AiChatHistoryMessage 前端回传的会话历史(轻量结构,后端重建为 Anthropic content blocks)
 type AiChatHistoryMessage struct {
-	Role        string             `json:"role"` // user / assistant
-	Text        string             `json:"text,omitempty"`
-	ToolCalls   []AiChatToolCall   `json:"tool_calls,omitempty"`
-	ToolResults []AiChatToolResult `json:"tool_results,omitempty"`
+	Role        string             `json:"role"`                   // user / assistant
+	Text        string             `json:"text,omitempty"`         //ai或者用户说过的话
+	ToolCalls   []AiChatToolCall   `json:"tool_calls,omitempty"`   //ai调用的工具
+	ToolResults []AiChatToolResult `json:"tool_results,omitempty"` //工具调用结果
 }
 
 type AiChatToolCall struct {
@@ -82,6 +82,15 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 
 		var textBuf strings.Builder
 		var toolUses []anthropic.ToolUseBlock
+		// 流式回调:网关的每个 SSE 事件都会进来一次,但只有一种事件会往外 emit——
+		// ① Type 为 content_block_delta(增量事件)才继续,块的 start/stop、
+		//    message_start/delta/stop 等生命周期事件直接忽略;
+		// ② 该增量必须是 text_delta(正文碎片)才 emit(delta) 推给前端。
+		//    同为 content_block_delta 的另外两种在此静默丢弃:
+		//    - input_json_delta(tool_use 参数碎片)→ 由 ChatStreamEx 内的 aggregator 拼装,
+		//      流结束后以完整 tool_use 出现在返回值 msg 里,由下方循环翻译成
+		//      clarify / tool_call / tool_result 帧(不走 delta 通道);
+		//    - thinking_delta(思考碎片)→ 整体过滤,前端不可见。
 		msg, err := uc.llm.ChatStreamEx(ctx, params, func(ev anthropic.MessageStreamEventUnion) {
 			if ev.Type != "content_block_delta" {
 				return
