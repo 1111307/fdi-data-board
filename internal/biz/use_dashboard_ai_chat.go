@@ -20,9 +20,9 @@ const aiMaxRounds = 6
 // aiMaxHistory 历史消息条数上限(防 prompt 膨胀)
 const aiMaxHistory = 40
 
-// ChatEvent SSE 下行事件(前端据此渲染:delta 文本/tool_call 工具卡/clarify 确认卡/tool_result 结果与图表数据)
+// ChatEvent SSE 下行事件(前端据此渲染:delta 文本/thinking 思考折叠块/tool_call 工具卡/clarify 确认卡/tool_result 结果与图表数据)
 type ChatEvent struct {
-	Type    string          `json:"type"` // delta / tool_call / tool_result / clarify / done / error
+	Type    string          `json:"type"` // delta / thinking / tool_call / tool_result / clarify / done / error
 	Text    string          `json:"text,omitempty"`
 	ID      string          `json:"id,omitempty"`
 	Name    string          `json:"name,omitempty"`
@@ -82,15 +82,15 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 
 		var textBuf strings.Builder
 		var toolUses []anthropic.ToolUseBlock
-		// 流式回调:网关的每个 SSE 事件都会进来一次,但只有一种事件会往外 emit——
+		// 流式回调:网关的每个 SSE 事件都会进来一次,两种增量会往外 emit:
 		// ① Type 为 content_block_delta(增量事件)才继续,块的 start/stop、
 		//    message_start/delta/stop 等生命周期事件直接忽略;
-		// ② 该增量必须是 text_delta(正文碎片)才 emit(delta) 推给前端。
-		//    同为 content_block_delta 的另外两种在此静默丢弃:
-		//    - input_json_delta(tool_use 参数碎片)→ 由 ChatStreamEx 内的 aggregator 拼装,
-		//      流结束后以完整 tool_use 出现在返回值 msg 里,由下方循环翻译成
-		//      clarify / tool_call / tool_result 帧(不走 delta 通道);
-		//    - thinking_delta(思考碎片)→ 整体过滤,前端不可见。
+		// ② text_delta(正文碎片)→ emit(delta),前端打字机渲染;
+		// ③ thinking_delta(思考碎片)→ emit(thinking),前端折叠展示,仅展示用,
+		//    不进 textBuf、不回传给模型(历史组装不含它)。
+		// 静默丢弃的:input_json_delta(tool_use 参数碎片)→ 由 ChatStreamEx 内的
+		// aggregator 拼装,流结束后以完整 tool_use 出现在返回值 msg 里,
+		// 由下方循环翻译成 clarify / tool_call / tool_result 帧(不走增量通道)。
 		msg, err := uc.llm.ChatStreamEx(ctx, params, func(ev anthropic.MessageStreamEventUnion) {
 			if ev.Type != "content_block_delta" {
 				return
@@ -98,6 +98,10 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 			if text := ev.AsContentBlockDelta().Delta.AsTextDelta().Text; text != "" {
 				textBuf.WriteString(text)
 				_ = emit(ChatEvent{Type: "delta", Text: text})
+				return
+			}
+			if th := ev.AsContentBlockDelta().Delta.AsThinkingDelta().Thinking; th != "" {
+				_ = emit(ChatEvent{Type: "thinking", Text: th})
 			}
 		})
 		if err != nil {
