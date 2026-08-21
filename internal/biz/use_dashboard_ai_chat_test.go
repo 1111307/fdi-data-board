@@ -260,3 +260,75 @@ func TestStreamChatResumeWithEmptyQuestion(t *testing.T) {
 		t.Fatal("empty question without pending tool_result should error")
 	}
 }
+
+// 用例7(线上bug回归):前端回传 tool_calls.args(含嵌套结构)重建后,
+// input 必须是 JSON 对象而非 base64/字符串(此前 Marshal []byte 导致网关 400)
+func TestStreamChatToolUseArgsStayObject(t *testing.T) {
+	fake := &chatLlmFake{rounds: []string{
+		`{"id":"m2","type":"message","role":"assistant","model":"k","stop_reason":"end_turn","content":[
+			{"type":"text","text":"好的。"}]}`,
+	}}
+	uc := newAiUcForTest(fake)
+
+	history := []AiChatHistoryMessage{
+		{Role: "user", Text: "fff"},
+		{Role: "assistant", ToolCalls: []AiChatToolCall{
+			{ID: "c1", Name: "clarify", Args: map[string]any{
+				"kind":     "ambiguous_tool",
+				"question": "查什么?",
+				"options":  []any{map[string]any{"tool": "get_overview", "reason": "概览"}},
+			}},
+		}},
+		{Role: "user", ToolResults: []AiChatToolResult{
+			{ID: "c1", Content: "用户选择: 使用 get_overview"},
+		}},
+	}
+
+	events := collectEvents(t, uc, "继续", history)
+	if last := events[len(events)-1]; last.Type != "done" {
+		t.Fatalf("stream failed: %s", eventTypes(events))
+	}
+
+	msgsJSON, _ := json.Marshal(fake.lastReq.Messages)
+	// input 是对象:出现 "input":{"kind" 形态;且不能是 base64 字符串("input":"eyJ…")
+	if !strings.Contains(string(msgsJSON), `"input":{"kind"`) {
+		t.Fatalf("tool_use input not marshaled as object: %s", string(msgsJSON))
+	}
+	if strings.Contains(string(msgsJSON), `"input":"eyJ`) {
+		t.Fatalf("tool_use input marshaled as base64 string: %s", string(msgsJSON))
+	}
+}
+
+// 用例8(线上bug回归):孤儿 tool_result(前一条 assistant 无对应 tool_use)必须被清理
+func TestStreamChatDropsOrphanToolResult(t *testing.T) {
+	fake := &chatLlmFake{rounds: []string{
+		`{"id":"m2","type":"message","role":"assistant","model":"k","stop_reason":"end_turn","content":[
+			{"type":"text","text":"好的。"}]}`,
+	}}
+	uc := newAiUcForTest(fake)
+
+	// assistant 只有 t1 的 tool_use,但 user 回执里有 t1 和孤儿 c1
+	history := []AiChatHistoryMessage{
+		{Role: "user", Text: "fff"},
+		{Role: "assistant", ToolCalls: []AiChatToolCall{
+			{ID: "t1", Name: "get_fail_reason", Args: map[string]any{"stage": "fff"}},
+		}},
+		{Role: "user", ToolResults: []AiChatToolResult{
+			{ID: "t1", Content: "结果略"},
+			{ID: "c1", Content: "用户选择: 概览"},
+		}},
+	}
+
+	events := collectEvents(t, uc, "继续", history)
+	if last := events[len(events)-1]; last.Type != "done" {
+		t.Fatalf("stream failed: %s", eventTypes(events))
+	}
+
+	msgsJSON, _ := json.Marshal(fake.lastReq.Messages)
+	if strings.Contains(string(msgsJSON), `"tool_use_id":"c1"`) {
+		t.Fatalf("orphan tool_result c1 not dropped: %s", string(msgsJSON))
+	}
+	if !strings.Contains(string(msgsJSON), `"tool_use_id":"t1"`) {
+		t.Fatalf("legit tool_result t1 missing: %s", string(msgsJSON))
+	}
+}

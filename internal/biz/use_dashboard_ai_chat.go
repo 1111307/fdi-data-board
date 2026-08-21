@@ -204,8 +204,9 @@ func buildAnthropicMessages(question string, history []AiChatHistoryMessage) ([]
 				blocks = append(blocks, anthropic.NewTextBlock(h.Text))
 			}
 			for _, tc := range h.ToolCalls {
-				raw, _ := json.Marshal(tc.Args)
-				blocks = append(blocks, anthropic.NewToolUseBlock(tc.ID, raw, tc.Name))
+				// Args 直接传 map:一旦 Marshal 成 []byte,SDK 会按 base64 字符串序列化,
+				// 网关报 cannot unmarshal string into input of type map
+				blocks = append(blocks, anthropic.NewToolUseBlock(tc.ID, tc.Args, tc.Name))
 			}
 			if len(blocks) == 0 {
 				continue
@@ -218,7 +219,43 @@ func buildAnthropicMessages(question string, history []AiChatHistoryMessage) ([]
 	if q != "" {
 		msgs = append(msgs, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(q)}})
 	}
+	msgs = dropOrphanToolResults(msgs)
 	return backfillToolResults(msgs), nil
+}
+
+// dropOrphanToolResults 协议兜底(反向):user 消息里的 tool_result 若无法配对
+// 最近一条 assistant 的 tool_use(前端历史缺 assistant(tool_use) 或顺序错乱),
+// 丢弃该块,否则网关 400: tool_use_id found in tool_result blocks without previous tool_use。
+func dropOrphanToolResults(msgs []anthropic.MessageParam) []anthropic.MessageParam {
+	out := make([]anthropic.MessageParam, 0, len(msgs))
+	lastUseIDs := map[string]bool{}
+	for _, m := range msgs {
+		if m.Role == anthropic.MessageParamRoleAssistant {
+			lastUseIDs = map[string]bool{}
+			for _, b := range m.Content {
+				if tu := b.OfToolUse; tu != nil {
+					lastUseIDs[tu.ID] = true
+				}
+			}
+			out = append(out, m)
+			continue
+		}
+		if m.Role == anthropic.MessageParamRoleUser && hasToolResult(m) {
+			kept := make([]anthropic.ContentBlockParamUnion, 0, len(m.Content))
+			for _, b := range m.Content {
+				if tr := b.OfToolResult; tr != nil && !lastUseIDs[tr.ToolUseID] {
+					continue // 孤儿 tool_result,丢弃
+				}
+				kept = append(kept, b)
+			}
+			if len(kept) == 0 {
+				continue // 整条只剩孤儿,消息丢弃
+			}
+			m.Content = kept
+		}
+		out = append(out, m)
+	}
+	return out
 }
 
 // historyEndsWithToolResult 历史末尾是否为带 tool_result 的 user 消息(即挂起的确认回执)
