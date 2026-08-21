@@ -26,6 +26,7 @@ type aiToolRegistry struct {
 }
 
 const aiClarifyToolName = "clarify"
+const aiSubmitPlanToolName = "submit_plan"
 
 func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRegistry {
 	r := &aiToolRegistry{tools: map[string]*aiToolDef{}}
@@ -52,6 +53,27 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			}, "description": "kind=ambiguous_tool 时的候选工具与理由"},
 			"args": map[string]any{"type": "object", "description": "kind=confirm_params 时的最终参数预览"},
 		}, "kind", "question"),
+	}, nil)
+
+	// ---- 保留工具:submit_plan(计划外显,复杂问题先出查询计划让用户审查) ----
+	add(anthropic.ToolParam{
+		Name:        aiSubmitPlanToolName,
+		Description: param.NewOpt("当问题需要【两步及以上】数据查询(对比、多阶段、多维度交叉)时,必须先调用此工具提交查询计划,经用户确认后才能开始执行。简单单步查询(只调一个工具即可回答)无需计划,直接调数据工具。steps 每步含:tool(要调的工具名)、args(该步参数)、purpose(这一步查什么、为什么需要,中文一句话)。summary 用中文一句话概括整个计划的思路与口径(时间范围/阶段/对比方式)。用户确认后按 steps 顺序执行;用户拒绝时你会收到反馈,据此重新规划。"),
+		InputSchema: aiSchema(map[string]any{
+			"summary": map[string]any{"type": "string", "description": "计划思路一句话:查什么、什么口径、怎么得出结论"},
+			"steps": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"tool":    map[string]any{"type": "string", "description": "工具名,如 get_fail_reason"},
+						"args":    map[string]any{"type": "object", "description": "该步参数"},
+						"purpose": map[string]any{"type": "string", "description": "这一步的目的,中文"},
+					},
+					"required": []string{"tool", "args", "purpose"},
+				},
+				"description": "按执行顺序排列的查询步骤"},
+		}, "summary", "steps"),
 	}, nil)
 
 	// ---- 数据工具:全部直调既有用例,口径与看板页面一致 ----

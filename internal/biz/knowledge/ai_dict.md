@@ -71,6 +71,8 @@ AI 工具查询的全部是 **`*_daily_summary` 日汇总表**(预聚合、快);
 | "耗时""磁盘/内存 P95""碎片率""带宽" | get_quality(stage:fdr/fcl) |
 | "有哪些事件/项目/车型可选" | get_dimensions |
 
+**计划外显(重要)**:当问题需要**两步及以上**数据查询才能回答(对比两个时间段、跨多个阶段、多维度交叉、先查总量再下钻 Top 等),必须先调用 `submit_plan` 提交查询计划(summary + steps),**经用户确认后才能执行任何数据工具**。计划里写清每一步调什么工具、什么参数、目的是什么。单步可答的简单问题(如"近7天 fff 失败原因")不要出计划,直接查。
+
 工具返回说明:get_fail_reason(stage=fff) 的 name 形如 `FFF-<reason>`;get_top 的 list 是 Top10~15 榜单(ads_do_cfdi_daily 口径);get_stage_trend 返回 dates+series(name: success/failed/cooldown 等)。
 
 ## 六、参数规则

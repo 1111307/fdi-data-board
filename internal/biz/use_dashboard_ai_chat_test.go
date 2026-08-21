@@ -332,3 +332,81 @@ func TestStreamChatDropsOrphanToolResult(t *testing.T) {
 		t.Fatalf("legit tool_result t1 missing: %s", string(msgsJSON))
 	}
 }
+
+// 用例9:复杂问题模型提交查询计划 → plan 帧暂停,不执行任何数据工具
+func TestStreamChatPlanPausesStream(t *testing.T) {
+	fake := &chatLlmFake{rounds: []string{
+		`{"id":"m1","type":"message","role":"assistant","model":"k","stop_reason":"tool_use","content":[
+			{"type":"tool_use","id":"p1","name":"submit_plan","input":{
+				"summary":"对比两周 FFF 失败原因",
+				"steps":[
+					{"tool":"get_fail_reason","args":{"stage":"fff","start_dt":"2026-08-04"},"purpose":"查上周失败原因"},
+					{"tool":"get_fail_reason","args":{"stage":"fff","start_dt":"2026-08-11"},"purpose":"查本周失败原因"}
+				]}}]}`,
+	}}
+	uc := newAiUcForTest(fake)
+
+	events := collectEvents(t, uc, "对比这两周的 FFF 失败原因", nil)
+
+	var planEv *ChatEvent
+	for i := range events {
+		if events[i].Type == "plan" {
+			planEv = &events[i]
+		}
+	}
+	if planEv == nil {
+		t.Fatalf("no plan event, got: %s", eventTypes(events))
+	}
+	if planEv.ID != "p1" || planEv.Args["summary"] != "对比两周 FFF 失败原因" {
+		t.Fatalf("plan event = %+v", planEv)
+	}
+	steps, _ := planEv.Args["steps"].([]any)
+	if len(steps) != 2 {
+		t.Fatalf("plan steps = %v", planEv.Args["steps"])
+	}
+	last := events[len(events)-1]
+	if last.Type != "done" || last.Stop != "plan" {
+		t.Fatalf("last event = %+v, want done/plan", last)
+	}
+	if strings.Contains(eventTypes(events), "tool_result") {
+		t.Fatalf("plan pause should not execute data tools: %s", eventTypes(events))
+	}
+}
+
+// 用例10:计划确认回执 → 模型按计划逐步执行数据工具
+func TestStreamChatPlanConfirmedExecutesSteps(t *testing.T) {
+	fake := &chatLlmFake{rounds: []string{
+		`{"id":"m2","type":"message","role":"assistant","model":"k","stop_reason":"tool_use","content":[
+			{"type":"tool_use","id":"t1","name":"get_fail_reason","input":{"stage":"fff"}}]}`,
+		`{"id":"m3","type":"message","role":"assistant","model":"k","stop_reason":"end_turn","content":[
+			{"type":"text","text":"两周对比完成。"}]}`,
+	}}
+	uc := newAiUcForTest(fake)
+
+	history := []AiChatHistoryMessage{
+		{Role: "user", Text: "对比这两周的失败原因"},
+		{Role: "assistant", ToolCalls: []AiChatToolCall{
+			{ID: "p1", Name: "submit_plan", Args: map[string]any{
+				"summary": "对比两周", "steps": []any{map[string]any{"tool": "get_fail_reason"}},
+			}},
+		}},
+		{Role: "user", ToolResults: []AiChatToolResult{
+			{ID: "p1", Content: "用户对查询计划的决定: 确认按计划执行"},
+		}},
+	}
+
+	events := collectEvents(t, uc, "", history)
+
+	got := eventTypes(events)
+	if !strings.Contains(got, "tool_call") || !strings.Contains(got, "tool_result") {
+		t.Fatalf("plan steps not executed, got: %s", got)
+	}
+	if last := events[len(events)-1]; last.Type != "done" || last.Stop != "end_turn" {
+		t.Fatalf("last event = %+v", events[len(events)-1])
+	}
+	// 提交的计划作为 tool_use 保留在上下文中(非孤儿)
+	msgsJSON, _ := json.Marshal(fake.lastReq.Messages)
+	if !strings.Contains(string(msgsJSON), `"name":"submit_plan"`) {
+		t.Fatalf("submit_plan tool_use missing from context: %s", string(msgsJSON))
+	}
+}

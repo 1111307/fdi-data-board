@@ -22,14 +22,14 @@ const aiMaxHistory = 40
 
 // ChatEvent SSE 下行事件(前端据此渲染:delta 文本/thinking 思考折叠块/tool_call 工具卡/clarify 确认卡/tool_result 结果与图表数据)
 type ChatEvent struct {
-	Type    string          `json:"type"` // delta / thinking / tool_call / tool_result / clarify / done / error
+	Type    string          `json:"type"` // delta / thinking / tool_call / tool_result / clarify / plan / done / error
 	Text    string          `json:"text,omitempty"`
 	ID      string          `json:"id,omitempty"`
 	Name    string          `json:"name,omitempty"`
 	Args    map[string]any  `json:"args,omitempty"`
 	Summary string          `json:"summary,omitempty"`
 	Data    json.RawMessage `json:"data,omitempty"` // tool_result 的完整 JSON(前端渲染图表)
-	Stop    string          `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / max_rounds
+	Stop    string          `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / plan / max_rounds
 	Error   string          `json:"error,omitempty"`
 }
 
@@ -128,11 +128,12 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 		}
 		resultBlocks := []anthropic.ContentBlockParamUnion{}
 		clarifyPaused := false
+		planPaused := false
 
 		for _, tu := range toolUses {
 			assistantBlocks = append(assistantBlocks, anthropic.NewToolUseBlock(tu.ID, tu.Input, tu.Name))
 
-			// clarify:人工确认暂停点,本流到此结束
+			// clarify:参数/意图求证,人工确认暂停点
 			if tu.Name == aiClarifyToolName {
 				var payload map[string]any
 				if len(tu.Input) > 0 {
@@ -140,6 +141,18 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 				}
 				_ = emit(ChatEvent{Type: "clarify", ID: tu.ID, Name: tu.Name, Args: payload})
 				clarifyPaused = true
+				continue
+			}
+
+			// submit_plan:计划外显,用户审查计划的暂停点
+			// (确认后模型按计划逐步执行数据工具;拒绝则收到反馈重新规划)
+			if tu.Name == aiSubmitPlanToolName {
+				var payload map[string]any
+				if len(tu.Input) > 0 {
+					_ = json.Unmarshal(tu.Input, &payload)
+				}
+				_ = emit(ChatEvent{Type: "plan", ID: tu.ID, Name: tu.Name, Args: payload})
+				planPaused = true
 				continue
 			}
 
@@ -159,6 +172,10 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 
 		msgs = append(msgs, anthropic.MessageParam{Role: anthropic.MessageParamRoleAssistant, Content: assistantBlocks})
 
+		if planPaused {
+			// 计划暂停点:前端确认/拒绝后,assistant(tool_use) + user(tool_result:用户意见) 带回历史续跑
+			return emit(ChatEvent{Type: "done", Stop: "plan"})
+		}
 		if clarifyPaused {
 			// 暂停点:前端确认后,把 assistant(tool_use) + user(tool_result) 带回历史重新请求
 			return emit(ChatEvent{Type: "done", Stop: "clarify"})
