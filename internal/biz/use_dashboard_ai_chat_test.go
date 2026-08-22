@@ -410,3 +410,29 @@ func TestStreamChatPlanConfirmedExecutesSteps(t *testing.T) {
 		t.Fatalf("submit_plan tool_use missing from context: %s", string(msgsJSON))
 	}
 }
+
+// 用例11:emit 首次写帧失败(客户端断开)→ 立即终止:不执行数据工具、不发起第二轮 LLM
+func TestStreamChatEmitErrorShortCircuits(t *testing.T) {
+	fake := &chatLlmFake{rounds: []string{
+		`{"id":"m1","type":"message","role":"assistant","model":"k","stop_reason":"tool_use","content":[
+			{"type":"tool_use","id":"t1","name":"get_fail_reason","input":{"stage":"fff"}}]}`,
+		`{"id":"m2","type":"message","role":"assistant","model":"k","stop_reason":"end_turn","content":[
+			{"type":"text","text":"不该到达的第二轮。"}]}`,
+	}}
+	uc := newAiUcForTest(fake)
+
+	var emitCount int
+	err := uc.StreamChat(context.Background(), "失败原因?", nil, func(ev ChatEvent) error {
+		emitCount++
+		return fmt.Errorf("write: broken pipe") // 第一次 emit 即失败
+	})
+	if err == nil {
+		t.Fatal("emit error should propagate")
+	}
+	if emitCount != 1 {
+		t.Fatalf("emit called %d times, want 1 (short-circuit after first failure)", emitCount)
+	}
+	if fake.calls != 1 {
+		t.Fatalf("llm called %d times, want 1 (no second round after client gone)", fake.calls)
+	}
+}

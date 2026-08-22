@@ -72,6 +72,9 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 	}
 
 	for round := 0; round < aiMaxRounds; round++ {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		params := anthropic.MessageNewParams{
 			Model:     uc.llmModel(),
 			MaxTokens: 4096,
@@ -82,30 +85,35 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 
 		var textBuf strings.Builder
 		var toolUses []anthropic.ToolUseBlock
-		// 流式回调:网关的每个 SSE 事件都会进来一次,两种增量会往外 emit:
-		// ① Type 为 content_block_delta(增量事件)才继续,块的 start/stop、
-		//    message_start/delta/stop 等生命周期事件直接忽略;
-		// ② text_delta(正文碎片)→ emit(delta),前端打字机渲染;
-		// ③ thinking_delta(思考碎片)→ emit(thinking),前端折叠展示,仅展示用,
-		//    不进 textBuf、不回传给模型(历史组装不含它)。
-		// 静默丢弃的:input_json_delta(tool_use 参数碎片)→ 由 ChatStreamEx 内的
-		// aggregator 拼装,流结束后以完整 tool_use 出现在返回值 msg 里,
-		// 由下方循环翻译成 clarify / tool_call / tool_result 帧(不走增量通道)。
+		// emitErr:首个写帧失败(客户端断开)即记录,后续事件只聚合不再外发;
+		// 流结束后据此短路——这是 ctx cancel 之外的第二条止损腿:
+		// 即使上游请求对 ctx 不敏感(悬挂的网关),客户端走了也能立刻全停
+		var emitErr error
+		safeEmit := func(ev ChatEvent) {
+			if emitErr != nil {
+				return
+			}
+			emitErr = emit(ev)
+		}
 		msg, err := uc.llm.ChatStreamEx(ctx, params, func(ev anthropic.MessageStreamEventUnion) {
 			if ev.Type != "content_block_delta" {
 				return
 			}
 			if text := ev.AsContentBlockDelta().Delta.AsTextDelta().Text; text != "" {
 				textBuf.WriteString(text)
-				_ = emit(ChatEvent{Type: "delta", Text: text})
+				safeEmit(ChatEvent{Type: "delta", Text: text})
 				return
 			}
 			if th := ev.AsContentBlockDelta().Delta.AsThinkingDelta().Thinking; th != "" {
-				_ = emit(ChatEvent{Type: "thinking", Text: th})
+				safeEmit(ChatEvent{Type: "thinking", Text: th})
 			}
 		})
 		if err != nil {
 			return fmt.Errorf("llm stream: %w", err)
+		}
+		if emitErr != nil {
+			// 客户端连接已断:继续执行工具/续轮毫无意义,立即终止
+			return emitErr
 		}
 		if msg == nil {
 			return fmt.Errorf("llm stream: empty message")
@@ -133,13 +141,18 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 		for _, tu := range toolUses {
 			assistantBlocks = append(assistantBlocks, anthropic.NewToolUseBlock(tu.ID, tu.Input, tu.Name))
 
+			// 客户端已断开:不发帧、不执行工具(止损,不发 Doris 查询)
+			if emitErr != nil || ctx.Err() != nil {
+				return emitErr
+			}
+
 			// clarify:参数/意图求证,人工确认暂停点
 			if tu.Name == aiClarifyToolName {
 				var payload map[string]any
 				if len(tu.Input) > 0 {
 					_ = json.Unmarshal(tu.Input, &payload)
 				}
-				_ = emit(ChatEvent{Type: "clarify", ID: tu.ID, Name: tu.Name, Args: payload})
+				safeEmit(ChatEvent{Type: "clarify", ID: tu.ID, Name: tu.Name, Args: payload})
 				clarifyPaused = true
 				continue
 			}
@@ -151,13 +164,13 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 				if len(tu.Input) > 0 {
 					_ = json.Unmarshal(tu.Input, &payload)
 				}
-				_ = emit(ChatEvent{Type: "plan", ID: tu.ID, Name: tu.Name, Args: payload})
+				safeEmit(ChatEvent{Type: "plan", ID: tu.ID, Name: tu.Name, Args: payload})
 				planPaused = true
 				continue
 			}
 
 			// 普通工具:进程内执行(口径与看板一致),结果作为 tool_result 回填
-			_ = emit(ChatEvent{Type: "tool_call", ID: tu.ID, Name: tu.Name, Args: rawToArgs(tu.Input)})
+			safeEmit(ChatEvent{Type: "tool_call", ID: tu.ID, Name: tu.Name, Args: rawToArgs(tu.Input)})
 			result, execErr := uc.tools.Exec(ctx, tu.Name, rawToArgs(tu.Input))
 			if execErr != nil {
 				result = "工具执行失败: " + execErr.Error()
@@ -166,7 +179,10 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 			if len(summary) > 120 {
 				summary = summary[:120] + "…"
 			}
-			_ = emit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary, Data: json.RawMessage(result)})
+			safeEmit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary, Data: json.RawMessage(result)})
+			if emitErr != nil {
+				return emitErr
+			}
 			resultBlocks = append(resultBlocks, anthropic.NewToolResultBlock(tu.ID, result, execErr != nil))
 		}
 
