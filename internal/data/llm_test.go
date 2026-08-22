@@ -2,6 +2,8 @@ package data
 
 import (
 	"context"
+	"fmt"
+	"time"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -96,5 +98,55 @@ func TestLlmRepoDisabledWhenClientMissing(t *testing.T) {
 	}
 	if err := repo.ChatStream(context.Background(), "s", "u", func(string) {}); err == nil {
 		t.Fatal("ChatStream should error when disabled")
+	}
+}
+
+// TestChatStreamExCancelCutsDownstreamTCP 证明:客户端取消 ctx 后,
+// 后端到网关的 TCP 连接被强制关闭(mock 网关侧能感知断开)。
+// 这是止损链的最后一环:网关看到断开才可能停止向模型要 token。
+func TestChatStreamExCancelCutsDownstreamTCP(t *testing.T) {
+	gatewaySeenDisconnect := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher := w.(http.Flusher)
+		for {
+			select {
+			case <-r.Context().Done(): // 客户端(我们的后端)断开,网关侧感知
+				close(gatewaySeenDisconnect)
+				return
+			default:
+			}
+			_, _ = fmt.Fprint(w, "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"index\":1,\"delta\":{\"type\":\"text_delta\",\"text\":\"x\"}}\n\n")
+			flusher.Flush()
+			time.Sleep(10 * time.Millisecond)
+		}
+	}))
+	defer srv.Close()
+
+	repo := newTestLlmRepo(srv.URL)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	n := 0
+	_, err := repo.ChatStreamEx(ctx, anthropic.MessageNewParams{
+		Messages: []anthropic.MessageParam{anthropic.NewUserMessage(anthropic.NewTextBlock("hi"))},
+	}, func(ev anthropic.MessageStreamEventUnion) {
+		n++
+		if n == 3 {
+			cancel() // 收到第 3 个事件时模拟客户端停止
+		}
+	})
+	if err == nil {
+		t.Fatal("want error after ctx cancel")
+	}
+	if n < 3 {
+		t.Fatalf("events received = %d, want >= 3", n)
+	}
+
+	select {
+	case <-gatewaySeenDisconnect:
+		// 下游 TCP 已被掐断,网关感知到客户端离开
+	case <-time.After(2 * time.Second):
+		t.Fatal("downstream TCP NOT cut within 2s after ctx cancel")
 	}
 }
