@@ -95,6 +95,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 			}
 			emitErr = emit(ev)
 		}
+
 		msg, err := uc.llm.ChatStreamEx(ctx, params, func(ev anthropic.MessageStreamEventUnion) {
 			if ev.Type != "content_block_delta" {
 				return
