@@ -140,6 +140,15 @@ func buildFffRunningWhere(param *biz.FffRunningParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
 	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
 
 	if len(conds) == 0 {
@@ -338,6 +347,15 @@ func buildFffTriggerWhere(param *biz.FffTriggerParam) (string, []interface{}) {
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
+
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
@@ -516,6 +534,15 @@ func buildFffCloseWhere(param *biz.FffCloseParam) (string, []interface{}) {
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
+
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
@@ -655,6 +682,15 @@ func buildFdrTriggerWhere(param *biz.FdrTriggerParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -800,6 +836,15 @@ func buildFclTriggerWhere(param *biz.FclTriggerParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -956,6 +1001,15 @@ func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
 	if param.OnlyFail {
 		conds = append(conds, "fcl_status != 'success'")
 	}

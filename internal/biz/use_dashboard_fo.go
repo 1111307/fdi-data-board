@@ -89,6 +89,7 @@ type UuidDetailParam struct {
 	EventNames  []string // 多选
 	ProjectName string
 	CarTypes    []string
+	AnonymousIds []string
 	StartDt     string
 	EndDt       string
 	OnlyFail    bool
@@ -103,6 +104,7 @@ type FclTriggerParam struct {
 	EventNames  []string
 	ProjectName string
 	CarTypes    []string
+	AnonymousIds []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -115,6 +117,7 @@ type FdrTriggerParam struct {
 	EventNames  []string
 	ProjectName string
 	CarTypes    []string
+	AnonymousIds []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -126,6 +129,7 @@ type FffCloseParam struct {
 	FilterName  string
 	ProjectName string
 	CarTypes    []string
+	AnonymousIds []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -138,6 +142,7 @@ type FffTriggerParam struct {
 	EventNames  []string
 	ProjectName string
 	CarTypes    []string
+	AnonymousIds []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -158,6 +163,7 @@ type FffRunningParam struct {
 	EventNames  []string
 	ProjectName string
 	CarTypes    []string
+	AnonymousIds []string
 	StartDt     string
 	EndDt       string
 	Page        int
@@ -194,6 +200,7 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
+		AnonymousIds: splitEventNames(req.AnonymousIds),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -225,6 +232,7 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
+		AnonymousIds: splitEventNames(req.AnonymousIds),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -257,6 +265,7 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
+		AnonymousIds: splitEventNames(req.AnonymousIds),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -289,6 +298,7 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
+		AnonymousIds: splitEventNames(req.AnonymousIds),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -321,6 +331,7 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
+		AnonymousIds: splitEventNames(req.AnonymousIds),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		OnlyFail:    req.OnlyFail == 1,
@@ -444,6 +455,7 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
+		AnonymousIds: splitEventNames(req.AnonymousIds),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,

@@ -39,6 +39,7 @@ type FffRunningRequest struct {
 	EventNames  string `form:"event_names"`
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -92,6 +93,7 @@ type FffTriggerRequest struct {
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -130,6 +132,7 @@ type FffCloseRequest struct {
 	FilterName  string `form:"filter_name"`
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -179,6 +182,7 @@ type FdrTriggerRequest struct {
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -224,6 +228,7 @@ type FclTriggerRequest struct {
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -284,6 +289,7 @@ type UuidDetailRequest struct {
 	EventNames  string `form:"event_names"` // 多选，逗号分隔
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败
