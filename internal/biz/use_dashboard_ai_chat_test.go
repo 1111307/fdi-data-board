@@ -518,3 +518,17 @@ func TestToolsGetDetailLimitClamp(t *testing.T) {
 		t.Fatalf("note missing 100-limit hint: %s", parsed.Note)
 	}
 }
+
+// 用例17:明细查询跨度超 7 天 → 报错且错误信息含限制原因(模型可转述)
+func TestDetailDateRangeLimit(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+	_, err := uc.tools.Exec(context.Background(), "get_detail", map[string]any{
+		"kind": "trigger", "start_dt": "2026-08-01", "end_dt": "2026-08-24",
+	})
+	if err == nil {
+		t.Fatal("31-day range should error")
+	}
+	if !strings.Contains(err.Error(), "7 天") || !strings.Contains(err.Error(), "数据量") {
+		t.Fatalf("error should explain limit reason, got: %s", err.Error())
+	}
+}

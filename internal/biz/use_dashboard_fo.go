@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -190,7 +191,7 @@ func NewFoDashboardUseCase(repo FoDashboardRepo) *FoDashboardUseCase {
 
 func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FffTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDetailDateRange(req.StartDt, req.EndDt)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +224,7 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_api.FffCloseRequest) (*dashboard_api.FffCloseResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDetailDateRange(req.StartDt, req.EndDt)
 	if err != nil {
 		return nil, err
 	}
@@ -255,7 +256,7 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 
 func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard_api.FdrTriggerRequest) (*dashboard_api.FdrTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDetailDateRange(req.StartDt, req.EndDt)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +289,7 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard_api.FclTriggerRequest) (*dashboard_api.FclTriggerResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDetailDateRange(req.StartDt, req.EndDt)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +322,7 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 
 func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard_api.UuidDetailRequest) (*dashboard_api.UuidDetailResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDetailDateRange(req.StartDt, req.EndDt)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +446,7 @@ func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context) (*dashboard_api
 
 func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard_api.FffRunningRequest) (*dashboard_api.FffRunningResponse, error) {
 	page, pageSize := normalizePage(req.Page, req.PageSize)
-	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	startDt, endDt, err := normalizeDetailDateRange(req.StartDt, req.EndDt)
 	if err != nil {
 		return nil, err
 	}
@@ -632,6 +633,30 @@ func normalizeDateRange(startDt, endDt string) (string, string, error) {
 		end = start.AddDate(0, 0, maxDateRange)
 	}
 
+	return start.Format(layout), end.Format(layout), nil
+}
+
+// ErrDetailDateRangeTooLong 明细查询时间跨度超限(事件级明细扫描成本高,限 7 天)
+var ErrDetailDateRangeTooLong = fmt.Errorf("明细查询时间跨度最多 7 天(事件级明细数据量大,更长范围请用汇总口径查询,或到看板明细页分批查看)")
+
+// normalizeDetailDateRange 明细查询专用日期校验:格式/顺序同 normalizeDateRange,
+// 额外限制跨度 ≤7 天,超限返回 ErrDetailDateRangeTooLong(调用方透传给前端/模型)
+func normalizeDetailDateRange(startDt, endDt string) (string, string, error) {
+	const layout = "2006-01-02"
+	if startDt == "" && endDt == "" {
+		return "", "", nil
+	}
+	start, err1 := time.Parse(layout, startDt)
+	end, err2 := time.Parse(layout, endDt)
+	if err1 != nil || err2 != nil {
+		return "", "", ErrInvalidDateRange
+	}
+	if start.After(end) {
+		start, end = end, start
+	}
+	if int(end.Sub(start).Hours()/24) > 7 {
+		return "", "", ErrDetailDateRangeTooLong
+	}
 	return start.Format(layout), end.Format(layout), nil
 }
 
