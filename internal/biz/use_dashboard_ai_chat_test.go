@@ -35,6 +35,7 @@ func mustMessage(raw string) *anthropic.Message {
 
 func (f *chatLlmFake) Enabled() bool { return true }
 func (f *chatLlmFake) Model() string { return "kimi-k3-test" }
+func (f *chatLlmFake) MaxTokens() int64 { return 16384 }
 func (f *chatLlmFake) ChatStream(ctx context.Context, s1, s2 string, cb func(string)) error {
 	return fmt.Errorf("unused")
 }
