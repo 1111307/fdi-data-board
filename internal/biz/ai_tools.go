@@ -132,7 +132,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 		Description: param.NewOpt("查询事件级明细(每行=一次真实事件)。kind=trigger 触发明细(时间/uuid/车辆/触发类型)/uuid 全链路明细(三阶段状态与版本)/running 筛选器运行明细/close 筛选器关闭明细/fdr 落盘明细/fcl 上传明细。注意:明细数据只保留近几天,更早时间范围会查空;最多返回 limit 行(默认20,最大100),超出部分需告知用户只支持查前100条。"),
 		InputSchema: aiSchemaWith(map[string]any{
 			"limit":         map[string]any{"type": "integer", "description": "返回行数上限,默认 20,最大 100"},
-			"anonymous_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "按车辆ID过滤,如用户问'某辆车的明细'"},
+			"anonymous_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "按匿名 ID(车辆标识)过滤,如用户问'某辆车的明细'或直接给 bydXXX 格式 ID"},
 		}, map[string]any{
 			"kind": map[string]any{"type": "string", "enum": []string{"trigger", "uuid", "running", "close", "fdr", "fcl"}, "description": "明细类型"},
 		}, "kind"),
