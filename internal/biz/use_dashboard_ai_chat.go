@@ -177,7 +177,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 				result = "工具执行失败: " + execErr.Error()
 			}
 			summary := result
-			if len(summary) > 120 {
+			if len(summary) > 360 {
 				summary = summary[:360] + "…"
 			}
 			safeEmit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary, Data: json.RawMessage(result)})
