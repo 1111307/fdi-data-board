@@ -77,7 +77,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 		}
 		params := anthropic.MessageNewParams{
 			Model:     uc.llmModel(),
-			MaxTokens: 4096,
+			MaxTokens: uc.llmMaxTokens(), // 输出上限,走 data.llm.max_tokens 配置(默认16384)
 			System:    []anthropic.TextBlockParam{{Text: knowledgePrompt()}},
 			Messages:  msgs,
 			Tools:     uc.tools.Params(),

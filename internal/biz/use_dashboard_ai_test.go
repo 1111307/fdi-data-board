@@ -73,6 +73,7 @@ type fakeLlmRepo struct {
 func (f *fakeLlmRepo) Enabled() bool { return true }
 
 func (f *fakeLlmRepo) Model() string { return "kimi-k3-test" }
+func (f *fakeLlmRepo) MaxTokens() int64 { return 16384 }
 
 func (f *fakeLlmRepo) ChatStreamEx(_ context.Context, params anthropic.MessageNewParams, onEvent func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error) {
 	return nil, fmt.Errorf("not implemented in summary fake")
@@ -89,6 +90,7 @@ type disabledLlmRepo struct{}
 
 func (disabledLlmRepo) Enabled() bool { return false }
 func (disabledLlmRepo) Model() string { return "" }
+func (disabledLlmRepo) MaxTokens() int64 { return 16384 }
 func (disabledLlmRepo) ChatStream(context.Context, string, string, func(string)) error {
 	return nil
 }

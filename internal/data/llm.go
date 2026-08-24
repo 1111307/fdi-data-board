@@ -40,6 +40,17 @@ func (r *LlmRepo) Model() string {
 	return r.data.conf.GetLlm().GetModel()
 }
 
+// MaxTokens 单次输出上限(未配置/非法时默认 16384)
+func (r *LlmRepo) MaxTokens() int64 {
+	if !r.Enabled() {
+		return 16384
+	}
+	if v := r.data.conf.GetLlm().GetMaxTokens(); v > 0 {
+		return v
+	}
+	return 16384
+}
+
 // ChatStream 发起流式对话,每收到一段增量文本调用一次 onDelta
 func (r *LlmRepo) ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string)) error {
 	if !r.Enabled() {
@@ -61,7 +72,7 @@ func (r *LlmRepo) ChatStreamEx(ctx context.Context, params anthropic.MessageNewP
 		params.Model = r.Model()
 	}
 	if params.MaxTokens == 0 {
-		params.MaxTokens = 4096
+		params.MaxTokens = r.MaxTokens()
 	}
 
 	stream := r.data.llmClient.Messages.NewStreaming(ctx, params)

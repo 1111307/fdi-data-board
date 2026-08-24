@@ -17,6 +17,8 @@ type LlmRepo interface {
 	Enabled() bool
 	// Model 网关配置的模型名(chat 场景由调用方填入请求参数)
 	Model() string
+	// MaxTokens 单次输出上限(来自 data.llm.max_tokens,未配置默认 16384)
+	MaxTokens() int64
 	ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string)) error
 	// ChatStreamEx 完整参数流式对话(带 tools/多轮历史),onEvent 逐事件回调,
 	// 返回聚合完成的最终 Message(含 content blocks 与 stop_reason)
@@ -42,6 +44,14 @@ func (uc *AiDashboardUseCase) llmModel() string {
 		return m
 	}
 	return "kimi-k3"
+}
+
+// llmMaxTokens 问答场景单次输出上限(repo 未配置时 16384)
+func (uc *AiDashboardUseCase) llmMaxTokens() int64 {
+	if v := uc.llm.MaxTokens(); v > 0 {
+		return v
+	}
+	return 16384
 }
 
 // aiDashboardSnapshot 交给大模型的数据快照(全部来自现有聚合接口,失败的分项置空跳过)

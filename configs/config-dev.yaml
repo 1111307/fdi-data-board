@@ -58,7 +58,7 @@ data:
     base_url: ${LLM_BASE_URL:https://llm-gateway.momenta.works}
     api_key: ${LLM_API_KEY:sk-Mwj6z4orGxezS5ZBADXzgQ}
     model: ${LLM_MODEL:glm-5.3}
-    max_tokens: ${LLM_MAX_TOKENS:8192}
+    max_tokens: ${LLM_MAX_TOKENS:16384}
     timeout: ${LLM_TIMEOUT:360s}
   etl:
     on: ${ETL_ON:false}
