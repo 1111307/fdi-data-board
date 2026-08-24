@@ -126,26 +126,23 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 	}, execStageQuery(fo, do, "quality"))
 
 	// ---- 明细下钻工具:事件级明细表(汇总口径查不到细节时的降级/下钻通道) ----
+	// 明细统一上限 100 条,note 提示模型告知用户"只支持查 100 条"
 	add(anthropic.ToolParam{
 		Name:        "get_detail",
-		Description: param.NewOpt("查询事件级明细(每行=一次真实触发/一条链路)。适用:用户要'具体哪些车/哪些uuid/明细行',或汇总工具查某事件为空想交叉确认。kind=trigger 查触发明细(时间/uuid/车型/触发类型),kind=uuid 查全链路明细(含三阶段状态与版本)。注意:明细数据只保留近几天,更早时间范围会查空;返回最多 limit 行(默认20),先取总量再取行。"),
+		Description: param.NewOpt("查询事件级明细(每行=一次真实事件)。kind=trigger 触发明细(时间/uuid/车辆/触发类型)/uuid 全链路明细(三阶段状态与版本)/running 筛选器运行明细/close 筛选器关闭明细/fdr 落盘明细/fcl 上传明细。注意:明细数据只保留近几天,更早时间范围会查空;最多返回 limit 行(默认20,最大100),超出部分需告知用户只支持查前100条。"),
 		InputSchema: aiSchemaWith(map[string]any{
-			"limit": map[string]any{"type": "integer", "description": "返回行数上限,默认 20,最大 50"},
+			"limit": map[string]any{"type": "integer", "description": "返回行数上限,默认 20,最大 100"},
 		}, map[string]any{
-			"kind": map[string]any{"type": "string", "enum": []string{"trigger", "uuid"}, "description": "trigger=触发明细,uuid=全链路明细"},
+			"kind": map[string]any{"type": "string", "enum": []string{"trigger", "uuid", "running", "close", "fdr", "fcl"}, "description": "明细类型"},
 		}, "kind"),
 	}, func(ctx context.Context, args map[string]any) (string, error) {
 		start, end := defaultDateRange(args)
 		events := argStringSlice(args, "event_names")
 		cars := argStringSlice(args, "car_types")
 		project := argString(args, "project_name")
-		limit := 20
-		if v, ok := args["limit"].(float64); ok && v > 0 {
-			limit = int(v)
-		}
-		if limit > 50 {
-			limit = 50
-		}
+		eventStr := strings.Join(events, ",")
+		carStr := strings.Join(cars, ",")
+		limit := argLimit(args, 20, 100)
 
 		kind := argString(args, "kind")
 		var list any
@@ -153,7 +150,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 		switch kind {
 		case "trigger":
 			res, err := fo.ListFffTrigger(ctx, &dashboard_api.FffTriggerRequest{
-				EventNames: strings.Join(events, ","), ProjectName: project, CarTypes: strings.Join(cars, ","),
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
 				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
 			})
 			if err != nil {
@@ -162,7 +159,43 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			list, total = res.List, res.Total
 		case "uuid":
 			res, err := fo.ListUuidDetail(ctx, &dashboard_api.UuidDetailRequest{
-				EventNames: strings.Join(events, ","), ProjectName: project, CarTypes: strings.Join(cars, ","),
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
+				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
+			})
+			if err != nil {
+				return "", err
+			}
+			list, total = res.List, res.Total
+		case "running":
+			res, err := fo.ListFffRunning(ctx, &dashboard_api.FffRunningRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
+				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
+			})
+			if err != nil {
+				return "", err
+			}
+			list, total = res.List, res.Total
+		case "close":
+			res, err := fo.ListFffClose(ctx, &dashboard_api.FffCloseRequest{
+				ProjectName: project, CarTypes: carStr,
+				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
+			})
+			if err != nil {
+				return "", err
+			}
+			list, total = res.List, res.Total
+		case "fdr":
+			res, err := fo.ListFdrTrigger(ctx, &dashboard_api.FdrTriggerRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
+				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
+			})
+			if err != nil {
+				return "", err
+			}
+			list, total = res.List, res.Total
+		case "fcl":
+			res, err := fo.ListFclTrigger(ctx, &dashboard_api.FclTriggerRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
 				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
 			})
 			if err != nil {
@@ -170,14 +203,120 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			}
 			list, total = res.List, res.Total
 		default:
-			return "", fmt.Errorf("kind 必须为 trigger 或 uuid")
+			return "", fmt.Errorf("kind 必须为 trigger/uuid/running/close/fdr/fcl")
+		}
+		note := fmt.Sprintf("共 %d 条,仅返回前 %d 行;明细查询最多支持 100 条,更多请到看板明细页导出", total, limit)
+		if total > 100 {
+			note = fmt.Sprintf("共 %d 条,仅返回前 %d 行;⚠️ 明细查询最多只支持 100 条,请在回答中明确告知用户该限制", total, limit)
 		}
 		return marshalToolResult(map[string]any{
-			"note":    fmt.Sprintf("共 %d 条,仅返回前 %d 行;明细仅保留近几天,更早日期会查空", total, limit),
-			"total":   total,
-			"rows":    list,
+			"note":  note,
+			"total": total,
+			"rows":  list,
 		})
 	})
+
+	// ---- 聚合类补充:此前未接入的 biz 聚合方法,统一薄适配 ----
+	common := func() map[string]any {
+		return map[string]any{
+			"start_dt":     map[string]any{"type": "string", "description": "开始日期 YYYY-MM-DD,缺省近7天"},
+			"end_dt":       map[string]any{"type": "string", "description": "结束日期 YYYY-MM-DD,缺省近7天"},
+			"event_names":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "事件名过滤"},
+			"project_name": map[string]any{"type": "string", "description": "项目过滤"},
+			"car_types":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "车型过滤"},
+		}
+	}
+	add(anthropic.ToolParam{
+		Name:        "get_funnel",
+		Description: param.NewOpt("查询数采全链路漏斗:FFF触发→FDR落盘→FCL上传各级数量与整体成功率。适用:全链路转化/整体成功率/漏斗。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "funnel"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_running_overview",
+		Description: param.NewOpt("查询筛选器运行概览:运行总数/运行车辆数/开关次数/运行成败。适用:运行情况/多少车在跑/开关占比。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "running_overview"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_running_trend",
+		Description: param.NewOpt("查询某筛选器的运行活跃车辆趋势(按日,需指定筛选器)。适用:某筛选器活跃车辆变化。"),
+		InputSchema: aiSchemaWith(common(), map[string]any{
+			"filter_name": map[string]any{"type": "string", "description": "筛选器名称,必填"},
+		}, "filter_name"),
+	}, execStageQuery(fo, do, "running_trend"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_sw_version",
+		Description: param.NewOpt("查询软件版本分布(各版本事件量/车辆数)。适用:版本对比/各版本数据量。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "sw_version"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_project_car",
+		Description: param.NewOpt("查询项目×车型矩阵(各组合车辆数与事件量)。适用:项目车型分布/哪个项目车型最多。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "project_car"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_project_event",
+		Description: param.NewOpt("查询项目×事件交叉统计。适用:某项目下各事件量/事件按项目分布。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "project_event"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_overview_events",
+		Description: param.NewOpt("查询事件横向对比(每个事件的车辆数/触发数/三阶段成功率)。适用:哪些事件量最大/事件级成功率对比。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "overview"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_trend",
+		Description: param.NewOpt("查询数据量趋势(运行/触发/落盘/上传多指标按日)。适用:整体数据量变化/多指标趋势。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "trend"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_fdr_fragment",
+		Description: param.NewOpt("查询 FDR 碎片率(原始值为千分比)。适用:碎片率/存储碎片情况。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "fragment"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_net_speed",
+		Description: param.NewOpt("查询网络速率统计。适用:网速/上传速度情况。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "net_speed"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_fcl_bw",
+		Description: param.NewOpt("查询 FCL 上传带宽(按日均值/峰值)。适用:上传带宽/带宽趋势。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "fcl_bw"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_top_vehicles",
+		Description: param.NewOpt("查询数据量 Top 车辆。适用:哪台车数据最多/最活跃车辆。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "top_vehicles"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_anomaly_vehicles",
+		Description: param.NewOpt("查询异常车辆(触发多/成功率低等)。适用:异常车辆/哪些车有问题。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "anomaly_vehicles"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_active_trend",
+		Description: param.NewOpt("查询活跃车辆趋势(按日去重车辆数)。适用:活跃车辆数变化。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "active_trend"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_cool_top",
+		Description: param.NewOpt("查询冷却丢弃 Top 筛选器(被冷却最多的筛选器)。适用:哪个筛选器冷却最多。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "cool_top"))
 
 	add(anthropic.ToolParam{
 		Name:        "get_dimensions",
@@ -244,6 +383,18 @@ func argStringSlice(args map[string]any, key string) []string {
 }
 
 // defaultDateRange 补齐缺省日期:近 7 天(含今天)
+// argLimit 取整型参数并夹在 [def, max] 区间
+func argLimit(args map[string]any, def, max int) int {
+	v := def
+	if f, ok := args["limit"].(float64); ok && f > 0 {
+		v = int(f)
+	}
+	if v > max {
+		v = max
+	}
+	return v
+}
+
 func defaultDateRange(args map[string]any) (string, string) {
 	start, end := argString(args, "start_dt"), argString(args, "end_dt")
 	if start == "" || end == "" {
@@ -368,6 +519,112 @@ func execStageQuery(fo *FoDashboardUseCase, do *DoDashboardUseCase, kind string)
 			default:
 				return "", fmt.Errorf("stage 必须为 fdr 或 fcl")
 			}
+		case "funnel":
+			res, err := fo.GetFunnel(ctx, &dashboard_api.FunnelRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "running_overview":
+			res, err := fo.GetRunningOverview(ctx, &dashboard_api.FffRunningRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "running_trend":
+			res, err := fo.GetFffRunningTrend(ctx, &dashboard_api.FffRunningTrendRequest{
+				FilterName: argString(args, "filter_name"), ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "sw_version":
+			res, err := do.GetSwVersion(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15)})
+		case "project_car":
+			res, err := do.GetProjectCar(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "project_event":
+			res, err := do.GetProjectEvent(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15)})
+		case "overview_events": // 事件横向对比
+			res, err := do.GetOverview(ctx, &dashboard_api.DoOverviewRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15)})
+		case "trend_multi": // 数据量多指标趋势
+			res, err := do.GetTrend(ctx, &dashboard_api.DoTrendRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "fragment":
+			res, err := do.GetFdrFragment(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "net_speed":
+			res, err := do.GetNetSpeed(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "fcl_bw":
+			res, err := do.GetFclBw(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "top_vehicles":
+			res, err := do.GetTopVehicles(ctx, &dashboard_api.DoTopVehicleRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15)})
+		case "anomaly_vehicles":
+			res, err := do.GetAnomalyVehicles(ctx, &dashboard_api.DoAnomalyRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15)})
+		case "active_trend":
+			res, err := do.GetActiveTrend(ctx, &dashboard_api.DoTopVehicleRequest{
+				EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end,
+			})
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(res)
+		case "cool_top":
+			res, err := do.GetCoolTop(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(map[string]any{"list": truncateItems(res.List, 10), "note": "冷却丢弃 Top 筛选器"})
 		}
 		return "", fmt.Errorf("unknown query kind: %s", kind)
 	}

@@ -437,3 +437,84 @@ func TestStreamChatEmitErrorShortCircuits(t *testing.T) {
 		t.Fatalf("llm called %d times, want 1 (no second round after client gone)", fake.calls)
 	}
 }
+
+// 用例12:get_detail 工具可用(trigger 明细),返回带 total/rows/note
+func TestToolsGetDetailTrigger(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+	out, err := uc.tools.Exec(context.Background(), "get_detail", map[string]any{
+		"kind": "trigger", "event_names": []any{"mid_highbeam_on"}, "project_name": "LUS",
+		"start_dt": "2026-08-21", "end_dt": "2026-08-24",
+	})
+	if err != nil {
+		t.Fatalf("get_detail error: %v", err)
+	}
+	var parsed struct {
+		Total int64 `json:"total"`
+		Rows  []any `json:"rows"`
+		Note  string `json:"note"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v, raw: %s", err, out)
+	}
+	if parsed.Total == 0 || len(parsed.Rows) == 0 {
+		t.Fatalf("expect rows for LUS/mid_highbeam_on, total=%d rows=%d", parsed.Total, len(parsed.Rows))
+	}
+	if parsed.Note == "" {
+		t.Fatal("note missing")
+	}
+}
+
+// 用例13:get_detail 非法 kind 报错,limit 上限 50
+func TestToolsGetDetailGuard(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+	if _, err := uc.tools.Exec(context.Background(), "get_detail", map[string]any{"kind": "bad"}); err == nil {
+		t.Fatal("invalid kind should error")
+	}
+}
+
+// 用例14:工具注册表全量盘点——所有 biz 聚合+明细方法都已注册,明细 limit 上限 100
+func TestToolsRegistryCoversAllBiz(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+	want := []string{
+		"clarify", "submit_plan",
+		"get_fail_reason", "get_stage_trend", "get_overview", "get_top", "get_quality",
+		"get_funnel", "get_running_overview", "get_running_trend", "get_sw_version",
+		"get_project_car", "get_project_event", "get_overview_events", "get_trend",
+		"get_fdr_fragment", "get_net_speed", "get_fcl_bw", "get_top_vehicles",
+		"get_anomaly_vehicles", "get_active_trend", "get_cool_top",
+		"get_detail", "get_dimensions",
+	}
+	for _, name := range want {
+		if _, ok := uc.tools.tools[name]; !ok {
+			t.Fatalf("tool %s not registered", name)
+		}
+	}
+	if got := len(uc.tools.order); got != len(want) {
+		t.Fatalf("registry size = %d, want %d (有未预期工具): %v", got, len(want), uc.tools.order)
+	}
+}
+
+// 用例15:get_detail limit 夹紧到 100,超量 total 提示模型告知用户上限
+func TestToolsGetDetailLimitClamp(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+	out, err := uc.tools.Exec(context.Background(), "get_detail", map[string]any{
+		"kind": "trigger", "limit": 500, "start_dt": "2026-08-21", "end_dt": "2026-08-24",
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	var parsed struct {
+		Total int64 `json:"total"`
+		Rows  []any `json:"rows"`
+		Note  string `json:"note"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(parsed.Rows) > 100 {
+		t.Fatalf("rows = %d, must <= 100", len(parsed.Rows))
+	}
+	if !strings.Contains(parsed.Note, "100") {
+		t.Fatalf("note missing 100-limit hint: %s", parsed.Note)
+	}
+}
