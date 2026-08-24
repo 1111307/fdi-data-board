@@ -158,3 +158,16 @@ func TestBuildAiUserPromptContainsSnapshot(t *testing.T) {
 		}
 	}
 }
+
+func (fakeFoRepo) ListFffTrigger(_ context.Context, _ *FffTriggerParam) ([]*FffTriggerItem, int64, error) {
+	return []*FffTriggerItem{
+		{Dt: "2026-08-22", Uuid: "u1", EventName: "mid_highbeam_on", AnonymousId: "a1", TriggerType: "periodic", CarType: "M03"},
+		{Dt: "2026-08-23", Uuid: "u2", EventName: "mid_highbeam_on", AnonymousId: "a2", TriggerType: "event", CarType: "M05"},
+	}, 235, nil
+}
+
+func (fakeFoRepo) ListUuidDetail(_ context.Context, _ *UuidDetailParam) ([]*UuidDetailItem, int64, error) {
+	return []*UuidDetailItem{
+		{Dt: "2026-08-23", AnonymousId: "a1", EventName: "mid_highbeam_on", Uuid: "u1"},
+	}, 139, nil
+}

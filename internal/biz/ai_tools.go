@@ -125,6 +125,60 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 		}, "stage"),
 	}, execStageQuery(fo, do, "quality"))
 
+	// ---- 明细下钻工具:事件级明细表(汇总口径查不到细节时的降级/下钻通道) ----
+	add(anthropic.ToolParam{
+		Name:        "get_detail",
+		Description: param.NewOpt("查询事件级明细(每行=一次真实触发/一条链路)。适用:用户要'具体哪些车/哪些uuid/明细行',或汇总工具查某事件为空想交叉确认。kind=trigger 查触发明细(时间/uuid/车型/触发类型),kind=uuid 查全链路明细(含三阶段状态与版本)。注意:明细数据只保留近几天,更早时间范围会查空;返回最多 limit 行(默认20),先取总量再取行。"),
+		InputSchema: aiSchemaWith(map[string]any{
+			"limit": map[string]any{"type": "integer", "description": "返回行数上限,默认 20,最大 50"},
+		}, map[string]any{
+			"kind": map[string]any{"type": "string", "enum": []string{"trigger", "uuid"}, "description": "trigger=触发明细,uuid=全链路明细"},
+		}, "kind"),
+	}, func(ctx context.Context, args map[string]any) (string, error) {
+		start, end := defaultDateRange(args)
+		events := argStringSlice(args, "event_names")
+		cars := argStringSlice(args, "car_types")
+		project := argString(args, "project_name")
+		limit := 20
+		if v, ok := args["limit"].(float64); ok && v > 0 {
+			limit = int(v)
+		}
+		if limit > 50 {
+			limit = 50
+		}
+
+		kind := argString(args, "kind")
+		var list any
+		var total int64
+		switch kind {
+		case "trigger":
+			res, err := fo.ListFffTrigger(ctx, &dashboard_api.FffTriggerRequest{
+				EventNames: strings.Join(events, ","), ProjectName: project, CarTypes: strings.Join(cars, ","),
+				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
+			})
+			if err != nil {
+				return "", err
+			}
+			list, total = res.List, res.Total
+		case "uuid":
+			res, err := fo.ListUuidDetail(ctx, &dashboard_api.UuidDetailRequest{
+				EventNames: strings.Join(events, ","), ProjectName: project, CarTypes: strings.Join(cars, ","),
+				StartDt: start, EndDt: end, Page: 1, PageSize: limit,
+			})
+			if err != nil {
+				return "", err
+			}
+			list, total = res.List, res.Total
+		default:
+			return "", fmt.Errorf("kind 必须为 trigger 或 uuid")
+		}
+		return marshalToolResult(map[string]any{
+			"note":    fmt.Sprintf("共 %d 条,仅返回前 %d 行;明细仅保留近几天,更早日期会查空", total, limit),
+			"total":   total,
+			"rows":    list,
+		})
+	})
+
 	add(anthropic.ToolParam{
 		Name:        "get_dimensions",
 		Description: param.NewOpt("查询可选维度枚举:事件名/项目/车型/筛选器列表。适用:用户问有哪些可选值,或 clarify 前需要候选列表。"),
