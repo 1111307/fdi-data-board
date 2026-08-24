@@ -244,7 +244,9 @@ func execStageQuery(fo *FoDashboardUseCase, do *DoDashboardUseCase, kind string)
 			} else if stage == "fcl" {
 				series = res.Fcl
 			}
-			return marshalToolResult(map[string]any{"dates": res.Dates, "series": series})
+			// 派生指标由工具算好(total/daily 环比/各系列 7 日合计与占比),
+			// 否则模型在 thinking 里手算亿级加法,极慢且易断流
+			return marshalToolResult(buildTrendDerived(res.Dates, series))
 		case "overview":
 			fo_, err := fo.GetFffOverview(ctx, triggerReq)
 			if err != nil {
@@ -317,7 +319,64 @@ func execStageQuery(fo *FoDashboardUseCase, do *DoDashboardUseCase, kind string)
 	}
 }
 
-// ---- schema/result 小工具 ----
+// buildTrendDerived 趋势结果 + 派生指标:
+// daily_total(逐日总量)、daily_total_pct_change(环比%,首日 null)、
+// totals(各系列合计)、totals_pct(占比%)、7 日合计行。
+// 目的:模型零算术,直接引用;series 原始数据保留(画图用)。
+func buildTrendDerived(dates []string, series []*dashboard_api.StageTrendSeries) map[string]any {
+	out := map[string]any{"dates": dates, "series": series}
+	if len(dates) == 0 {
+		return out
+	}
+	n := len(dates)
+
+	// 逐日总量与环比
+	totalByDay := make([]int64, n)
+	for _, s := range series {
+		for i, v := range s.Data {
+			if i < n {
+				totalByDay[i] += v
+			}
+		}
+	}
+	totalPct := make([]*float64, n) // 首日 null
+	for i := 1; i < n; i++ {
+		if totalByDay[i-1] > 0 {
+			p := float64(totalByDay[i]-totalByDay[i-1]) / float64(totalByDay[i-1]) * 100
+			totalPct[i] = &p
+		}
+	}
+	out["daily_total"] = totalByDay
+	out["daily_total_pct_change"] = totalPct
+
+	// 各系列合计与占比(占全部系列总和)
+	type seriesTotal struct {
+		Name string   `json:"name"`
+		Total int64   `json:"total"`
+		Pct  *float64 `json:"pct_of_all"`
+	}
+	var grand int64
+	totals := make([]seriesTotal, 0, len(series))
+	for _, s := range series {
+		var t int64
+		for _, v := range s.Data {
+			t += v
+		}
+		totals = append(totals, seriesTotal{Name: s.Name, Total: t})
+		grand += t
+	}
+	if grand > 0 {
+		for i := range totals {
+			p := float64(totals[i].Total) / float64(grand) * 100
+			totals[i].Pct = &p
+		}
+	}
+	out["series_totals"] = totals
+	out["grand_total"] = grand
+	return out
+}
+
+
 
 func aiSchema(props map[string]any, required ...string) anthropic.ToolInputSchemaParam {
 	req := []string{}
