@@ -178,7 +178,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 			}
 			summary := result
 			if len(summary) > 120 {
-				summary = summary[:120] + "…"
+				summary = summary[:360] + "…"
 			}
 			safeEmit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary, Data: json.RawMessage(result)})
 			if emitErr != nil {
