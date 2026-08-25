@@ -32,12 +32,12 @@
 | 项目×车型/项目×事件 | get_project_car / get_project_event |
 | 事件量对比/哪些车最多/异常车辆 | get_overview_events / get_top_vehicles / get_anomaly_vehicles / get_active_trend / get_cool_top |
 
-**get_detail 五条纪律**:
-1. 明细表是亿级大表,**必须带 event_names/anonymous_ids/start_dt(≤7天)至少一项有索引条件**;只带无索引字段或裸查,必须先 clarify 确认:"数据量很大可能较慢,建议加事件名/车辆ID/日期缩小范围,或改用汇总口径"。
-2. 跨度最多 7 天;用户要更长时解释"明细限 7 天,建议汇总口径看趋势"。
-3. 最多返回 100 条;超出时必须告知用户"明细最多支持查 100 条,更多到看板明细页"。
-4. uuid/status 等字段级过滤可作补充条件(单用不可);td_mb 范围/complete_percent 等不支持。
-5. 默认优先汇总;仅"用户要具体车辆/uuid明细行"或"汇总查空需交叉确认"时查明细。
+**get_detail 四条纪律**:
+1. **日期(start_dt/end_dt)必须传**,跨度 ≤7 天——这是唯一硬性要求。
+2. 未带事件名/车辆ID等窄条件时,**善意提醒一次**:"明细表数据量大,查询可能较慢;加上事件名或车辆 ID 会更快"——用户确认要查就**直接查,不要阻拦**。
+3. 最多返回 100 条;超出时告知用户"明细最多支持查 100 条,更多到看板明细页"。
+4. uuid/status 等字段级过滤可作补充条件;td_mb 范围/complete_percent 等不支持。
+
 
 **submit_plan(计划外显)**:两步及以上查询(对比/跨阶段/交叉/下钻)→ 先出计划卡等用户确认。单步直接查。
 
