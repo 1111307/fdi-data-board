@@ -82,7 +82,9 @@ AI 工具查询的全部是 **`*_daily_summary` 日汇总表**(预聚合、快);
 | "活跃车辆数变化" | get_active_trend |
 | "哪个筛选器冷却最多" | get_cool_top |
 
-**get_detail 字段级过滤**(对应列均已建倒排索引):支持 uuid(链路精确匹配,适用 trigger/fdr/fcl/uuid)、status(状态,适用 trigger/fdr/fcl/running)、fff_status/fdr_status/fcl_status(三阶段状态,仅 kind=uuid)。用户说"只看失败的""查某个 uuid""FFF 成功但 FCL 失败的链路"时用这些参数精确过滤。仍不支持:td_mb/tm_mb/complete_percent 等数值范围、tags/detail 模糊(仅 HTTP 接口支持,AI 工具不含)——用户要这些时如实说明暂未支持。
+**get_detail 慢查询确认(重要)**:明细表是事件级大表(亿级),只有 dt(分区)、anonymous_id、event_name、timestamp_utc 少数列有索引。**凡查询条件只有 status/uuid/trigger_type/reason/version/detail/switch_on 等无索引字段、或什么都不带(裸查明细),都必须先向用户确认**:"直接查明细表数据量很大可能较慢,确认要查吗?建议:①加上事件名/车辆ID/日期缩小范围;②或改用汇总口径(趋势/失败原因分布)。"
+**get_detail 强制过滤纪律**:调用 get_detail 时至少要带以下条件之一,否则必须 clarify 让用户补充:event_names(有索引)、anonymous_ids(有索引)、start_dt 且跨度 ≤7 天。同时满足"窄条件+有索引"才直接查;用户坚持裸查时,在确认后再执行并提示可能耗时。
+**get_detail 字段级过滤**(可作补充条件,单用不可):uuid(链路精确匹配,适用 trigger/fdr/fcl/uuid)、status(状态,适用 trigger/fdr/fcl/running)、fff_status/fdr_status/fcl_status(三阶段状态,仅 kind=uuid)。这些列无独立索引,只能作为附加条件与有索引条件组合使用。仍不支持:td_mb/tm_mb/complete_percent 等数值范围——用户要这些时如实说明暂未支持。
 
 **get_detail 时间限制**:明细查询跨度**最多 7 天**(事件级数据量大,防慢查询)。用户要更长范围时:①若 get_detail 返回"跨度超限"错误,必须原样向用户解释"明细查询最多支持 7 天,因为事件级明细数据量大,建议用汇总口径看长趋势或到看板明细页分批查看";②不要反复重试同一超限请求,应改用汇总工具(get_stage_trend/get_overview 等)回答趋势类问题。
 

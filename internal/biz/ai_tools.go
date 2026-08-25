@@ -129,7 +129,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 	// 明细统一上限 100 条,note 提示模型告知用户"只支持查 100 条"
 	add(anthropic.ToolParam{
 		Name:        "get_detail",
-		Description: param.NewOpt("查询事件级明细(每行=一次真实事件)。kind=trigger 触发明细(时间/uuid/车辆/触发类型)/uuid 全链路明细(三阶段状态与版本)/running 筛选器运行明细/close 筛选器关闭明细/fdr 落盘明细/fcl 上传明细。注意:明细数据只保留近几天,更早时间范围会查空;最多返回 limit 行(默认20,最大100),超出部分需告知用户只支持查前100条。"),
+		Description: param.NewOpt("查询事件级明细(每行=一次真实事件,亿级大表)。★慢查询纪律:必须带 event_names/anonymous_ids/start_dt(≤7天) 至少一项有索引条件才可直接查;只带 status/uuid 等无索引字段或裸查,必须先 clarify 向用户确认并建议缩小范围。kind=trigger 触发明细/uuid 全链路明细/running 运行明细/close 关闭明细/fdr 落盘明细/fcl 上传明细。明细只保留近几天;最多 limit 行(默认20,最大100),超出需告知用户只支持查前100条。"),
 		InputSchema: aiSchemaWith(map[string]any{
 			"start_dt":      map[string]any{"type": "string", "description": "开始日期 YYYY-MM-DD,缺省近7天"},
 			"end_dt":        map[string]any{"type": "string", "description": "结束日期 YYYY-MM-DD,缺省近7天"},
