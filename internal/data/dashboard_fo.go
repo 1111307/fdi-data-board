@@ -1721,15 +1721,16 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 
 // fetchDimensions 并发查询 Doris 获取四类维度枚举值
 // GetCarTypesByProject 查指定项目下的车型列表(近3个月,联动场景专用,不走缓存)。
-// 用车辆日汇总表(预聚合,单项目 90 天约几百行)而非 fff_running(亿级明细,
-// 无 project_name 索引,90 天扫描会很慢导致前端车型下拉长时间转圈)。
+// 用 _agg 车辆日汇总表(普通表 ads_cfdi_vehicle_daily_summary 计划下线,不依赖);
+// 90 天全量约 470 万行、单项目 5.5 万行,DISTINCT 秒回。
+// 不用 fff_running(亿级明细且 project_name 无索引,90 天扫描数十秒)。
 func (r *foDashboardRepo) GetCarTypesByProject(ctx context.Context, projectName string) ([]string, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 
 	var rows []struct{ Val string }
 	err := db.Raw(`SELECT DISTINCT car_type AS val
-		FROM ads_cfdi_vehicle_daily_summary
+		FROM ` + tableVehicleDailySummaryAgg + `
 		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
 		AND project_name = ?
 		AND car_type IS NOT NULL AND car_type != ''
