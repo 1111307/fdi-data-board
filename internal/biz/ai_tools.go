@@ -402,6 +402,59 @@ func argStringSlice(args map[string]any, key string) []string {
 }
 
 // defaultDateRange 补齐缺省日期:近 7 天(含今天)
+// enumNotes 枚举值 → 白话说明(工具返回时内嵌,模型解释数据时直接引用,
+// 不依赖 system prompt 背字典——知识在使用点出现)
+var enumNotes = map[string]string{
+	// FFF 失败原因
+	"cooldown":         "冷却丢弃(短时重复触发被系统主动丢弃,非故障)",
+	"acquire_data":     "采集数据失败",
+	"trigger_maximum":  "触发次数达上限",
+	"drm_quota":        "DRM 配额限制",
+	"switch_off":       "筛选器被关闭",
+	// FDR 失败原因
+	"max_files_exceeded":   "文件数超限",
+	"mem_pool_water_line":  "内存池水位过高",
+	"event_not_recognized": "事件未识别",
+	"full_gc":              "Full GC 卡顿",
+	"bag_invalid":          "数据包无效",
+	"disk_overrun":         "磁盘超限",
+	"unauthorized":         "未授权",
+	// FCL 失败原因
+	"quota_exceeded":             "云盘配额超限",
+	"unexpected_bag_upload_query": "异常上传查询",
+	"bag_not_exist":              "数据包不存在",
+	"tls_error":                  "TLS 连接错误",
+	"meta_file_lost":             "元数据丢失",
+	"create_socket_failed":       "建连失败",
+	"event_in_blacklist":         "事件被拉黑",
+	"http_request_failed":        "HTTP 请求失败",
+	// 通用
+	"success": "成功", "failed": "失败", "discard": "丢弃", "other": "其他",
+	// 关闭原因
+	"out of memory":            "内存不足关闭",
+	"not enough memory":        "内存不足关闭",
+	"close operator for crash": "程序崩溃关闭",
+}
+
+// FFF / FDR_FCL 两组枚举白话(按 stage 提取子集,返回时内嵌)
+var fffEnumNotes = func() map[string]string {
+	keys := []string{"cooldown", "acquire_data", "trigger_maximum", "drm_quota", "switch_off", "other"}
+	out := make(map[string]string, len(keys))
+	for _, k := range keys {
+		out[k] = enumNotes[k]
+	}
+	return out
+}()
+
+var fdrFclEnumNotes = func() map[string]string {
+	keys := []string{"max_files_exceeded", "mem_pool_water_line", "event_not_recognized", "full_gc", "bag_invalid", "disk_overrun", "unauthorized", "quota_exceeded", "unexpected_bag_upload_query", "bag_not_exist", "tls_error", "meta_file_lost", "create_socket_failed", "event_in_blacklist", "http_request_failed", "other"}
+	out := make(map[string]string, len(keys))
+	for _, k := range keys {
+		out[k] = enumNotes[k]
+	}
+	return out
+}()
+
 // argLimit 取整型参数并夹在 [def, max] 区间
 func argLimit(args map[string]any, def, max int) int {
 	v := def
@@ -449,13 +502,13 @@ func execStageQuery(fo *FoDashboardUseCase, do *DoDashboardUseCase, kind string)
 				if err != nil {
 					return "", err
 				}
-				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15), "note": "name 形如 FFF-<reason>"})
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15), "enum_notes": fffEnumNotes, "note": "name 形如 FFF-<reason>"})
 			case "fdr", "fcl":
 				res, err := do.GetFailReason(ctx, &dashboard_api.DoFailReasonRequest{EventNames: eventStr, ProjectName: project, CarTypes: carStr, StartDt: start, EndDt: end})
 				if err != nil {
 					return "", err
 				}
-				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15), "note": "仅含 " + argString(args, "stage") + " 阶段条目"})
+				return marshalToolResult(map[string]any{"list": truncateItems(res.List, 15), "enum_notes": fdrFclEnumNotes, "note": "仅含 " + argString(args, "stage") + " 阶段条目"})
 			default:
 				return "", fmt.Errorf("stage 必须为 fff/fdr/fcl")
 			}
@@ -706,7 +759,22 @@ func buildTrendDerived(dates []string, series []*dashboard_api.StageTrendSeries)
 	}
 	out["series_totals"] = totals
 	out["grand_total"] = grand
+	// series name 白话(内嵌到返回,模型解释趋势时不依赖 system prompt 背字典)
+	if sn := seriesNotes(series); len(sn) > 0 {
+		out["series_notes"] = sn
+	}
 	return out
+}
+
+// seriesNotes 从 series name 提取枚举白话子集
+func seriesNotes(series []*dashboard_api.StageTrendSeries) map[string]string {
+	sn := make(map[string]string)
+	for _, s := range series {
+		if note, ok := enumNotes[s.Name]; ok {
+			sn[s.Name] = note
+		}
+	}
+	return sn
 }
 
 
