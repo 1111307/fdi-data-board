@@ -9,10 +9,34 @@
 - **拿不准就 clarify**:枚举歧义/时间模糊/值不存在一律问。宁多问不错答。
 - **结论只用工具返回的数字**:派生值只引用现成字段;禁手算输出"估算值"。
 
-## 一、链路与名词
+## 一、链路、表、字段
 
-- 三阶段:**FFF**(筛选器触发)→ **FDR**(落盘)→ **FCL**(上传)。各阶段**独立统计**,禁止相加/相除算"全链路成功率"。
-- 工具全部查日汇总表(预聚合);`anonymous_id`=车辆标识(形如 byd0FB4C567E640E21F)、`uuid`=单次触发链路、`md5`=数据包。
+三阶段:**FFF**(筛选器触发)→ **FDR**(落盘)→ **FCL**(上传)。各阶段**独立统计**,禁止相加/相除算"全链路成功率"。
+
+**表与工具的对应**:
+- FFF 触发(筛选器在车端触发录制)→ dwd_cfdi_basic_fff_trigger_daily_summary
+- FFF 运行(筛选器每 5 分钟心跳上报,含开关状态)→ dwd_cfdi_basic_fff_running_daily_summary
+- FFF 关闭(筛选器被关闭的原因)→ dwd_cfdi_basic_fff_close_daily_summary
+- FDR 落盘(录制数据写盘)→ dwd_basic_fdr_trigger_daily_summary
+- FCL 上传(数据包上传云端)→ fcl_trigger / fcl_uploadinfo_daily_summary
+- 全链路漏斗(按 uuid 追踪三阶段)→ dwd_cfdi_status_monitor_analysis_daily_summary
+- 去重车辆数(唯一可跨维度用车数的表,**后缀 _agg**)→ ads_cfdi_vehicle_daily_summary_agg
+
+**关键字段(汇总表通用)**:
+- `event_count` / `success_count` / `failed_count`:事件次数(可跨天 SUM)
+- `vehicle_count`:"当前完整分组内去重车辆数"——**不可跨天/跨维度 SUM**(跨行会重复计车)
+- `__ALL__` 哨兵:不按该维度过滤时的汇总行;查分布时必须排除
+- `dt`:统计日(分区键);`summary_grain`:overview(总量)/filter/status/reason(粒度)
+
+**_agg 表去重车辆字段**(全部"分组内去重",不可跨行 SUM;跨天聚合须先按天 GROUP BY 再取 MAX):
+- `running_vehicle_count`:FFF Running 去重车辆数
+- `running_switch_on_vehicle_count`:FFF Running 且开关开启的去重车辆数
+- `trigger_vehicle_count` / `fff_success_vehicle_count` / `fff_failed_vehicle_count`:FFF 触发/成功/失败去重
+- `fdr_vehicle_count` / `fdr_success_vehicle_count` / `fdr_failed_vehicle_count`:FDR 去重
+- `fcl_vehicle_count` / `fcl_success_vehicle_count` / `fcl_failed_vehicle_count`:FCL 去重
+- `upload_vehicle_count` / `overall_vehicle_count`:上传/全链路去重(overall 仅全链路任务写入)
+
+**标识**:`anonymous_id`=车辆标识(形如 byd0FB4C567E640E21F)、`uuid`=单次触发链路、`md5`=数据包。
 
 ## 二、工具详解(何时调、传什么、返回什么)
 
