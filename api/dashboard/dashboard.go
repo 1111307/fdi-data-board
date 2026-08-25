@@ -41,6 +41,8 @@ type FffRunningRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	SwitchOn    *int   `form:"switch_on"`     // 开关:1=开启 0=关闭(有索引)
+	SwVersion   string `form:"sw_version"`    // 软件版本(有索引)
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -96,6 +98,10 @@ type FffTriggerRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
+	Status      string `form:"status"`      // 状态(有索引)
+	TriggerType string `form:"trigger_type"` // 触发类型(有索引)
+	Tags        string `form:"tags"`        // 标签(分词索引)
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -136,6 +142,8 @@ type FffCloseRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Reason      string `form:"reason"`       // 关闭原因(分词索引)
+	Version     string `form:"version"`      // 筛选器版本(有索引)
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -187,6 +195,9 @@ type FdrTriggerRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
+	Status      string `form:"status"`      // 状态(有索引)
+	Detail      string `form:"detail"`      // 详情(分词索引)
 	StartDt     string   `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -234,6 +245,8 @@ type FclTriggerRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
+	Status      string `form:"status"`      // 状态(有索引)
 	StartDt          string   `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -296,6 +309,10 @@ type UuidDetailRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
+	FffStatus   string `form:"fff_status"`  // FFF 阶段状态(有索引)
+	FdrStatus   string `form:"fdr_status"`  // FDR 阶段状态(有索引)
+	FclStatus   string `form:"fcl_status"`  // FCL 阶段状态(有索引)
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败

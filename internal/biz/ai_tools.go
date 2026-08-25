@@ -138,6 +138,11 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			"car_types":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "车型过滤"},
 			"limit":         map[string]any{"type": "integer", "description": "返回行数上限,默认 20,最大 100"},
 			"anonymous_ids": map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "按匿名 ID(车辆标识)过滤"},
+			"uuid":          map[string]any{"type": "string", "description": "按链路 UUID 精确匹配(trigger/fdr/fcl/uuid)"},
+			"status":        map[string]any{"type": "string", "enum": []string{"success", "fail", "discard", "waiting"}, "description": "按状态过滤(trigger/fdr/fcl/running)"},
+			"fff_status":    map[string]any{"type": "string", "description": "按 FFF 阶段状态过滤(仅 kind=uuid)"},
+			"fdr_status":    map[string]any{"type": "string", "description": "按 FDR 阶段状态过滤(仅 kind=uuid)"},
+			"fcl_status":    map[string]any{"type": "string", "description": "按 FCL 阶段状态过滤(仅 kind=uuid)"},
 		}, map[string]any{
 			"kind": map[string]any{"type": "string", "enum": []string{"trigger", "uuid", "running", "close", "fdr", "fcl"}, "description": "明细类型"},
 		}, "kind"),
@@ -159,6 +164,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			res, err := fo.ListFffTrigger(ctx, &dashboard_api.FffTriggerRequest{
 				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
 				StartDt: start, EndDt: end, Page: 1, PageSize: limit, AnonymousIds: anonStr,
+				Uuid: argString(args, "uuid"), Status: argString(args, "status"),
 			})
 			if err != nil {
 				return "", err
@@ -168,6 +174,10 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			res, err := fo.ListUuidDetail(ctx, &dashboard_api.UuidDetailRequest{
 				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
 				StartDt: start, EndDt: end, Page: 1, PageSize: limit, AnonymousIds: anonStr,
+				Uuid: argString(args, "uuid"),
+				FffStatus: argString(args, "fff_status"),
+				FdrStatus: argString(args, "fdr_status"),
+				FclStatus: argString(args, "fcl_status"),
 			})
 			if err != nil {
 				return "", err
@@ -195,6 +205,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			res, err := fo.ListFdrTrigger(ctx, &dashboard_api.FdrTriggerRequest{
 				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
 				StartDt: start, EndDt: end, Page: 1, PageSize: limit, AnonymousIds: anonStr,
+				Uuid: argString(args, "uuid"), Status: argString(args, "status"),
 			})
 			if err != nil {
 				return "", err
@@ -204,6 +215,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			res, err := fo.ListFclTrigger(ctx, &dashboard_api.FclTriggerRequest{
 				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
 				StartDt: start, EndDt: end, Page: 1, PageSize: limit, AnonymousIds: anonStr,
+				Uuid: argString(args, "uuid"), Status: argString(args, "status"),
 			})
 			if err != nil {
 				return "", err
