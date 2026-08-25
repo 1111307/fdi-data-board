@@ -23,7 +23,7 @@
 | 概览/整体情况/成功率 | get_overview |
 | Top/排行/最多 | get_top(kind:trigger/mem/disk/quota/close) |
 | P95/耗时/碎片率/带宽/网速 | get_quality / get_fdr_fragment / get_fcl_bw / get_net_speed |
-| 可选维度枚举 | get_dimensions |
+| 可选维度枚举/某项目下车型 | get_dimensions(传 project_name 联动过滤车型) |
 | 具体车辆/uuid/明细行 | get_detail(kind:trigger/uuid/running/close/fdr/fcl) |
 | 全链路漏斗/转化率 | get_funnel |
 | 运行情况/开关 | get_running_overview |

@@ -339,10 +339,13 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 
 	add(anthropic.ToolParam{
 		Name:        "get_dimensions",
-		Description: param.NewOpt("查询可选维度枚举:事件名/项目/车型/筛选器列表。适用:用户问有哪些可选值,或 clarify 前需要候选列表。"),
-		InputSchema: aiSchema(map[string]any{}, ""),
-	}, func(ctx context.Context, _ map[string]any) (string, error) {
-		res, err := fo.GetDimensions(ctx, "")
+		Description: param.NewOpt("查询可选维度枚举:事件名/项目/车型/筛选器列表。传 project_name 时 car_types 只返回该项目的车型(近3个月)。适用:用户问有哪些可选值/某项目下有哪些车型,或 clarify 前需要候选列表。"),
+		InputSchema: aiSchema(map[string]any{
+			"project_name": map[string]any{"type": "string", "description": "项目名;传入则车型列表联动过滤为该项目下的可选值"},
+		}),
+	}, func(ctx context.Context, args map[string]any) (string, error) {
+		project := argString(args, "project_name")
+		res, err := fo.GetDimensions(ctx, project)
 		if err != nil {
 			return "", err
 		}
