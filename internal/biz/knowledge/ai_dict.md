@@ -38,6 +38,19 @@
 
 **标识**:`anonymous_id`=车辆标识(形如 byd0FB4C567E640E21F)、`uuid`=单次触发链路、`md5`=数据包。
 
+**明细表关键字段(每行 = 一次真实事件)**:
+
+| 表 | 含义 | 关键字段 |
+|---|---|---|
+| fff_trigger | 筛选器触发明细 | `before/after`=触发前后秒数(录制窗口)、`trigger_type`=触发类型、`collect_type`=采集类型、`status`=触发状态、`tags`=标签数组、`detail`=详情文本 |
+| fff_running | 筛选器心跳明细(每5分钟) | `switch_on`=开关(1开0关)、`version`=筛选器版本、`status`=状态JSON |
+| fff_close | 筛选器关闭明细 | `reason`=关闭原因文本(如 out of memory)、`version`=筛选器版本 |
+| fdr_trigger | 落盘明细 | `td_mb`=TD大小(MB)、`tm_mb`=TM大小(MB)、`dse`=DSE信息、`time_cost_ms`=耗时(毫秒)、`begin/end/dump_timestamp`=三阶段时间戳(微秒) |
+| fcl_trigger | 上传触发明细 | `complete_percent`=完成百分比、`upload_fail_times`=失败次数、`local_file`=本地文件路径、`trigger_source`=触发来源(FFF/Forever_log/FDC) |
+| monitor_analysis(uuid明细) | 全链路明细(按uuid) | `fff/fdr/fcl_status`=三阶段各自状态、`fff/fdr/fcl_updated_at`=各阶段时间戳(微秒)、`fff/fdr/fcl_detail`=各阶段详情文本、`begin/dump/end_timestamp`=链路三节点、`md5`=包哈希、`bag_name`=包名 |
+
+字段语义:`td_mb`/`tm_mb` 是字符串型 MB 大小(注意不是数字)、`before/after` 是录制窗口秒数(触发前 N 秒 + 触发后 M 秒的录制范围)、`trigger_source=Forever_log` 表示手动/永久日志触发(非事件触发)。
+
 ## 二、工具详解(何时调、传什么、返回什么)
 
 **get_dimensions** — 可选值枚举。传 project_name 时车型联动过滤为该项目可选值。返回 {event_names, projects, car_types, filters}。适用:"有哪些项目/车型/事件可选"、"BGANS 下有哪些车型"、clarify 前要候选列表。
