@@ -97,6 +97,12 @@ type UuidDetailParam struct {
 	StageFilter string // fff_discard/fdr_discard/fcl_discard/fcl_success
 	Page        int
 	PageSize    int
+	Uuid               string
+	FffStatus          string
+	FdrStatus          string
+	FclStatus          string
+	CompletePercentMin *int
+	CompletePercentMax *int
 }
 
 // FclTriggerParam FCL 上传明细查询参数
@@ -110,6 +116,13 @@ type FclTriggerParam struct {
 	EndDt       string
 	Page        int
 	PageSize    int
+	Uuid                string
+	Status              string
+	CompletePercentMin  *int
+	CompletePercentMax  *int
+	UploadFailTimesMin  *int
+	UploadFailTimesMax  *int
+	LocalFile           string
 }
 
 // FdrTriggerParam FDR 落盘明细查询参数
@@ -123,6 +136,14 @@ type FdrTriggerParam struct {
 	EndDt       string
 	Page        int
 	PageSize    int
+	Uuid     string
+	Status   string
+	Detail   string
+	Dse      string
+	TdMbMin  *float64
+	TdMbMax  *float64
+	TmMbMin  *float64
+	TmMbMax  *float64
 }
 
 // FffCloseParam 筛选器关闭明细查询参数
@@ -135,6 +156,8 @@ type FffCloseParam struct {
 	EndDt       string
 	Page        int
 	PageSize    int
+	Reason      string
+	Version     string
 }
 
 // FffTriggerParam 筛选器触发明细查询参数
@@ -148,6 +171,10 @@ type FffTriggerParam struct {
 	EndDt       string
 	Page        int
 	PageSize    int
+	Uuid        string
+	Status      string
+	TriggerType string
+	Tags        string
 }
 
 // FoDimensions 维度枚举数据（FO/DO 公共）
@@ -169,6 +196,8 @@ type FffRunningParam struct {
 	EndDt       string
 	Page        int
 	PageSize    int
+	SwitchOn    *int
+	SwVersion   string
 }
 
 // FffRunningTrendParam 算子活跃车辆趋势查询参数
@@ -202,6 +231,10 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
+		Uuid:        req.Uuid,
+		Status:      req.Status,
+		TriggerType: req.TriggerType,
+		Tags:        req.Tags,
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -234,6 +267,8 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
+		Reason:      req.Reason,
+		Version:     req.Version,
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -267,6 +302,14 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
+		Uuid:     req.Uuid,
+		Status:   req.Status,
+		Detail:   req.Detail,
+		Dse:      req.Dse,
+		TdMbMin:  req.TdMbMin,
+		TdMbMax:  req.TdMbMax,
+		TmMbMin:  req.TmMbMin,
+		TmMbMax:  req.TmMbMax,
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -300,6 +343,13 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
+		Uuid:               req.Uuid,
+		Status:             req.Status,
+		CompletePercentMin: req.CompletePercentMin,
+		CompletePercentMax: req.CompletePercentMax,
+		UploadFailTimesMin: req.UploadFailTimesMin,
+		UploadFailTimesMax: req.UploadFailTimesMax,
+		LocalFile:          req.LocalFile,
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -333,6 +383,12 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
+		Uuid:               req.Uuid,
+		FffStatus:          req.FffStatus,
+		FdrStatus:          req.FdrStatus,
+		FclStatus:          req.FclStatus,
+		CompletePercentMin: req.CompletePercentMin,
+		CompletePercentMax: req.CompletePercentMax,
 		StartDt:     startDt,
 		EndDt:       endDt,
 		OnlyFail:    req.OnlyFail == 1,
@@ -457,6 +513,8 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
+		SwitchOn:    req.SwitchOn,
+		SwVersion:   req.SwVersion,
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,

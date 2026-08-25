@@ -82,6 +82,8 @@ AI 工具查询的全部是 **`*_daily_summary` 日汇总表**(预聚合、快);
 | "活跃车辆数变化" | get_active_trend |
 | "哪个筛选器冷却最多" | get_cool_top |
 
+**get_detail 字段级过滤**:除日期/事件/项目/车型/匿名ID外,还支持 uuid(链路精确匹配)、status(状态:success/fail/discard/waiting,适用于 trigger/fdr/fcl)、fff_status/fdr_status/fcl_status(三阶段状态,仅 kind=uuid)、sw_version(仅 kind=running)。用户说"只看失败的""查某个uuid""FFF 成功但 FCL 失败的链路"时用这些参数精确过滤。
+
 **get_detail 时间限制**:明细查询跨度**最多 7 天**(事件级数据量大,防慢查询)。用户要更长范围时:①若 get_detail 返回"跨度超限"错误,必须原样向用户解释"明细查询最多支持 7 天,因为事件级明细数据量大,建议用汇总口径看长趋势或到看板明细页分批查看";②不要反复重试同一超限请求,应改用汇总工具(get_stage_trend/get_overview 等)回答趋势类问题。
 
 **get_detail 支持按车辆查询**:用户给匿名 ID(即车辆标识,形如 byd0FB4C567E640E21F;用户可能说'车辆ID/车架号/某辆车')时,传 anonymous_ids 数组过滤,可查该车在各明细表的记录(注意项目/事件过滤不要同时传,匿名 ID 通常跨项目)。注:工具参数名为 anonymous_ids(复数数组);HTTP 明细接口同时兼容 anonymous_id(单数)/anonymous_ids(逗号分隔)两种写法并自动合并去重。

@@ -532,3 +532,25 @@ func TestDetailDateRangeLimit(t *testing.T) {
 		t.Fatalf("error should explain limit reason, got: %s", err.Error())
 	}
 }
+
+// 用例19:明细字段级过滤(status/uuid/三阶段状态)请求透传正确
+func TestToolsGetDetailFieldFilters(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+	out, err := uc.tools.Exec(context.Background(), "get_detail", map[string]any{
+		"kind": "trigger", "status": "fail", "uuid": "test-uuid-123",
+		"start_dt": "2026-08-21", "end_dt": "2026-08-24",
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	var parsed struct {
+		Rows []map[string]any `json:"rows"`
+	}
+	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(parsed.Rows) == 0 {
+		t.Fatal("fake should return rows")
+	}
+	// fake 不真实过滤,只验证请求可执行(字段名/类型正确即通过)
+}

@@ -41,6 +41,8 @@ type FffRunningRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	SwitchOn    *int   `form:"switch_on"`     // 开关:1=开启 0=关闭;不传=不过滤
+	SwVersion   string `form:"sw_version"`    // 软件版本,精确匹配
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -96,6 +98,10 @@ type FffTriggerRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid        string `form:"uuid"`        // 触发链路UUID,精确匹配
+	Status      string `form:"status"`      // 状态:success/fail/discard/waiting
+	TriggerType string `form:"trigger_type"` // 触发类型:cloud/vehicle/manual
+	Tags        string `form:"tags"`        // 标签,LIKE 模糊匹配
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -136,6 +142,8 @@ type FffCloseRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Reason      string `form:"reason"`       // 关闭原因,LIKE 模糊匹配
+	Version     string `form:"version"`      // 筛选器版本,精确匹配
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -187,7 +195,15 @@ type FdrTriggerRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	StartDt     string `form:"start_dt"`
+	Uuid        string   `form:"uuid"`        // 链路UUID,精确匹配
+	Status      string   `form:"status"`      // 状态:success/fail/discard/waiting
+	Detail      string   `form:"detail"`      // 详情,LIKE 模糊匹配
+	Dse         string   `form:"dse"`         // DSE,精确匹配
+	TdMbMin     *float64 `form:"td_mb_min"`   // td_mb 下限
+	TdMbMax     *float64 `form:"td_mb_max"`   // td_mb 上限
+	TmMbMin     *float64 `form:"tm_mb_min"`   // tm_mb 下限
+	TmMbMax     *float64 `form:"tm_mb_max"`   // tm_mb 上限
+	StartDt     string   `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
 	PageSize    int    `form:"page_size"`
@@ -234,7 +250,14 @@ type FclTriggerRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	StartDt     string `form:"start_dt"`
+	Uuid             string   `form:"uuid"`             // 链路UUID,精确匹配
+	Status           string   `form:"status"`           // 状态
+	CompletePercentMin *int   `form:"complete_percent_min"` // 完成率下限(0-100)
+	CompletePercentMax *int   `form:"complete_percent_max"` // 完成率上限(0-100)
+	UploadFailTimesMin *int   `form:"upload_fail_times_min"` // 上传失败次数下限
+	UploadFailTimesMax *int   `form:"upload_fail_times_max"` // 上传失败次数上限
+	LocalFile        string   `form:"local_file"`        // 本地文件路径,LIKE 模糊匹配
+	StartDt          string   `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
 	PageSize    int    `form:"page_size"`
@@ -296,6 +319,12 @@ type UuidDetailRequest struct {
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid               string `form:"uuid"`               // 链路UUID,精确匹配
+	FffStatus          string `form:"fff_status"`          // FFF 阶段状态
+	FdrStatus          string `form:"fdr_status"`          // FDR 阶段状态
+	FclStatus          string `form:"fcl_status"`          // FCL 阶段状态
+	CompletePercentMin *int   `form:"complete_percent_min"` // 完成率下限(0-100)
+	CompletePercentMax *int   `form:"complete_percent_max"` // 完成率上限(0-100)
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败
