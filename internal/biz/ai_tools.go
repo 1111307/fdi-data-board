@@ -131,8 +131,8 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 		Name:        "get_detail",
 		Description: param.NewOpt("查询事件级明细(每行=一次真实事件,亿级大表)。★慢查询纪律:必须带 event_names/anonymous_ids/start_dt(≤7天) 至少一项有索引条件才可直接查;只带 status/uuid 等无索引字段或裸查,必须先 clarify 向用户确认并建议缩小范围。kind=trigger 触发明细/uuid 全链路明细/running 运行明细/close 关闭明细/fdr 落盘明细/fcl 上传明细。明细只保留近几天;最多 limit 行(默认20,最大100),超出需告知用户只支持查前100条。"),
 		InputSchema: aiSchemaWith(map[string]any{
-			"start_dt":      map[string]any{"type": "string", "description": "开始日期 YYYY-MM-DD,缺省近7天"},
-			"end_dt":        map[string]any{"type": "string", "description": "结束日期 YYYY-MM-DD,缺省近7天"},
+			"start_dt":      map[string]any{"type": "string", "description": "开始日期 YYYY-MM-DD,缺省近3个月"},
+			"end_dt":        map[string]any{"type": "string", "description": "结束日期 YYYY-MM-DD,缺省近3个月"},
 			"event_names":   map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "事件名过滤"},
 			"project_name":  map[string]any{"type": "string", "description": "项目过滤"},
 			"car_types":     map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "车型过滤"},
@@ -238,8 +238,8 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 	// ---- 聚合类补充:此前未接入的 biz 聚合方法,统一薄适配 ----
 	common := func() map[string]any {
 		return map[string]any{
-			"start_dt":     map[string]any{"type": "string", "description": "开始日期 YYYY-MM-DD,缺省近7天"},
-			"end_dt":       map[string]any{"type": "string", "description": "结束日期 YYYY-MM-DD,缺省近7天"},
+			"start_dt":     map[string]any{"type": "string", "description": "开始日期 YYYY-MM-DD,缺省近3个月"},
+			"end_dt":       map[string]any{"type": "string", "description": "结束日期 YYYY-MM-DD,缺省近3个月"},
 			"event_names":  map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "事件名过滤"},
 			"project_name": map[string]any{"type": "string", "description": "项目过滤"},
 			"car_types":    map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "车型过滤"},
@@ -414,11 +414,14 @@ func argLimit(args map[string]any, def, max int) int {
 	return v
 }
 
+// defaultDateRange 汇总工具默认时间范围:近 3 个月(90 天)。
+// 之前默认近 7 天,用户问"有哪些车型/项目"这类全局盘点问题时容易漏掉
+// 近期不活跃的维度值——扩到 3 个月,由模型在回答中标注实际范围。
 func defaultDateRange(args map[string]any) (string, string) {
 	start, end := argString(args, "start_dt"), argString(args, "end_dt")
 	if start == "" || end == "" {
 		today := time.Now()
-		start = today.AddDate(0, 0, -6).Format("2006-01-02")
+		start = today.AddDate(0, 0, -89).Format("2006-01-02")
 		end = today.Format("2006-01-02")
 	}
 	return start, end
