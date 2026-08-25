@@ -14,23 +14,41 @@
 - 三阶段:**FFF**(筛选器触发)→ **FDR**(落盘)→ **FCL**(上传)。各阶段**独立统计**,禁止相加/相除算"全链路成功率"。
 - 工具全部查日汇总表(预聚合);`anonymous_id`=车辆标识(形如 byd0FB4C567E640E21F)、`uuid`=单次触发链路、`md5`=数据包。
 
-## 二、工具路由表
+## 二、工具详解(何时调、传什么、返回什么)
 
-| 问题形态 | 工具 |
-|---|---|
-| 失败原因/为什么失败 | get_fail_reason(需 stage) |
-| 每日趋势/变化 | get_stage_trend(需 stage)或 get_trend(多指标) |
-| 概览/整体情况/成功率 | get_overview |
-| Top/排行/最多 | get_top(kind:trigger/mem/disk/quota/close) |
-| P95/耗时/碎片率/带宽/网速 | get_quality / get_fdr_fragment / get_fcl_bw / get_net_speed |
-| 可选维度枚举/某项目下车型 | get_dimensions(传 project_name 联动过滤车型) |
-| 具体车辆/uuid/明细行 | get_detail(kind:trigger/uuid/running/close/fdr/fcl) |
-| 全链路漏斗/转化率 | get_funnel |
-| 运行情况/开关 | get_running_overview |
-| 某筛选器活跃趋势 | get_running_trend(需 filter_name) |
-| 版本对比 | get_sw_version |
-| 项目×车型/项目×事件 | get_project_car / get_project_event |
-| 事件量对比/哪些车最多/异常车辆 | get_overview_events / get_top_vehicles / get_anomaly_vehicles / get_active_trend / get_cool_top |
+**get_dimensions** — 可选值枚举。传 project_name 时车型联动过滤为该项目可选值。返回 {event_names, projects, car_types, filters}。适用:"有哪些项目/车型/事件可选"、"BGANS 下有哪些车型"、clarify 前要候选列表。
+
+**get_overview** — 三阶段总览。返回 {fff_overview:{trigger_total/trigger_success/trigger_failed/trigger_success_rate}, fdr_quality:{fdr_total/fdr_success/时间P95}, fcl_quality:{upload_total}}。适用:"整体怎么样/成功率多少/健康吗"。单步首选。
+
+**get_fail_reason(stage)** — 某阶段失败原因分布。stage 必填 fff/fdr/fcl。返回 {list:[{name:"FFF-cooldown",value:58}...], enum_notes:{cooldown:"冷却丢弃(...)"}}。适用:"为什么失败/失败原因/失败分布"。enum_notes 里有所的原因白话,回答时直接用。
+
+**get_stage_trend(stage)** — 某阶段每日趋势。返回 {dates, series:[{name:"success",data:[...]}], series_notes, daily_total, daily_total_pct_change(环比算好), series_totals(各系列合计+占比), grand_total}。适用:"趋势/每日变化/环比"。**派生数字全在返回里,禁止手算**。
+
+**get_trend** — 多指标整体趋势(运行/触发/落盘/上传)。适用:"整体数据量变化"。
+
+**get_top(kind)** — Top 榜单。kind: trigger(触发最多事件)/mem(内存不足)/disk(磁盘不足)/quota(配额超限)/close(关闭最多筛选器)。返回 {list:[{event_name, count}]}。适用:"最多/排行/Top"。
+
+**get_quality(stage)** — 质量指标。stage: fdr(落盘耗时P95/磁盘P95/内存P95)/fcl(Bag大小P95/上传量)。适用:"耗时/磁盘内存/Bag大小"。
+
+**get_fdr_fragment** — FDR 碎片率(原始值千分比)。**get_fcl_bw** — 上传带宽。**get_net_speed** — 网络速率。
+
+**get_funnel** — 全链路漏斗(FFF→FDR→FCL 转化)。适用:"全链路成功率/转化率/漏斗"。注意与三阶段独立口径区分,回答时说明是漏斗口径。
+
+**get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
+
+**get_sw_version** — 软件版本分布。适用:"哪个版本数据多/版本对比"。
+
+**get_project_car** — 项目×车型矩阵(车辆数+事件量)。适用:"项目下有哪些车型/各组合数据量"。
+
+**get_project_event** — 项目×事件交叉。**get_overview_events** — 事件横向对比(车辆/触发/三阶段成功率)。
+
+**get_top_vehicles / get_anomaly_vehicles / get_active_trend / get_cool_top** — 数据量Top车辆/异常车辆/活跃车辆趋势/冷却最多筛选器。
+
+**get_detail(kind)** — 事件级明细(每行=一次真实事件)。kind: trigger/uuid/running/close/fdr/fcl。返回 {total, rows, note}(≤100行,note 有条数提示)。
+
+**clarify** — 参数求证。用户意图/枚举/时间模糊时问,一次一个缺口+候选值。
+
+**submit_plan** — 查询计划。两步及以上查询先出计划卡等确认。
 
 **get_detail 四条纪律**:
 1. **日期(start_dt/end_dt)必须传**,跨度 ≤7 天——这是唯一硬性要求。
