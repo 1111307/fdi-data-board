@@ -2,6 +2,7 @@ package biz
 
 import (
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -26,6 +27,9 @@ type aiToolRegistry struct {
 }
 
 const aiClarifyToolName = "clarify"
+//go:embed knowledge/ai_glossary.md
+var aiGlossaryFS embed.FS
+
 const aiSubmitPlanToolName = "submit_plan"
 
 func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRegistry {
@@ -336,6 +340,58 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 		Description: param.NewOpt("查询冷却丢弃 Top 筛选器(被冷却最多的筛选器)。适用:哪个筛选器冷却最多。"),
 		InputSchema: aiSchema(common()),
 	}, execStageQuery(fo, do, "cool_top"))
+
+	// ---- 领域字典:按需查名词/字段/陷阱(渐进加载,不常驻 system prompt) ----
+	add(anthropic.ToolParam{
+		Name:        "lookup_dict",
+		Description: param.NewOpt("查询数采领域名词/表字段含义/聚合陷阱。当你解释数据遇到不明白的字段名、需要确认口径或聚合方式时调用。kind=table(表与汇总字段)/detail(明细表字段)/trap(聚合陷阱与单位换算)。keyword 可选,按关键词过滤(如 'td_mb'、'vehicle_count'、'__ALL__')。返回的是权威字典,优先于你的记忆。"),
+		InputSchema: aiSchema(map[string]any{
+			"kind":    map[string]any{"type": "string", "enum": []string{"table", "detail", "trap"}, "description": "字典类别"},
+			"keyword": map[string]any{"type": "string", "description": "可选,按关键词过滤(字段名/表名/陷阱关键词)"},
+		}, "kind"),
+	}, func(ctx context.Context, args map[string]any) (string, error) {
+		raw, err := aiGlossaryFS.ReadFile("knowledge/ai_glossary.md")
+		if err != nil {
+			return "", err
+		}
+		content := string(raw)
+		kind := argString(args, "kind")
+
+		// 按 ## kind= 分段
+		sections := make(map[string]string)
+		for _, sec := range strings.Split(content, "\n## kind=") {
+			if idx := strings.Index(sec, ":"); idx > 0 && idx < 20 {
+				k := strings.TrimSpace(sec[:idx])
+				body := strings.TrimSpace(sec[idx+1:])
+				sections[k] = body
+			}
+		}
+		body, ok := sections[kind]
+		if !ok {
+			return "", fmt.Errorf("kind 必须为 table/detail/trap")
+		}
+
+		// keyword 过滤:保留含关键词的行及其上下文(前一行标题)
+		if kw := argString(args, "keyword"); kw != "" {
+			lines := strings.Split(body, "\n")
+			var kept []string
+			for i, line := range lines {
+				if strings.Contains(strings.ToLower(line), strings.ToLower(kw)) {
+					start := i
+					if i > 0 && (strings.HasPrefix(lines[i-1], "-") || strings.HasPrefix(lines[i-1], "|") || strings.HasPrefix(lines[i-1], "**")) {
+						start = i - 1
+					}
+					for j := start; j <= i; j++ {
+						kept = append(kept, lines[j])
+					}
+				}
+			}
+			if len(kept) > 0 {
+				body = strings.Join(kept, "\n")
+			}
+		}
+		return body, nil
+	})
 
 	add(anthropic.ToolParam{
 		Name:        "get_dimensions",

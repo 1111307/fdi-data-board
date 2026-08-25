@@ -476,7 +476,7 @@ func TestToolsGetDetailGuard(t *testing.T) {
 func TestToolsRegistryCoversAllBiz(t *testing.T) {
 	uc := newAiUcForTest(&chatLlmFake{})
 	want := []string{
-		"clarify", "submit_plan",
+		"clarify", "submit_plan", "lookup_dict",
 		"get_fail_reason", "get_stage_trend", "get_overview", "get_top", "get_quality",
 		"get_funnel", "get_running_overview", "get_running_trend", "get_sw_version",
 		"get_project_car", "get_project_event", "get_overview_events", "get_trend",
@@ -553,4 +553,50 @@ func TestToolsGetDetailFieldFilters(t *testing.T) {
 		t.Fatal("fake should return rows")
 	}
 	// fake 不真实过滤,只验证请求可执行(字段名/类型正确即通过)
+}
+
+// 用例20:lookup_dict 三类都可查,keyword 过滤生效
+func TestToolsLookupDict(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+
+	// kind=table:含表名与 vehicle_count 陷阱
+	out, err := uc.tools.Exec(context.Background(), "lookup_dict", map[string]any{"kind": "table"})
+	if err != nil {
+		t.Fatalf("table: %v", err)
+	}
+	if !strings.Contains(out, "fff_trigger") || !strings.Contains(out, "vehicle_count") {
+		t.Fatal("kind=table missing table/field content")
+	}
+
+	// kind=detail:含明细字段
+	out, err = uc.tools.Exec(context.Background(), "lookup_dict", map[string]any{"kind": "detail"})
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if !strings.Contains(out, "td_mb") || !strings.Contains(out, "switch_on") {
+		t.Fatal("kind=detail missing detail fields")
+	}
+
+	// kind=trap:含陷阱
+	out, err = uc.tools.Exec(context.Background(), "lookup_dict", map[string]any{"kind": "trap"})
+	if err != nil {
+		t.Fatalf("trap: %v", err)
+	}
+	if !strings.Contains(out, "85 倍") || !strings.Contains(out, "__ALL__") {
+		t.Fatal("kind=trap missing trap content")
+	}
+
+	// keyword 过滤:查 vehicle_count 只返回相关行
+	out, err = uc.tools.Exec(context.Background(), "lookup_dict", map[string]any{"kind": "trap", "keyword": "P95"})
+	if err != nil {
+		t.Fatalf("kw: %v", err)
+	}
+	if !strings.Contains(out, "P95") {
+		t.Fatal("keyword filter broken")
+	}
+
+	// 非法 kind
+	if _, err := uc.tools.Exec(context.Background(), "lookup_dict", map[string]any{"kind": "bad"}); err == nil {
+		t.Fatal("invalid kind should error")
+	}
 }
