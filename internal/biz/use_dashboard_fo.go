@@ -31,6 +31,7 @@ type FoDashboardRepo interface {
 	GetCloseReason(ctx context.Context, param *CloseReasonParam) ([]*CloseReasonItem, error)
 	GetStageTrend(ctx context.Context, param *StageTrendParam) (*StageTrendData, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
+	GetCarTypesByProject(ctx context.Context, projectName string) ([]string, error)
 	GetFffRunningTrend(ctx context.Context, param *FffRunningTrendParam) (*FffRunningTrendData, error)
 	GetRunningOverview(ctx context.Context, param *FffRunningParam) (*FoRunningOverviewData, error)
 	GetFffOverview(ctx context.Context, param *FffTriggerParam) (*FoFffOverviewData, error)
@@ -462,7 +463,25 @@ func (uc *FoDashboardUseCase) GetStageTrend(ctx context.Context, req *dashboard_
 	}, nil
 }
 
-func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context) (*dashboard_api.FoDimensionsResponse, error) {
+func (uc *FoDashboardUseCase) GetDimensions(ctx context.Context, projectName string) (*dashboard_api.FoDimensionsResponse, error) {
+	// 传了 project_name → 车型按该项目过滤(近3个月),其余维度仍走缓存全量
+	if strings.TrimSpace(projectName) != "" {
+		carTypes, err := uc.repo.GetCarTypesByProject(ctx, projectName)
+		if err != nil {
+			return nil, err
+		}
+		dims, err := uc.repo.GetDimensions(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return &dashboard_api.FoDimensionsResponse{
+			BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+			FilterNames:  dims.FilterNames,
+			EventNames:   dims.EventNames,
+			ProjectNames: dims.ProjectNames,
+			CarTypes:     carTypes,
+		}, nil
+	}
 	dims, err := uc.repo.GetDimensions(ctx)
 	if err != nil {
 		return nil, err

@@ -471,6 +471,11 @@ type DoTrendResponse struct {
 	SuccessRates  []float64 `json:"success_rates"`
 }
 
+// DimensionsRequest 下拉维度请求(project_name 非空时 car_types 联动过滤)
+type DimensionsRequest struct {
+	ProjectName string `form:"project_name"`
+}
+
 // DimensionsResponse FO/DO Dashboard 公共下拉维度响应
 type DimensionsResponse struct {
 	BaseResponse

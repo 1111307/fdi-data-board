@@ -342,7 +342,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 		Description: param.NewOpt("查询可选维度枚举:事件名/项目/车型/筛选器列表。适用:用户问有哪些可选值,或 clarify 前需要候选列表。"),
 		InputSchema: aiSchema(map[string]any{}, ""),
 	}, func(ctx context.Context, _ map[string]any) (string, error) {
-		res, err := fo.GetDimensions(ctx)
+		res, err := fo.GetDimensions(ctx, "")
 		if err != nil {
 			return "", err
 		}

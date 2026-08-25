@@ -370,7 +370,14 @@ func (s *FoDashboardService) GetDimensions(ctx *gin.Context) (api.HttpResponse, 
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 
-	result, err := s.uc.GetDimensions(ctx)
+	var req dashboard_api.DimensionsRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetDimensions(ctx, req.ProjectName)
 	if err != nil {
 		log.Errorf("GetDimensions error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())

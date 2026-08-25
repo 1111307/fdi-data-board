@@ -1720,6 +1720,28 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 }
 
 // fetchDimensions 并发查询 Doris 获取四类维度枚举值
+// GetCarTypesByProject 查指定项目下的车型列表(近3个月,联动场景专用,不走缓存)
+func (r *foDashboardRepo) GetCarTypesByProject(ctx context.Context, projectName string) ([]string, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+
+	var rows []struct{ Val string }
+	err := db.Raw(`SELECT DISTINCT car_type AS val
+		FROM dwd_cfdi_basic_fff_running
+		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+		AND project_name = ?
+		AND car_type IS NOT NULL AND car_type != ''
+		ORDER BY val`, projectName).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Val)
+	}
+	return out, nil
+}
+
 func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimensions, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
