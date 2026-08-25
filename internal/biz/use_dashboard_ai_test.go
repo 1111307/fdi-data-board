@@ -171,3 +171,58 @@ func (fakeFoRepo) ListUuidDetail(_ context.Context, _ *UuidDetailParam) ([]*Uuid
 		{Dt: "2026-08-23", AnonymousId: "a1", EventName: "mid_highbeam_on", Uuid: "u1"},
 	}, 139, nil
 }
+
+func (fakeFoRepo) ListFffRunning(_ context.Context, _ *FffRunningParam) ([]*FffRunningItem, int64, error) {
+	return nil, 0, nil
+}
+
+func (fakeFoRepo) ListFffClose(_ context.Context, _ *FffCloseParam) ([]*FffCloseItem, int64, error) {
+	return nil, 0, nil
+}
+
+func (fakeFoRepo) ListFdrTrigger(_ context.Context, _ *FdrTriggerParam) ([]*FdrTriggerItem, int64, error) {
+	return nil, 0, nil
+}
+
+func (fakeFoRepo) ListFclTrigger(_ context.Context, _ *FclTriggerParam) ([]*FclTriggerItem, int64, error) {
+	return nil, 0, nil
+}
+
+// 用例16:get_detail 支持按车辆ID过滤(schema 含 anonymous_ids,请求透传)
+func TestToolsGetDetailVehicleFilter(t *testing.T) {
+	uc := newAiUcForTest(&chatLlmFake{})
+	out, err := uc.tools.Exec(context.Background(), "get_detail", map[string]any{
+		"kind": "trigger", "anonymous_ids": []any{"byd0FB4C567E640E21F"},
+		"start_dt": "2026-08-18", "end_dt": "2026-08-24",
+	})
+	if err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if !strings.Contains(out, "rows") {
+		t.Fatalf("unexpected result: %s", out[:100])
+	}
+}
+
+// 用例18:splitAnonymousIds 合并复数/单数两种参数形态(前端旧参数兼容)
+func TestSplitAnonymousIds(t *testing.T) {
+	// 只传复数
+	got := splitAnonymousIds("carA,carB", "")
+	if len(got) != 2 || got[0] != "carA" || got[1] != "carB" {
+		t.Fatalf("plural only: %v", got)
+	}
+	// 只传单数(前端旧参数)
+	got = splitAnonymousIds("", "byd0FB4C567E640E21F")
+	if len(got) != 1 || got[0] != "byd0FB4C567E640E21F" {
+		t.Fatalf("singular only: %v", got)
+	}
+	// 两者都传 → 并集去重
+	got = splitAnonymousIds("carA,carB", "carB,carC")
+	if len(got) != 3 {
+		t.Fatalf("merge dedup: %v", got)
+	}
+	// 都空
+	got = splitAnonymousIds("", "")
+	if len(got) != 0 {
+		t.Fatalf("empty: %v", got)
+	}
+}

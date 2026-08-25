@@ -40,6 +40,7 @@ type FffRunningRequest struct {
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -94,6 +95,7 @@ type FffTriggerRequest struct {
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -133,6 +135,7 @@ type FffCloseRequest struct {
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -183,6 +186,7 @@ type FdrTriggerRequest struct {
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -229,6 +233,7 @@ type FclTriggerRequest struct {
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	Page        int    `form:"page"`
@@ -290,6 +295,7 @@ type UuidDetailRequest struct {
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	StartDt     string `form:"start_dt"`
 	EndDt       string `form:"end_dt"`
 	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败

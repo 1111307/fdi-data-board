@@ -201,7 +201,7 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		AnonymousIds: splitEventNames(req.AnonymousIds),
+		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -233,7 +233,7 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 		FilterName:  req.FilterName,
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		AnonymousIds: splitEventNames(req.AnonymousIds),
+		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -266,7 +266,7 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		AnonymousIds: splitEventNames(req.AnonymousIds),
+		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -299,7 +299,7 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		AnonymousIds: splitEventNames(req.AnonymousIds),
+		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -332,7 +332,7 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		AnonymousIds: splitEventNames(req.AnonymousIds),
+		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		OnlyFail:    req.OnlyFail == 1,
@@ -456,7 +456,7 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 		EventNames:  splitEventNames(req.EventNames),
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
-		AnonymousIds: splitEventNames(req.AnonymousIds),
+		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		StartDt:     startDt,
 		EndDt:       endDt,
 		Page:        page,
@@ -658,6 +658,25 @@ func normalizeDetailDateRange(startDt, endDt string) (string, string, error) {
 		return "", "", ErrDetailDateRangeTooLong
 	}
 	return start.Format(layout), end.Format(layout), nil
+}
+
+// splitAnonymousIds 合并匿名ID的两种参数形态:anonymous_ids(复数,逗号分隔)与
+// anonymous_id(单数,前端旧参数)取并集去重——前端明细栏曾用单数导致车辆筛选失效
+func splitAnonymousIds(plural, singular string) []string {
+	ids := splitEventNames(plural)
+	single := splitEventNames(singular)
+	if len(single) == 0 {
+		return ids
+	}
+	seen := make(map[string]struct{}, len(ids)+len(single))
+	merged := make([]string, 0, len(ids)+len(single))
+	for _, id := range append(ids, single...) {
+		if _, ok := seen[id]; !ok {
+			seen[id] = struct{}{}
+			merged = append(merged, id)
+		}
+	}
+	return merged
 }
 
 // splitEventNames 将逗号分隔的字符串拆分为切片，空字符串返回 nil
