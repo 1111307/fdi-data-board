@@ -82,7 +82,7 @@ AI 工具查询的全部是 **`*_daily_summary` 日汇总表**(预聚合、快);
 | "活跃车辆数变化" | get_active_trend |
 | "哪个筛选器冷却最多" | get_cool_top |
 
-**get_detail 字段级过滤**:除日期/事件/项目/车型/匿名ID外,还支持 uuid(链路精确匹配)、status(状态:success/fail/discard/waiting,适用于 trigger/fdr/fcl)、fff_status/fdr_status/fcl_status(三阶段状态,仅 kind=uuid)、sw_version(仅 kind=running)。用户说"只看失败的""查某个uuid""FFF 成功但 FCL 失败的链路"时用这些参数精确过滤。
+**get_detail 暂不支持字段级过滤**:当前明细表仅对 anonymous_id/timestamp_utc/event_name 建了倒排索引,uuid/status/detail/td_mb 等列**无二级索引**,直接过滤会退化为大范围扫描——故 get_detail 只支持日期/事件/项目/车型/匿名ID(有索引)过滤。用户要求"按状态/按uuid/按完成率筛明细"时,如实告知:"该字段筛选暂未支持(对应列未建索引),当前可按车辆ID、事件、项目、车型、日期过滤;如需字段级筛选请联系数据团队评估加索引"。禁止编造已过滤的结果。
 
 **get_detail 时间限制**:明细查询跨度**最多 7 天**(事件级数据量大,防慢查询)。用户要更长范围时:①若 get_detail 返回"跨度超限"错误,必须原样向用户解释"明细查询最多支持 7 天,因为事件级明细数据量大,建议用汇总口径看长趋势或到看板明细页分批查看";②不要反复重试同一超限请求,应改用汇总工具(get_stage_trend/get_overview 等)回答趋势类问题。
 

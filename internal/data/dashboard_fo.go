@@ -154,15 +154,6 @@ func buildFffRunningWhere(param *biz.FffRunningParam) (string, []interface{}) {
 	if len(conds) == 0 {
 		return "", args
 	}
-	if param.SwitchOn != nil {
-		conds = append(conds, "switch_on = ?")
-		args = append(args, *param.SwitchOn)
-	}
-	if param.SwVersion != "" {
-		conds = append(conds, "sw_version = ?")
-		args = append(args, param.SwVersion)
-	}
-
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
@@ -365,23 +356,6 @@ func buildFffTriggerWhere(param *biz.FffTriggerParam) (string, []interface{}) {
 		}
 	}
 
-	if param.Uuid != "" {
-		conds = append(conds, "uuid = ?")
-		args = append(args, param.Uuid)
-	}
-	if param.Status != "" {
-		conds = append(conds, "status = ?")
-		args = append(args, param.Status)
-	}
-	if param.TriggerType != "" {
-		conds = append(conds, "trigger_type = ?")
-		args = append(args, param.TriggerType)
-	}
-	if param.Tags != "" {
-		conds = append(conds, "tags LIKE ?")
-		args = append(args, "%"+param.Tags+"%")
-	}
-
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
@@ -569,15 +543,6 @@ func buildFffCloseWhere(param *biz.FffCloseParam) (string, []interface{}) {
 		}
 	}
 
-	if param.Reason != "" {
-		conds = append(conds, "reason LIKE ?")
-		args = append(args, "%"+param.Reason+"%")
-	}
-	if param.Version != "" {
-		conds = append(conds, "version = ?")
-		args = append(args, param.Version)
-	}
-
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
@@ -725,39 +690,6 @@ func buildFdrTriggerWhere(param *biz.FdrTriggerParam) (string, []interface{}) {
 		for _, a := range param.AnonymousIds {
 			args = append(args, a)
 		}
-	}
-
-	if param.Uuid != "" {
-		conds = append(conds, "uuid = ?")
-		args = append(args, param.Uuid)
-	}
-	if param.Status != "" {
-		conds = append(conds, "status = ?")
-		args = append(args, param.Status)
-	}
-	if param.Detail != "" {
-		conds = append(conds, "detail LIKE ?")
-		args = append(args, "%"+param.Detail+"%")
-	}
-	if param.Dse != "" {
-		conds = append(conds, "dse = ?")
-		args = append(args, param.Dse)
-	}
-	if param.TdMbMin != nil {
-		conds = append(conds, "td_mb >= ?")
-		args = append(args, *param.TdMbMin)
-	}
-	if param.TdMbMax != nil {
-		conds = append(conds, "td_mb <= ?")
-		args = append(args, *param.TdMbMax)
-	}
-	if param.TmMbMin != nil {
-		conds = append(conds, "tm_mb >= ?")
-		args = append(args, *param.TmMbMin)
-	}
-	if param.TmMbMax != nil {
-		conds = append(conds, "tm_mb <= ?")
-		args = append(args, *param.TmMbMax)
 	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
@@ -912,35 +844,6 @@ func buildFclTriggerWhere(param *biz.FclTriggerParam) (string, []interface{}) {
 		for _, a := range param.AnonymousIds {
 			args = append(args, a)
 		}
-	}
-
-	if param.Uuid != "" {
-		conds = append(conds, "uuid = ?")
-		args = append(args, param.Uuid)
-	}
-	if param.Status != "" {
-		conds = append(conds, "status = ?")
-		args = append(args, param.Status)
-	}
-	if param.CompletePercentMin != nil {
-		conds = append(conds, "complete_percent >= ?")
-		args = append(args, *param.CompletePercentMin)
-	}
-	if param.CompletePercentMax != nil {
-		conds = append(conds, "complete_percent <= ?")
-		args = append(args, *param.CompletePercentMax)
-	}
-	if param.UploadFailTimesMin != nil {
-		conds = append(conds, "upload_fail_times >= ?")
-		args = append(args, *param.UploadFailTimesMin)
-	}
-	if param.UploadFailTimesMax != nil {
-		conds = append(conds, "upload_fail_times <= ?")
-		args = append(args, *param.UploadFailTimesMax)
-	}
-	if param.LocalFile != "" {
-		conds = append(conds, "local_file LIKE ?")
-		args = append(args, "%"+param.LocalFile+"%")
 	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
@@ -1123,31 +1026,6 @@ func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
 		conds = append(conds, "fcl_status = 'success'")
 	case "fcl_discard":
 		conds = append(conds, "fcl_status = 'discard'")
-	}
-
-	if param.Uuid != "" {
-		conds = append(conds, "uuid = ?")
-		args = append(args, param.Uuid)
-	}
-	if param.FffStatus != "" {
-		conds = append(conds, "fff_status = ?")
-		args = append(args, param.FffStatus)
-	}
-	if param.FdrStatus != "" {
-		conds = append(conds, "fdr_status = ?")
-		args = append(args, param.FdrStatus)
-	}
-	if param.FclStatus != "" {
-		conds = append(conds, "fcl_status = ?")
-		args = append(args, param.FclStatus)
-	}
-	if param.CompletePercentMin != nil {
-		conds = append(conds, "complete_percent >= ?")
-		args = append(args, *param.CompletePercentMin)
-	}
-	if param.CompletePercentMax != nil {
-		conds = append(conds, "complete_percent <= ?")
-		args = append(args, *param.CompletePercentMax)
 	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
