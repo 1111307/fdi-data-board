@@ -8,7 +8,7 @@ server:
   gin:
     addr: 0.0.0.0:8080
     # AI 总结 SSE 长流(thinking 模型生成 40~90s)需要更长上限;kratos Timeout 为 server 级,无法按路由豁免
-    timeout: 360s
+    timeout: 1200s
     run_mode: ${RUN_MODE:prd}
 data:
   mysql:
@@ -49,11 +49,11 @@ data:
     domain: ${FUNC_SCOPE:fdi_cloud}
   llm:
     # Anthropic Messages 协议网关;三项任一为空则 AI 总结退化为本地统计模式
-    base_url: ${LLM_BASE_URL:}
-    api_key: ${LLM_API_KEY:}
-    model: ${LLM_MODEL:}
-    max_tokens: ${LLM_MAX_TOKENS:4096}
-    timeout: ${LLM_TIMEOUT:120s}
+    base_url: ${LLM_BASE_URL:https://llm-gateway.momenta.works}
+    api_key: ${LLM_API_KEY:sk-Mwj6z4orGxezS5ZBADXzgQ}
+    model: ${LLM_MODEL:deepseek-v4-flash}
+    max_tokens: ${LLM_MAX_TOKENS:16384}
+    timeout: ${LLM_TIMEOUT:360s}
   etl:
     on: ${ETL_ON:true}
     backfill_on: ${ETL_BACKFILL_ON:true}
