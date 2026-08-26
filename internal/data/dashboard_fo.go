@@ -1897,17 +1897,14 @@ func buildFffRunningTrendWhere(param *biz.FffRunningTrendParam) (string, []inter
 func buildRunningOverviewSQL(param *biz.FffRunningParam) (string, []interface{}) {
 	where, args := buildFffRunningWhere(param)
 	vehicleWhere, vehicleArgs := buildFffRunningVehicleWhere(param)
-	// vehicle_total:区间内峰值日活跃车辆数——每天先按 __ALL__ 行聚合(消除 event_name
-	// 展开和 sw_version 展开)，再取区间 MAX(消除跨天膨胀)。
-	// 旧写法直接 SUM(running_switch_on_vehicle_count) 会把同一辆车按
-	// 事件数×版本数×天数重复计数(DJINS-BNB 实测膨胀 85 倍)。
+	// vehicle_total:区间内峰值日活跃车辆数——每天按天聚合(消除 sw_version 展开)，
+	// 再取区间 MAX(消除跨天膨胀);event_name 维度由 vehicleWhere 决定(前端传啥查啥)
 	sql := `SELECT
 		COALESCE(SUM(running_count), 0) AS running_total,
 		(
 			SELECT COALESCE(MAX(daily_count), 0) FROM (
 				SELECT SUM(running_switch_on_vehicle_count) AS daily_count
 				FROM ` + tableVehicleDailySummaryAgg + vehicleWhere + `
-				  AND event_name = '__ALL__'
 				GROUP BY dt
 			) t
 		) AS vehicle_total,
