@@ -34,7 +34,7 @@
 
 **get_funnel** — 全链路漏斗(FFF→FDR→FCL 转化)。适用:"全链路成功率/转化率/漏斗"。注意与三阶段独立口径区分,回答时说明是漏斗口径。
 
-**get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
+**get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。注意:running 表无 event_name 列,前端传的值按 filter_name 查;传事件名返回 0 是如实结果,解释时引导改查 event_name 类工具。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
 
 **get_sw_version** — 软件版本分布。适用:"哪个版本数据多/版本对比"。
 
