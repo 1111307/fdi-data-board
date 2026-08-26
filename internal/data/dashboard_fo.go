@@ -187,15 +187,15 @@ func buildFffRunningVehicleWhere(param *biz.FffRunningParam) (string, []interfac
 		conds = append(conds, "dt = CURDATE()")
 	}
 
-	// _agg 表的 event_name 列存的就是筛选器名(running 源 filter_name);
-	// 前端传 filter_name 就按 filter_name 查,传 event_names 就按 event_names 查,
-	// 都传就都过滤,都不传就不过滤——不做任何兜底/猜测
+	// _agg 表 event_name 列混存事件名(trigger 源)和筛选器名(running/close 源),
+	// 前端统一传 event_name(可能是事件名也可能是筛选器名),直接查此列;
+	// filter_name 旧参数保留兼容(语义同 event_name,都查 event_name 列)
+	names := nonAllValues(param.EventNames)
 	if param.FilterName != "" {
-		conds = append(conds, "event_name = ?")
-		args = append(args, param.FilterName)
+		names = append(names, param.FilterName)
 	}
-	if len(nonAllValues(param.EventNames)) > 0 {
-		eventCond, eventArgs := buildAggEventCondition(nonAllValues(param.EventNames))
+	if len(names) > 0 {
+		eventCond, eventArgs := buildAggEventCondition(names)
 		conds = append(conds, eventCond)
 		args = append(args, eventArgs...)
 	}
@@ -2076,26 +2076,3 @@ func (r *foDashboardRepo) scanFffFailReason(_ context.Context, tx *gorm.DB) ([]*
 	return list, nil
 }
 
-// ResolveFilterNameFromEvent 判断传入名字是否是事件名(trigger 源 event_name 有值),
-// 是则返回该事件对应的真实 filter_name;不是事件名则原样返回(调用方自行处理)。
-// 用途:running 汇总表只有 filter_name 列,前端把事件名塞进 filter_name 时查不到——
-// 这里做一层名字→筛选器的解析,让"传啥都能查"但只查 trigger 汇总表一次(轻量)。
-func (r *foDashboardRepo) ResolveFilterNameFromEvent(ctx context.Context, eventName, startDt, endDt string) (string, error) {
-	db, cancel := r.dorisQuery(ctx)
-	defer cancel()
-
-	var row struct{ FilterName string `gorm:"column:filter_name"` }
-	err := db.Raw(`SELECT filter_name
-		FROM dwd_cfdi_basic_fff_trigger_daily_summary
-		WHERE dt BETWEEN ? AND ?
-		  AND event_name = ?
-		  AND summary_grain = 'filter'
-		  AND filter_name != '__ALL__' AND filter_name != ''
-		GROUP BY filter_name
-		ORDER BY COUNT(*) DESC
-		LIMIT 1`, startDt, endDt, eventName).Scan(&row).Error
-	if err != nil {
-		return "", err
-	}
-	return row.FilterName, nil
-}
