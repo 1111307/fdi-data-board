@@ -250,6 +250,7 @@ func buildAnthropicMessages(question string, history []AiChatHistoryMessage) ([]
 			return nil, fmt.Errorf("历史消息 role 非法: %s", h.Role)
 		}
 	}
+	msgs = sanitizeAnthropicMessages(msgs)
 	if q != "" {
 		msgs = append(msgs, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: []anthropic.ContentBlockParamUnion{anthropic.NewTextBlock(q)}})
 	}
@@ -293,6 +294,68 @@ func dropOrphanToolResults(msgs []anthropic.MessageParam) []anthropic.MessagePar
 }
 
 // historyEndsWithToolResult 历史末尾是否为带 tool_result 的 user 消息(即挂起的确认回执)
+// sanitizeAnthropicMessages 强制 Anthropic 协议合法性:每个 assistant 消息的每个
+// tool_use 在紧随其后的 user 消息里恰好有一个 tool_result(去重+补缺+丢孤儿),
+// 防止前端历史脏数据导致 "each tool_use must have a single result" 400。
+func sanitizeAnthropicMessages(msgs []anthropic.MessageParam) []anthropic.MessageParam {
+	out := make([]anthropic.MessageParam, 0, len(msgs))
+	for i := 0; i < len(msgs); i++ {
+		m := msgs[i]
+		if m.Role != anthropic.MessageParamRoleAssistant {
+			out = append(out, m)
+			continue
+		}
+		// assistant: tool_use 按 id 去重
+		seenUse := map[string]bool{}
+		var useIDs []string
+		dedupBlocks := m.Content[:0]
+		for _, b := range m.Content {
+			if tu := b.OfToolUse; tu != nil {
+				if seenUse[tu.ID] {
+					continue
+				}
+				seenUse[tu.ID] = true
+				useIDs = append(useIDs, tu.ID)
+			}
+			dedupBlocks = append(dedupBlocks, b)
+		}
+		m.Content = dedupBlocks
+		out = append(out, m)
+
+		// 紧随的 user 消息:tool_result 去重、丢孤儿、补缺失
+		if i+1 < len(msgs) && msgs[i+1].Role == anthropic.MessageParamRoleUser {
+			u := msgs[i+1]
+			seenRes := map[string]bool{}
+			var kept []anthropic.ContentBlockParamUnion
+			for _, b := range u.Content {
+				if tr := b.OfToolResult; tr != nil {
+					if !seenUse[tr.ToolUseID] || seenRes[tr.ToolUseID] {
+						continue // 孤儿或重复
+					}
+					seenRes[tr.ToolUseID] = true
+				}
+				kept = append(kept, b)
+			}
+			for _, id := range useIDs {
+				if !seenRes[id] {
+					kept = append(kept, anthropic.NewToolResultBlock(id, "(该工具调用结果缺失)", false))
+				}
+			}
+			u.Content = kept
+			out = append(out, u)
+			i++
+		} else if len(useIDs) > 0 {
+			// assistant 有 tool_use 但下一条不是 user → 补一条 tool_result 消息
+			var fill []anthropic.ContentBlockParamUnion
+			for _, id := range useIDs {
+				fill = append(fill, anthropic.NewToolResultBlock(id, "(该工具调用结果缺失)", false))
+			}
+			out = append(out, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: fill})
+		}
+	}
+	return out
+}
+
 func historyEndsWithToolResult(history []AiChatHistoryMessage) bool {
 	if len(history) == 0 || history[len(history)-1].Role != "user" {
 		return false

@@ -224,7 +224,7 @@ func TestStreamChatBackfillsMissingToolResult(t *testing.T) {
 	if !strings.Contains(string(msgsJSON), `"tool_use_id":"t2"`) {
 		t.Fatalf("missing tool_use t2 not backfilled: %s", string(msgsJSON))
 	}
-	if !strings.Contains(string(msgsJSON), "结果未随历史回传") {
+	if !strings.Contains(string(msgsJSON), "该工具调用结果缺失") {
 		t.Fatalf("placeholder tool_result missing: %s", string(msgsJSON))
 	}
 }
