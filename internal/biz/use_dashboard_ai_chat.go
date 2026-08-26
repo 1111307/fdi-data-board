@@ -28,7 +28,7 @@ type ChatEvent struct {
 	Name    string          `json:"name,omitempty"`
 	Args    map[string]any  `json:"args,omitempty"`
 	Summary string          `json:"summary,omitempty"`
-	Data    json.RawMessage `json:"data,omitempty"` // tool_result 的完整 JSON(前端渲染图表)
+	Data    interface{}     `json:"data,omitempty"` // tool_result 的完整内容(JSON 或纯文本,前端按需解析)
 	Stop    string          `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / plan / max_rounds
 	Error   string          `json:"error,omitempty"`
 }
@@ -180,7 +180,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 			if len(summary) > 360 {
 				summary = summary[:360] + "…"
 			}
-			safeEmit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary, Data: json.RawMessage(result)})
+			safeEmit(ChatEvent{Type: "tool_result", ID: tu.ID, Name: tu.Name, Summary: summary, Data: result})
 			if emitErr != nil {
 				return emitErr
 			}
