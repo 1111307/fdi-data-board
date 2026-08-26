@@ -27,6 +27,12 @@
 - `fcl_vehicle_count` / `fcl_success_vehicle_count` / `fcl_failed_vehicle_count`:FCL 去重
 - `upload_vehicle_count` / `overall_vehicle_count`:上传/全链路去重(overall 仅全链路任务写入)
 
+**event_name/filter_name 列兼容(重要)**:
+- 有 event_name 列的表(trigger/monitor/_agg 等):前端传的值直接查 event_name 列;
+- **没有 event_name 列的表**(fff_running/fff_running_daily_summary/fff_close/fff_close_daily_summary):前端传的值被当作 filter_name 查。
+  传筛选器名(如 auto_off_filter)能查到;传事件名(如 ACC_FAIL_md_fault_reported)返回 0——这是如实结果(运行/关闭表只记录筛选器维度,事件名不在这些表里),不是查询失败。
+- 解释 0 结果时:若某名字在 running/overview 类查询返回 0,说明它是事件名,引导用户改查 get_fail_reason/get_top/get_stage_trend 等走 event_name 的工具。
+
 **标识**:`anonymous_id`=车辆标识(形如 byd0FB4C567E640E21F)、`uuid`=单次触发链路、`md5`=数据包。
 
 ## kind=detail: 明细表字段(每行 = 一次真实事件)
