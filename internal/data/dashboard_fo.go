@@ -427,9 +427,11 @@ func buildFffTriggerReasonWhere(param *biz.FffTriggerParam) (string, []interface
 		}
 	}
 
-	conds = append(conds, "filter_name = ?")
-	args = append(args, aggAllValue)
-	// 专项分析：event_names 即算子名，映射为 filter_name 过滤
+	// filter_name 条件:前端统一传 event_name(可能是事件名或筛选器名);
+	// 不再强制 filter_name='__ALL__'——否则传筛选器名当 event_name 时
+	// 与下方映射的 filter_name IN 条件矛盾,永远查空。传啥查啥:
+	// 传事件名 → event_name=? 已命中,不加 filter_name 条件(全量);
+	// 传筛选器名 → 映射为 filter_name IN (...) 过滤
 	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
 
 	if param.ProjectName != "" {
