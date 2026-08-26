@@ -187,9 +187,16 @@ func buildFffRunningVehicleWhere(param *biz.FffRunningParam) (string, []interfac
 		conds = append(conds, "dt = CURDATE()")
 	}
 
-	eventCond, eventArgs := buildAggEventCondition(nonAllValues(param.EventNames))
-	conds = append(conds, eventCond)
-	args = append(args, eventArgs...)
+	// _agg 表的 event_name 列存的就是筛选器名(running 源 filter_name);
+	// 前端传了 filter_name 就按它过滤,与主查询口径一致;没传走 event_names(兼容旧参数)
+	if param.FilterName != "" {
+		conds = append(conds, "event_name = ?")
+		args = append(args, param.FilterName)
+	} else {
+		eventCond, eventArgs := buildAggEventCondition(nonAllValues(param.EventNames))
+		conds = append(conds, eventCond)
+		args = append(args, eventArgs...)
+	}
 
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
