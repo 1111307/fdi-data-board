@@ -2075,3 +2075,27 @@ func (r *foDashboardRepo) scanFffFailReason(_ context.Context, tx *gorm.DB) ([]*
 	}
 	return list, nil
 }
+
+// ResolveFilterNameFromEvent 判断传入名字是否是事件名(trigger 源 event_name 有值),
+// 是则返回该事件对应的真实 filter_name;不是事件名则原样返回(调用方自行处理)。
+// 用途:running 汇总表只有 filter_name 列,前端把事件名塞进 filter_name 时查不到——
+// 这里做一层名字→筛选器的解析,让"传啥都能查"但只查 trigger 汇总表一次(轻量)。
+func (r *foDashboardRepo) ResolveFilterNameFromEvent(ctx context.Context, eventName, startDt, endDt string) (string, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+
+	var row struct{ FilterName string `gorm:"column:filter_name"` }
+	err := db.Raw(`SELECT filter_name
+		FROM dwd_cfdi_basic_fff_trigger_daily_summary
+		WHERE dt BETWEEN ? AND ?
+		  AND event_name = ?
+		  AND summary_grain = 'filter'
+		  AND filter_name != '__ALL__' AND filter_name != ''
+		GROUP BY filter_name
+		ORDER BY COUNT(*) DESC
+		LIMIT 1`, startDt, endDt, eventName).Scan(&row).Error
+	if err != nil {
+		return "", err
+	}
+	return row.FilterName, nil
+}

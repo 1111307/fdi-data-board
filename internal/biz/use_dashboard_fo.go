@@ -32,6 +32,7 @@ type FoDashboardRepo interface {
 	GetStageTrend(ctx context.Context, param *StageTrendParam) (*StageTrendData, error)
 	GetDimensions(ctx context.Context) (*FoDimensions, error)
 	GetCarTypesByProject(ctx context.Context, projectName string) ([]string, error)
+	ResolveFilterNameFromEvent(ctx context.Context, eventName, startDt, endDt string) (string, error)
 	GetFffRunningTrend(ctx context.Context, param *FffRunningTrendParam) (*FffRunningTrendData, error)
 	GetRunningOverview(ctx context.Context, param *FffRunningParam) (*FoRunningOverviewData, error)
 	GetFffOverview(ctx context.Context, param *FffTriggerParam) (*FoFffOverviewData, error)
@@ -572,6 +573,14 @@ func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashb
 		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     startDt,
 		EndDt:       endDt,
+	}
+	// 兼容:前端可能把事件名塞进 filter_name(用户下拉选的是事件)。
+	// running 汇总表只有 filter_name 列,事件名直接查查不到——
+	// 尝试从 trigger 汇总表解析该事件名对应的 filter_name,解析到则用真实筛选器名。
+	if param.FilterName != "" {
+		if realFilter, err := uc.repo.ResolveFilterNameFromEvent(ctx, param.FilterName, startDt, endDt); err == nil && realFilter != "" && realFilter != param.FilterName {
+			param.FilterName = realFilter
+		}
 	}
 	data, err := uc.repo.GetRunningOverview(ctx, param)
 	if err != nil {
