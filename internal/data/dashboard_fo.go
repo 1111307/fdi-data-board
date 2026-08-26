@@ -1286,7 +1286,7 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 		SUM(cnt) AS fff_total,
 		SUM(CASE WHEN fff_status!='discard' THEN cnt ELSE 0 END) AS fff_allow,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' THEN cnt ELSE 0 END) AS fdr_fail,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` THEN cnt ELSE 0 END) AS fdr_fail,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS fcl_success,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' THEN cnt ELSE 0 END) AS fcl_fail` + base
 
@@ -1294,7 +1294,7 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 		` AND fff_status = 'discard' GROUP BY fff_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	fdrFailSQL := `SELECT fdr_detail_tag AS name, SUM(cnt) AS cnt` + base +
-		` AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
+		` AND ` + fdrStageFailedCondition() + ` GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	fclFailSQL := `SELECT fcl_detail_tag AS name, SUM(cnt) AS cnt` + base +
 		` AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' GROUP BY fcl_detail_tag ORDER BY cnt DESC LIMIT 10`
@@ -1376,6 +1376,58 @@ type stageSuccessFailedRow struct {
 	Failed  int64     `gorm:"column:failed"`
 }
 
+func fffStageTrendNames() []string {
+	return []string{
+		"success",
+		"check_is_no_need_cooldown",
+		"check_drm_quota",
+		"check_need_acquire_data",
+		"check_not_reach_trigger_maximum",
+		"bag_invalid",
+		"event_not_recognized",
+		"tls_error",
+		"query cloud DISCARD, detail:Filter quota exceeded",
+		"query cloud DISCARD, detail:EventName is in blacklist",
+		"other",
+	}
+}
+
+func fdrStageTrendNames() []string {
+	return []string{
+		"success",
+		"because of full gc",
+		"mem pool water line",
+		"Disk overrun",
+		"Exceeds the maximum number of files",
+		"bag_invalid",
+		"bag_dir_missing",
+		"event_not_recognized",
+		"unauthorized",
+		"other",
+	}
+}
+
+func fclStageTrendNames() []string {
+	return []string{
+		"success",
+		"query cloud DISCARD, detail:Filter quota exceeded",
+		"reach upload limit",
+		"query cloud DISCARD, detail:EventName is in blacklist",
+		"geofence_error",
+		"unexpected geofence cause",
+		"tls_error",
+		"bag not exist",
+		"meta file lost",
+		"meta file empty",
+		"unexpected bag_upload_query cause",
+		"s3 upload force quit",
+		"create socket failed",
+		"http request failed",
+		"transfer dns failed",
+		"other",
+	}
+}
+
 func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
 	// 专项分析走汇总表；失败原因拆分依赖 reason 粒度（无 filter_name），传了 filter_name 回退明细表
 	if param.FilterName != "" {
@@ -1444,7 +1496,7 @@ func (r *foDashboardRepo) getStageTrendFromSummary(ctx context.Context, param *b
 		fffFailed[dt] = row.FffFailed
 	}
 
-	fffNames := []string{"success", "cooldown", "drm_quota", "acquire_data", "trigger_maximum", "bag_invalid", "event_not_recognized", "tls_error", "quota_exceeded", "event_in_blacklist", "other"}
+	fffNames := fffStageTrendNames()
 	fdrNames := []string{"success", "failed"}
 	fclNames := []string{"success", "failed"}
 
@@ -1581,60 +1633,76 @@ func (r *foDashboardRepo) getStageTrendFromDetail(ctx context.Context, param *bi
 		FffBlacklist        int64     `gorm:"column:fff_blacklist"`
 		FffOther            int64     `gorm:"column:fff_other"`
 		FdrSuccess          int64     `gorm:"column:fdr_success"`
-		FdrMemory           int64     `gorm:"column:fdr_memory"`
-		FdrDisk             int64     `gorm:"column:fdr_disk"`
+		FdrFullGC           int64     `gorm:"column:fdr_full_gc"`
+		FdrMemPoolWaterLine int64     `gorm:"column:fdr_mem_pool_water_line"`
+		FdrDiskOverrun      int64     `gorm:"column:fdr_disk_overrun"`
+		FdrMaxFiles         int64     `gorm:"column:fdr_max_files"`
 		FdrBagInvalid       int64     `gorm:"column:fdr_bag_invalid"`
 		FdrBagDirMissing    int64     `gorm:"column:fdr_bag_dir_missing"`
 		FdrEventNotRec      int64     `gorm:"column:fdr_event_not_recognized"`
 		FdrUnauthorized     int64     `gorm:"column:fdr_unauthorized"`
 		FdrOther            int64     `gorm:"column:fdr_other"`
 		FclSuccess          int64     `gorm:"column:fcl_success"`
-		FclQuotaExceeded    int64     `gorm:"column:fcl_quota_exceeded"`
+		FclFilterQuota      int64     `gorm:"column:fcl_filter_quota"`
 		FclReachUploadLimit int64     `gorm:"column:fcl_reach_upload_limit"`
-		FclBlacklist        int64     `gorm:"column:fcl_blacklist"`
-		FclGeofence         int64     `gorm:"column:fcl_geofence"`
+		FclEventBlacklist   int64     `gorm:"column:fcl_event_blacklist"`
+		FclGeofenceError    int64     `gorm:"column:fcl_geofence_error"`
+		FclUnexpectedGeo    int64     `gorm:"column:fcl_unexpected_geofence"`
 		FclTlsError         int64     `gorm:"column:fcl_tls_error"`
-		FclBagMissing       int64     `gorm:"column:fcl_bag_missing"`
-		FclUploadError      int64     `gorm:"column:fcl_upload_error"`
-		FclNetworkError     int64     `gorm:"column:fcl_network_error"`
+		FclBagNotExist      int64     `gorm:"column:fcl_bag_not_exist"`
+		FclMetaFileLost     int64     `gorm:"column:fcl_meta_file_lost"`
+		FclMetaFileEmpty    int64     `gorm:"column:fcl_meta_file_empty"`
+		FclBagUploadQuery   int64     `gorm:"column:fcl_bag_upload_query"`
+		FclS3ForceQuit      int64     `gorm:"column:fcl_s3_force_quit"`
+		FclCreateSocket     int64     `gorm:"column:fcl_create_socket"`
+		FclHTTPRequest      int64     `gorm:"column:fcl_http_request"`
+		FclTransferDNS      int64     `gorm:"column:fcl_transfer_dns"`
 		FclOther            int64     `gorm:"column:fcl_other"`
 	}
 
 	sql := `SELECT dt,
 		SUM(CASE WHEN fff_status != 'discard' THEN cnt ELSE 0 END) AS fff_success,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='cooldown' THEN cnt ELSE 0 END) AS fff_cooldown,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='drm_quota' THEN cnt ELSE 0 END) AS fff_drm_quota,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='acquire_data' THEN cnt ELSE 0 END) AS fff_no_acquire,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='trigger_maximum' THEN cnt ELSE 0 END) AS fff_trigger_max,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_is_no_need_cooldown' THEN cnt ELSE 0 END) AS fff_cooldown,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_drm_quota' THEN cnt ELSE 0 END) AS fff_drm_quota,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_need_acquire_data' THEN cnt ELSE 0 END) AS fff_no_acquire,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_not_reach_trigger_maximum' THEN cnt ELSE 0 END) AS fff_trigger_max,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fff_bag_invalid,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fff_event_not_recognized,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fff_tls_error,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fff_quota_exceeded,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fff_blacklist,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='query cloud DISCARD, detail:Filter quota exceeded' THEN cnt ELSE 0 END) AS fff_quota_exceeded,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='query cloud DISCARD, detail:EventName is in blacklist' THEN cnt ELSE 0 END) AS fff_blacklist,
 		SUM(CASE WHEN fff_status='discard'
-			AND fff_detail_tag NOT IN ('cooldown','drm_quota','acquire_data','trigger_maximum','bag_invalid','event_not_recognized','tls_error','quota_exceeded','event_in_blacklist')
+			AND fff_detail_tag NOT IN ('check_is_no_need_cooldown','check_drm_quota','check_need_acquire_data','check_not_reach_trigger_maximum','bag_invalid','event_not_recognized','tls_error','query cloud DISCARD, detail:Filter quota exceeded','query cloud DISCARD, detail:EventName is in blacklist')
 			THEN cnt ELSE 0 END) AS fff_other,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='memory' THEN cnt ELSE 0 END) AS fdr_memory,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='disk' THEN cnt ELSE 0 END) AS fdr_disk,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fdr_bag_invalid,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='bag_dir_missing' THEN cnt ELSE 0 END) AS fdr_bag_dir_missing,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fdr_event_not_recognized,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='unauthorized' THEN cnt ELSE 0 END) AS fdr_unauthorized,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
-			AND fdr_detail_tag NOT IN ('memory','disk','bag_invalid','bag_dir_missing','event_not_recognized','unauthorized')
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='because of full gc' THEN cnt ELSE 0 END) AS fdr_full_gc,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='mem pool water line' THEN cnt ELSE 0 END) AS fdr_mem_pool_water_line,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='Disk overrun' THEN cnt ELSE 0 END) AS fdr_disk_overrun,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='Exceeds the maximum number of files' THEN cnt ELSE 0 END) AS fdr_max_files,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fdr_bag_invalid,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='bag_dir_missing' THEN cnt ELSE 0 END) AS fdr_bag_dir_missing,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fdr_event_not_recognized,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='unauthorized' THEN cnt ELSE 0 END) AS fdr_unauthorized,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + `
+			AND fdr_detail_tag NOT IN ('because of full gc','mem pool water line','Disk overrun','Exceeds the maximum number of files','bag_invalid','bag_dir_missing','event_not_recognized','unauthorized')
 			THEN cnt ELSE 0 END) AS fdr_other,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS fcl_success,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fcl_quota_exceeded,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='reach_upload_limit' THEN cnt ELSE 0 END) AS fcl_reach_upload_limit,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fcl_blacklist,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='geofence_error' THEN cnt ELSE 0 END) AS fcl_geofence,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='query cloud DISCARD, detail:Filter quota exceeded' THEN cnt ELSE 0 END) AS fcl_filter_quota,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='reach upload limit' THEN cnt ELSE 0 END) AS fcl_reach_upload_limit,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='query cloud DISCARD, detail:EventName is in blacklist' THEN cnt ELSE 0 END) AS fcl_event_blacklist,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='geofence_error' THEN cnt ELSE 0 END) AS fcl_geofence_error,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='unexpected geofence cause' THEN cnt ELSE 0 END) AS fcl_unexpected_geofence,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fcl_tls_error,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='bag_missing' THEN cnt ELSE 0 END) AS fcl_bag_missing,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='upload_error' THEN cnt ELSE 0 END) AS fcl_upload_error,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='network_error' THEN cnt ELSE 0 END) AS fcl_network_error,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='bag not exist' THEN cnt ELSE 0 END) AS fcl_bag_not_exist,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='meta file lost' THEN cnt ELSE 0 END) AS fcl_meta_file_lost,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='meta file empty' THEN cnt ELSE 0 END) AS fcl_meta_file_empty,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='unexpected bag_upload_query cause' THEN cnt ELSE 0 END) AS fcl_bag_upload_query,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='s3 upload force quit' THEN cnt ELSE 0 END) AS fcl_s3_force_quit,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='create socket failed' THEN cnt ELSE 0 END) AS fcl_create_socket,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='http request failed' THEN cnt ELSE 0 END) AS fcl_http_request,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='transfer dns failed' THEN cnt ELSE 0 END) AS fcl_transfer_dns,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard'
-			AND fcl_detail_tag NOT IN ('quota_exceeded','reach_upload_limit','event_in_blacklist','geofence_error','tls_error','bag_missing','upload_error','network_error')
+			AND fcl_detail_tag NOT IN ('query cloud DISCARD, detail:Filter quota exceeded','reach upload limit','query cloud DISCARD, detail:EventName is in blacklist','geofence_error','unexpected geofence cause','tls_error','bag not exist','meta file lost','meta file empty','unexpected bag_upload_query cause','s3 upload force quit','create socket failed','http request failed','transfer dns failed')
 			THEN cnt ELSE 0 END) AS fcl_other
 		FROM ads_do_cfdi_daily` + where + ` AND event_name != '` + aggForeverLogValue + `'
 		GROUP BY dt ORDER BY dt ASC`
@@ -1644,9 +1712,9 @@ func (r *foDashboardRepo) getStageTrendFromDetail(ctx context.Context, param *bi
 		return nil, err
 	}
 
-	fffNames := []string{"success", "cooldown", "drm_quota", "acquire_data", "trigger_maximum", "bag_invalid", "event_not_recognized", "tls_error", "quota_exceeded", "event_in_blacklist", "other"}
-	fdrNames := []string{"success", "memory", "disk", "bag_invalid", "bag_dir_missing", "event_not_recognized", "unauthorized", "other"}
-	fclNames := []string{"success", "quota_exceeded", "reach_upload_limit", "event_in_blacklist", "geofence_error", "tls_error", "bag_missing", "upload_error", "network_error", "other"}
+	fffNames := fffStageTrendNames()
+	fdrNames := fdrStageTrendNames()
+	fclNames := fclStageTrendNames()
 
 	fffVals := make(map[string][]int64, len(rows))
 	fdrVals := make(map[string][]int64, len(rows))
@@ -1656,8 +1724,8 @@ func (r *foDashboardRepo) getStageTrendFromDetail(ctx context.Context, param *bi
 		dt := row.Dt.Format("2006-01-02")
 		dates = append(dates, dt)
 		fffVals[dt] = []int64{row.FffSuccess, row.FffCooldown, row.FffDrmQuota, row.FffNoAcquire, row.FffTriggerMax, row.FffBagInvalid, row.FffEventNotRec, row.FffTlsError, row.FffQuotaExceeded, row.FffBlacklist, row.FffOther}
-		fdrVals[dt] = []int64{row.FdrSuccess, row.FdrMemory, row.FdrDisk, row.FdrBagInvalid, row.FdrBagDirMissing, row.FdrEventNotRec, row.FdrUnauthorized, row.FdrOther}
-		fclVals[dt] = []int64{row.FclSuccess, row.FclQuotaExceeded, row.FclReachUploadLimit, row.FclBlacklist, row.FclGeofence, row.FclTlsError, row.FclBagMissing, row.FclUploadError, row.FclNetworkError, row.FclOther}
+		fdrVals[dt] = []int64{row.FdrSuccess, row.FdrFullGC, row.FdrMemPoolWaterLine, row.FdrDiskOverrun, row.FdrMaxFiles, row.FdrBagInvalid, row.FdrBagDirMissing, row.FdrEventNotRec, row.FdrUnauthorized, row.FdrOther}
+		fclVals[dt] = []int64{row.FclSuccess, row.FclFilterQuota, row.FclReachUploadLimit, row.FclEventBlacklist, row.FclGeofenceError, row.FclUnexpectedGeo, row.FclTlsError, row.FclBagNotExist, row.FclMetaFileLost, row.FclMetaFileEmpty, row.FclBagUploadQuery, row.FclS3ForceQuit, row.FclCreateSocket, row.FclHTTPRequest, row.FclTransferDNS, row.FclOther}
 	}
 
 	return &biz.StageTrendData{

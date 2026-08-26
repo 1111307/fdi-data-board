@@ -100,6 +100,10 @@ func isAggAllOrEmpty(value string) bool {
 	return value == "" || value == aggAllValue
 }
 
+func fdrStageFailedCondition() string {
+	return "fff_status != 'discard' AND fdr_status = 'discard' AND fcl_status = ''"
+}
+
 // grainForFilter status_monitor 类汇总表：传了 filter_name 用 filter 粒度，否则用 overview
 func grainForFilter(filterName string) string {
 	if filterName == "" {
