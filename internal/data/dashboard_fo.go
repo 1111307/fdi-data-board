@@ -427,12 +427,13 @@ func buildFffTriggerReasonWhere(param *biz.FffTriggerParam) (string, []interface
 		}
 	}
 
-	// filter_name 条件:前端统一传 event_name(可能是事件名或筛选器名);
-	// 不再强制 filter_name='__ALL__'——否则传筛选器名当 event_name 时
-	// 与下方映射的 filter_name IN 条件矛盾,永远查空。传啥查啥:
-	// 传事件名 → event_name=? 已命中,不加 filter_name 条件(全量);
-	// 传筛选器名 → 映射为 filter_name IN (...) 过滤
-	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
+	// filter_name 条件:不再强制 filter_name='__ALL__',也不再映射 event_names→filter_name。
+	// reason 粒度的 filter_name 列实测全部是 __ALL__(9944 行无一例外):
+	// - 传事件名 → event_name=? 命中 __ALL__ 行,有数据;若再拼 filter_name IN ('事件名')
+	//   反而不命中 __ALL__ → 查空(上一版踩的坑)
+	// - 传筛选器名 → event_name=? 不命中(reason 粒度没有该 event_name)→ 0,如实
+	conds = append(conds, "filter_name = ?")
+	args = append(args, aggAllValue)
 
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
