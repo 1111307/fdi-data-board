@@ -51,7 +51,7 @@ data:
     # Anthropic Messages 协议网关;三项任一为空则 AI 总结退化为本地统计模式
     base_url: ${LLM_BASE_URL:https://llm-gateway.momenta.works}
     api_key: ${LLM_API_KEY:sk-Mwj6z4orGxezS5ZBADXzgQ}
-    model: ${LLM_MODEL:deepseek-v4-flash}
+    model: ${LLM_MODEL:glm-5.3-flash}
     max_tokens: ${LLM_MAX_TOKENS:16384}
     timeout: ${LLM_TIMEOUT:360s}
   fom:

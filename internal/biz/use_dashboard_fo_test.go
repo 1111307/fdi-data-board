@@ -13,6 +13,9 @@ type fakeFoDashboardRepo struct {
 	fffFailReasonParam   *FffTriggerParam
 	fffFailReasonErr     error
 	closeReasonParam     *CloseReasonParam
+	fffRunning           []*FffRunningItem
+	fffRunningTotal      int64
+	fffRunningParam      *FffRunningParam
 	runningTrend         *FffRunningTrendData
 	runningTrendByFilter map[string]*FffRunningTrendData
 	runningTrendParam    *FffRunningTrendParam
@@ -25,8 +28,9 @@ func (r *fakeFoDashboardRepo) GetFunnel(context.Context, *FunnelParam) (*FunnelD
 	return nil, nil
 }
 
-func (r *fakeFoDashboardRepo) ListFffRunning(context.Context, *FffRunningParam) ([]*FffRunningItem, int64, error) {
-	return nil, 0, nil
+func (r *fakeFoDashboardRepo) ListFffRunning(_ context.Context, param *FffRunningParam) ([]*FffRunningItem, int64, error) {
+	r.fffRunningParam = param
+	return r.fffRunning, r.fffRunningTotal, nil
 }
 
 func (r *fakeFoDashboardRepo) ListFffTrigger(context.Context, *FffTriggerParam) ([]*FffTriggerItem, int64, error) {
@@ -214,6 +218,52 @@ func TestFoDashboardUseCaseGetRunningOverviewResolvesEventToFilterNames(t *testi
 	}
 	if !reflect.DeepEqual(repo.runningOverviewParam, wantParam) {
 		t.Fatalf("unexpected repo param: got %#v want %#v", repo.runningOverviewParam, wantParam)
+	}
+}
+
+func TestFoDashboardUseCaseListFffRunningResolvesEventToFilterNames(t *testing.T) {
+	repo := &fakeFoDashboardRepo{
+		fffRunningTotal: 2,
+		fffRunning: []*FffRunningItem{
+			{FilterName: "hotupdate_filter_operator_a"},
+			{FilterName: "cpp_filter_b"},
+		},
+	}
+	resolver := &fakeRunningFilterNameResolver{
+		filterNames: []string{"hotupdate_filter_operator_a", "cpp_filter_b"},
+	}
+	uc := NewFoDashboardUseCase(repo, resolver)
+
+	resp, err := uc.ListFffRunning(context.Background(), &dashboard_api.FffRunningRequest{
+		EventNames:  "event_x",
+		ProjectName: "project_x",
+		CarTypes:    "SUV,MPV",
+		StartDt:     "2026-06-01",
+		EndDt:       "2026-06-03",
+		Page:        2,
+		PageSize:    20,
+	})
+	if err != nil {
+		t.Fatalf("ListFffRunning returned error: %v", err)
+	}
+	if resp.Total != 2 || resp.Page != 2 || resp.PageSize != 20 {
+		t.Fatalf("unexpected pagination: total=%d page=%d page_size=%d", resp.Total, resp.Page, resp.PageSize)
+	}
+	if resolver.eventName != "event_x" {
+		t.Fatalf("resolver eventName = %q, want %q", resolver.eventName, "event_x")
+	}
+
+	wantParam := &FffRunningParam{
+		EventNames:  []string{"hotupdate_filter_operator_a", "cpp_filter_b"},
+		ProjectName: "project_x",
+		CarTypes:    []string{"SUV", "MPV"},
+		StartDt:     "2026-06-01",
+		EndDt:       "2026-06-03",
+		Page:        2,
+		PageSize:    20,
+	}
+	if !reflect.DeepEqual(repo.fffRunningParam, wantParam) {
+		t.Fatalf("unexpected repo param: got %#v want %#v", repo.fffRunningParam, wantParam)
 	}
 }
 

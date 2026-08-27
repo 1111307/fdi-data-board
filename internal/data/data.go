@@ -30,6 +30,7 @@ var ProviderSet = wire.NewSet(
 	NewGreeterGrpcRepo,
 	NewFoDashboardRepo,
 	NewDoDashboardRepo,
+	NewRunningFilterNameResolver,
 	NewEtlRepo,
 	NewReconcileRepo,
 	NewLlmRepo,

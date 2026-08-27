@@ -511,10 +511,14 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 	if err != nil {
 		return nil, err
 	}
+	eventNames, err := uc.resolveRunningEventNames(ctx, splitEventNames(req.EventNames))
+	if err != nil {
+		return nil, err
+	}
 
 	param := &FffRunningParam{
 		FilterName:   req.FilterName,
-		EventNames:   splitEventNames(req.EventNames),
+		EventNames:   eventNames,
 		ProjectName:  req.ProjectName,
 		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
@@ -621,7 +625,7 @@ func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashb
 	if err != nil {
 		return nil, err
 	}
-	eventNames, err := uc.resolveRunningOverviewEventNames(ctx, splitEventNames(req.EventNames))
+	eventNames, err := uc.resolveRunningEventNames(ctx, splitEventNames(req.EventNames))
 	if err != nil {
 		return nil, err
 	}
@@ -655,7 +659,7 @@ func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashb
 	}, nil
 }
 
-func (uc *FoDashboardUseCase) resolveRunningOverviewEventNames(ctx context.Context, eventNames []string) ([]string, error) {
+func (uc *FoDashboardUseCase) resolveRunningEventNames(ctx context.Context, eventNames []string) ([]string, error) {
 	if uc.runningFilterNameResolver == nil || len(eventNames) == 0 {
 		return eventNames, nil
 	}
