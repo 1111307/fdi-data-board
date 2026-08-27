@@ -226,7 +226,7 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 
 	param := &FffTriggerParam{
 		FilterName:   req.FilterName,
-		EventNames:   splitEventNames(req.EventNames),
+		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
 		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
@@ -297,7 +297,7 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 
 	param := &FdrTriggerParam{
 		FilterName:   req.FilterName,
-		EventNames:   splitEventNames(req.EventNames),
+		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
 		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
@@ -333,7 +333,7 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 
 	param := &FclTriggerParam{
 		FilterName:   req.FilterName,
-		EventNames:   splitEventNames(req.EventNames),
+		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
 		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
@@ -368,7 +368,7 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 
 	param := &UuidDetailParam{
 		FilterName:   req.FilterName,
-		EventNames:   splitEventNames(req.EventNames),
+		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
 		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
@@ -511,7 +511,7 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 	if err != nil {
 		return nil, err
 	}
-	eventNames, err := uc.resolveRunningEventNames(ctx, splitEventNames(req.EventNames))
+	eventNames, err := uc.resolveRunningEventNames(ctx, splitDetailEventNames(req.EventName, req.EventNames))
 	if err != nil {
 		return nil, err
 	}
@@ -625,7 +625,7 @@ func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashb
 	if err != nil {
 		return nil, err
 	}
-	eventNames, err := uc.resolveRunningEventNames(ctx, splitEventNames(req.EventNames))
+	eventNames, err := uc.resolveRunningEventNames(ctx, splitDetailEventNames(req.EventName, req.EventNames))
 	if err != nil {
 		return nil, err
 	}
@@ -819,6 +819,15 @@ func splitAnonymousIds(plural, singular string) []string {
 		}
 	}
 	return merged
+}
+
+// splitDetailEventNames 明细接口事件参数:兼容单数查询参数 event_name(与 event_names
+// 任取其一,复数优先)——单数此前被静默忽略,导致事件过滤不生效混入其他事件
+func splitDetailEventNames(single, multi string) []string {
+	if multi != "" {
+		return splitEventNames(multi)
+	}
+	return splitEventNames(single)
 }
 
 // splitEventNames 将逗号分隔的字符串拆分为切片，空字符串返回 nil

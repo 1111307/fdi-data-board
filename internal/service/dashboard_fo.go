@@ -28,7 +28,7 @@ func NewFoDashboardService(uc *biz.FoDashboardUseCase) *FoDashboardService {
 //	@Produce	json
 //	@Security	OAuth2Password
 //	@Param		filter_name		query		string	false	"筛选器名称"
-//	@Param		event_name		query		string	false	"事件名"
+//	@Param		event_names		query		string	false	"事件名,多选逗号分隔;兼容单数 event_name"
 //	@Param		project_name	query		string	false	"项目名称"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
 //	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
@@ -112,7 +112,7 @@ func (s *FoDashboardService) ListFffClose(ctx *gin.Context) (api.HttpResponse, e
 //	@Tags		FoDashboard
 //	@Produce	json
 //	@Security	OAuth2Password
-//	@Param		event_name		query		string	false	"事件名"
+//	@Param		event_names		query		string	false	"事件名,多选逗号分隔;兼容单数 event_name"
 //	@Param		project_name	query		string	false	"项目名称"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
 //	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
@@ -154,7 +154,7 @@ func (s *FoDashboardService) ListFdrTrigger(ctx *gin.Context) (api.HttpResponse,
 //	@Tags		FoDashboard
 //	@Produce	json
 //	@Security	OAuth2Password
-//	@Param		event_name		query		string	false	"事件名"
+//	@Param		event_names		query		string	false	"事件名,多选逗号分隔;兼容单数 event_name"
 //	@Param		project_name	query		string	false	"项目名称"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
 //	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
@@ -517,7 +517,7 @@ func (s *FoDashboardService) GetRunningOverview(ctx *gin.Context) (api.HttpRespo
 //	@Produce	json
 //	@Security	OAuth2Password
 //	@Param		filter_name		query		string	false	"筛选器名称"
-//	@Param		event_name		query		string	false	"事件名"
+//	@Param		event_names		query		string	false	"事件名,多选逗号分隔;兼容单数 event_name"
 //	@Param		project_name	query		string	false	"项目名称"
 //	@Param		car_types		query		string	false	"车型，多选逗号分隔"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"

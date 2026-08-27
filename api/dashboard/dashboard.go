@@ -37,6 +37,7 @@ type FffRunningItem struct {
 type FffRunningRequest struct {
 	FilterName   string `form:"filter_name"`
 	EventNames   string `form:"event_names"`
+	EventName    string `form:"event_name"` // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
@@ -94,6 +95,7 @@ type FffTriggerItem struct {
 type FffTriggerRequest struct {
 	FilterName   string `form:"filter_name"`
 	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
@@ -191,6 +193,7 @@ type FdrTriggerItem struct {
 type FdrTriggerRequest struct {
 	FilterName   string `form:"filter_name"`
 	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
@@ -241,6 +244,7 @@ type FclTriggerItem struct {
 type FclTriggerRequest struct {
 	FilterName   string `form:"filter_name"`
 	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
@@ -305,6 +309,7 @@ type UuidDetailItem struct {
 type UuidDetailRequest struct {
 	FilterName   string `form:"filter_name"`
 	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
