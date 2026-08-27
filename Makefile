@@ -84,9 +84,9 @@ build:
 
 .PHONY: generate
 # generate
+# 不在项目模块内裸 go get / go mod tidy:会解析上游依赖图元数据,
+# 低版本工具链遇到高 go 版本要求的新模块(如 anthropic-sdk-go)会报错退出
 generate:
-	go mod tidy
-	go get github.com/google/wire/cmd/wire@latest
 	go generate ./...
 
 .PHONY: swagger

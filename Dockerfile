@@ -11,23 +11,24 @@ RUN sed -i "s|https://dl-cdn.alpinelinux.org/alpine|https://artifactory.momenta.
     && apk add --no-cache gawk
 
 
+# 构建工具统一用 go install pkg@version 安装在项目模块之外,禁止在 /src 内裸 go get:
+# 项目目录内的 go get 会解析上游依赖图元数据(retract 列表),低版本工具链遇到
+# 高 go 版本要求的模块(如 anthropic-sdk-go v1.67.0)会直接报错退出。
 RUN set -x\
-    && go get google.golang.org/protobuf@v1.33.0 \
     && go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.3  \
-	&& go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0  \
-    && go get -u github.com/favadi/protoc-go-inject-tag@latest \
 	&& go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.4.0 \
-	&& go install github.com/swaggo/swag/cmd/swag@v1.16.2 \
 	&& go install github.com/favadi/protoc-go-inject-tag@latest \
+	&& go install github.com/swaggo/swag/cmd/swag@v1.16.2 \
     && go install github.com/go-kratos/kratos/cmd/kratos/v2@v2.0.0-20251205160234-b9fab9a5a5ab \
     && go install github.com/go-kratos/kratos/cmd/protoc-gen-go-http/v2@latest \
     && go install github.com/google/gnostic/cmd/protoc-gen-openapi@v0.7.0 \
-    && go install github.com/google/wire/cmd/wire@latest \
-    && go mod download  \
-    && go mod tidy
+    && go install github.com/google/wire/cmd/wire@latest
+
+# 依赖下载与校验(不用 tidy:tidy 会重算整张依赖图并可能改动 go.mod/go.sum)
+RUN set -x\
+    && go mod download
 
 RUN mkdir -p bin \
-    && go mod tidy \
      && make all  \
     && GOOS=linux GOARCH=amd64 go build -buildvcs=false -ldflags '-w -s -extldflags "-static"' -o ./bin/server ./cmd/...  \
     && upx /src/bin/server
