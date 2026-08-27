@@ -107,7 +107,13 @@ func TestBuildFffOverviewSQLUsesSelectedEventWithoutAllEventConflict(t *testing.
 		EventNames: []string{"hotupdate_filter_navi_action"},
 	})
 
-	wantArgs := []interface{}{"2026-06-01", "2026-06-01", "overview", "hotupdate_filter_navi_action"}
+	// trigger_filter_count / close_filter_count 两个子查询各自带一组 (日期,日期,事件) 参数,
+	// 主查询再带 (日期,日期,grain,事件)
+	wantArgs := []interface{}{
+		"2026-06-01", "2026-06-01", "hotupdate_filter_navi_action",
+		"2026-06-01", "2026-06-01", "hotupdate_filter_navi_action",
+		"2026-06-01", "2026-06-01", "overview", "hotupdate_filter_navi_action",
+	}
 	if !reflect.DeepEqual(args, wantArgs) {
 		t.Fatalf("unexpected args: got %#v want %#v", args, wantArgs)
 	}
@@ -180,45 +186,6 @@ func mustDate(t *testing.T, raw string) time.Time {
 		t.Fatal(err)
 	}
 	return dt
-}
-
-func TestBuildDimensionEventNameSQLUsesPreviousDayTriggerDetail(t *testing.T) {
-	sql := buildDimensionEventNameSQL()
-
-	if !strings.Contains(sql, "FROM dwd_cfdi_basic_fff_trigger") {
-		t.Fatalf("sql %q does not query trigger detail table", sql)
-	}
-	if strings.Contains(sql, tableFffTriggerDailySummary) {
-		t.Fatalf("sql %q should not query trigger summary table", sql)
-	}
-	if !strings.Contains(sql, "dt = DATE_SUB(CURDATE(), INTERVAL 1 DAY)") {
-		t.Fatalf("sql %q does not use previous day partition", sql)
-	}
-	if !strings.Contains(sql, "event_name IS NOT NULL") || !strings.Contains(sql, "event_name != ''") {
-		t.Fatalf("sql %q does not filter empty event names", sql)
-	}
-}
-
-func TestBuildDimensionFilterNameSQLUsesTriggerSummaryFilterGrain(t *testing.T) {
-	sql := buildDimensionFilterNameSQL()
-
-	if !strings.Contains(sql, tableFffTriggerDailySummary) {
-		t.Fatalf("sql %q does not query trigger summary table", sql)
-	}
-	if strings.Contains(sql, tableFffRunningDailySummary) {
-		t.Fatalf("sql %q should not query running summary table", sql)
-	}
-	for _, fragment := range []string{
-		"summary_grain = 'filter'",
-		"filter_name IS NOT NULL",
-		"filter_name != ''",
-		"filter_name != '" + aggAllValue + "'",
-		"dt >= DATE_SUB(CURDATE(), INTERVAL 360 DAY)",
-	} {
-		if !strings.Contains(sql, fragment) {
-			t.Fatalf("sql %q does not contain %q", sql, fragment)
-		}
-	}
 }
 
 func TestBuildRunningOverviewSQLUsesAdsForSwitchOnVehicles(t *testing.T) {

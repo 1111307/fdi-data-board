@@ -16,10 +16,10 @@
 **关键字段(汇总表通用)**:
 - `event_count` / `success_count` / `failed_count`:事件次数(可跨天 SUM)
 - `vehicle_count`:"当前完整分组内去重车辆数"——**不可跨天/跨维度 SUM**(跨行会重复计车)
-- `__ALL__` 哨兵:不按该维度过滤时的汇总行;查分布时必须排除
+- `__ALL__` 哨兵(双向规则):表里同时存 `__ALL__` 汇总行和真实值明细行。查**总量**(用户没点名事件/筛选器)必须只查 `__ALL__` 行;查**分布**必须排除 `__ALL__`。方向用反,数字必错(重复计车或翻倍)。
 - `dt`:统计日(分区键);`summary_grain`:overview(总量)/filter/status/reason(粒度)
 
-**_agg 表去重车辆字段**(全部"分组内去重",不可跨行 SUM;跨天聚合须先按天 GROUP BY 再取 MAX):
+**_agg 表去重车辆字段**(全部"分组内去重";明细行按 event_name 展开,同车跑多个筛选器就落多行,**SUM 明细行必重复计车**;总量只查 `__ALL__` 行——该口径同车一天只一行,SUM 安全):
 - `running_vehicle_count`:FFF Running 去重车辆数
 - `running_switch_on_vehicle_count`:FFF Running 且开关开启的去重车辆数
 - `trigger_vehicle_count` / `fff_success_vehicle_count` / `fff_failed_vehicle_count`:FFF 触发/成功/失败去重
@@ -50,9 +50,9 @@
 
 ## kind=trap: 聚合陷阱
 
-1. **vehicle_count 不可跨行 SUM**:汇总表和 _agg 表的 vehicle_count 都是"分组内去重",跨天/跨维度 SUM 会把同一辆车按事件数×版本数×天数重复计车(实测膨胀 85 倍)。需要跨天车辆数时:按天 GROUP BY 再取 MAX("峰值日活")。
+1. **vehicle_count 不可跨行 SUM**:这些字段都是"当前分组内去重"。同一辆车会出现在多个 event_name 分组行(同时跑多个筛选器),SUM 明细行会重复计车——实测某日全表 SUM=774w,`__ALL__` 口径正确值=28.6w,膨胀 27 倍。正确取数:**总量车辆数只查 `__ALL__` 行**;**指定事件/筛选器**查 `event_name=该值` 的行;跨天区间先按天 SUM(__ALL__ 行当天已去重)再取 MAX 得"峰值日活"。
 2. **event_count 可 SUM**:事件类计数(event_count/success_count/failed_count/running_count 等)跨行相加安全。
-3. **__ALL__ 排除**:统计分布时必须排除 __ALL__ 与空串,否则计数翻倍(表里同时存了 __ALL__ 汇总行和真实值行)。
+3. **__ALL__ 双向**:查分布(列各值排行)必须排除 __ALL__ 与空串,否则翻倍;查总量(未点名筛选值)必须只查 __ALL__ 行,否则明细行重复计车。汇总行和明细行混在一起 SUM 必错。
 4. **P95 不可再聚合**:分位值只能原样引用。
 5. **单位**:package_size=字节(÷1024³=GB)、td_mb/tm_mb=MB、time_cost_ms=毫秒、fragment=千分比(÷10=%)、bandwidth=MB/s。
 6. **数据延迟**:当日/近两日可能不全,判断"无数据"前先考虑时间窗是否太近。

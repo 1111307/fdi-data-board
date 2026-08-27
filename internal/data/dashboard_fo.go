@@ -194,7 +194,13 @@ func buildFffRunningVehicleWhere(param *biz.FffRunningParam) (string, []interfac
 	if param.FilterName != "" {
 		names = append(names, param.FilterName)
 	}
-	if len(names) > 0 {
+	if len(names) == 0 {
+		// 未传事件/筛选器:必须只查 __ALL__ 汇总行。_agg 表按 project×car_type×event_name
+		// 分组展开,明细行的车辆数是"分组内去重",全表 SUM 会把同一辆车在多个分组行
+		// 重复计入(2026-08-26 实测:全表 SUM≈774w,__ALL__ 口径正确值≈28.6w)
+		conds = append(conds, "event_name = ?")
+		args = append(args, aggAllValue)
+	} else {
 		eventCond, eventArgs := buildAggEventCondition(names)
 		conds = append(conds, eventCond)
 		args = append(args, eventArgs...)
@@ -1810,7 +1816,7 @@ func (r *foDashboardRepo) GetCarTypesByProject(ctx context.Context, projectName 
 
 	var rows []struct{ Val string }
 	err := db.Raw(`SELECT DISTINCT car_type AS val
-		FROM ` + tableVehicleDailySummaryAgg + `
+		FROM `+tableVehicleDailySummaryAgg+`
 		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
 		AND project_name = ?
 		AND car_type IS NOT NULL AND car_type != ''
@@ -2146,4 +2152,3 @@ func (r *foDashboardRepo) scanFffFailReason(_ context.Context, tx *gorm.DB) ([]*
 	}
 	return list, nil
 }
-

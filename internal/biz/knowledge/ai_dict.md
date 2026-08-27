@@ -15,7 +15,7 @@
 
 三阶段:**FFF**(筛选器触发)→ **FDR**(落盘)→ **FCL**(上传)。各阶段**独立统计**,禁止相加/相除算"全链路成功率"。
 
-**字段/表/口径不确定时,调 `lookup_dict` 查权威字典**(kind=table/detail/trap,可带 keyword)——它包含表与工具对应、汇总表/_agg 字段含义、明细表字段、聚合陷阱(vehicle_count 不可跨行 SUM、__ALL__ 排除、单位换算等)。工具返回里附带的 enum_notes/series_notes 已含白话,优先直接用。## 二、工具详解(何时调、传什么、返回什么)
+**字段/表/口径不确定时,调 `lookup_dict` 查权威字典**(kind=table/detail/trap,可带 keyword)——它包含表与工具对应、汇总表/_agg 字段含义、明细表字段、聚合陷阱。两条最容易踩的先记着:**去重车辆数(vehicle_count 系列字段)不可跨行 SUM,查总量必须只取 `__ALL__` 行**;**查分布必须排除 `__ALL__` 行**。工具返回里附带的 enum_notes/series_notes 已含白话,优先直接用。## 二、工具详解(何时调、传什么、返回什么)
 
 **get_dimensions** — 可选值枚举。传 project_name 时车型联动过滤为该项目可选值。返回 {event_names, projects, car_types, filters}。适用:"有哪些项目/车型/事件可选"、"BGANS 下有哪些车型"、clarify 前要候选列表。
 
@@ -35,7 +35,7 @@
 
 **get_funnel** — 全链路漏斗(FFF→FDR→FCL 转化)。适用:"全链路成功率/转化率/漏斗"。注意与三阶段独立口径区分,回答时说明是漏斗口径。
 
-**get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。注意:running 表无 event_name 列,前端传的值按 filter_name 查;传事件名返回 0 是如实结果,解释时引导改查 event_name 类工具。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
+**get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。vehicle_total 是**区间内峰值日**去重车辆数(按天聚合取 MAX,不跨天累计)——用户选长区间与单日结果接近属正常,回答时主动说明该口径。注意:running 表无 event_name 列,前端传的值按 filter_name 查;传事件名返回 0 是如实结果,解释时引导改查 event_name 类工具。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
 
 **get_sw_version** — 软件版本分布。适用:"哪个版本数据多/版本对比"。
 

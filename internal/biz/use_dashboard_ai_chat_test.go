@@ -33,8 +33,8 @@ func mustMessage(raw string) *anthropic.Message {
 	return &m
 }
 
-func (f *chatLlmFake) Enabled() bool { return true }
-func (f *chatLlmFake) Model() string { return "kimi-k3-test" }
+func (f *chatLlmFake) Enabled() bool    { return true }
+func (f *chatLlmFake) Model() string    { return "kimi-k3-test" }
 func (f *chatLlmFake) MaxTokens() int64 { return 16384 }
 func (f *chatLlmFake) ChatStream(ctx context.Context, s1, s2 string, cb func(string)) error {
 	return fmt.Errorf("unused")
@@ -449,8 +449,8 @@ func TestToolsGetDetailTrigger(t *testing.T) {
 		t.Fatalf("get_detail error: %v", err)
 	}
 	var parsed struct {
-		Total int64 `json:"total"`
-		Rows  []any `json:"rows"`
+		Total int64  `json:"total"`
+		Rows  []any  `json:"rows"`
 		Note  string `json:"note"`
 	}
 	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
@@ -504,8 +504,8 @@ func TestToolsGetDetailLimitClamp(t *testing.T) {
 		t.Fatalf("exec: %v", err)
 	}
 	var parsed struct {
-		Total int64 `json:"total"`
-		Rows  []any `json:"rows"`
+		Total int64  `json:"total"`
+		Rows  []any  `json:"rows"`
 		Note  string `json:"note"`
 	}
 	if err := json.Unmarshal([]byte(out), &parsed); err != nil {
@@ -577,12 +577,12 @@ func TestToolsLookupDict(t *testing.T) {
 		t.Fatal("kind=detail missing detail fields")
 	}
 
-	// kind=trap:含陷阱
+	// kind=trap:含陷阱(实测膨胀倍数 + __ALL__ 双向规则)
 	out, err = uc.tools.Exec(context.Background(), "lookup_dict", map[string]any{"kind": "trap"})
 	if err != nil {
 		t.Fatalf("trap: %v", err)
 	}
-	if !strings.Contains(out, "85 倍") || !strings.Contains(out, "__ALL__") {
+	if !strings.Contains(out, "膨胀 27 倍") || !strings.Contains(out, "__ALL__") {
 		t.Fatal("kind=trap missing trap content")
 	}
 
