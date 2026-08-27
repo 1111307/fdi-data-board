@@ -678,3 +678,120 @@ func (s *DoDashboardService) GetDoFunnel(ctx *gin.Context) (api.HttpResponse, er
 
 	return result, nil
 }
+
+// GetFdrQuality godoc
+//
+//	@Summary	DO FDR 质量 P95（TD 磁盘/TM 内存/落盘耗时）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoFdrQualityResponse
+//	@Router		/dashboard/v1/do/fdr_quality [GET]
+func (s *DoDashboardService) GetFdrQuality(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoFdrQualityResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFdrQuality(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("DoGetFdrQuality error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetFclQuality godoc
+//
+//	@Summary	DO FCL Bag 大小质量（P95/均值/最大值）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoFclQualityResponse
+//	@Router		/dashboard/v1/do/fcl_quality [GET]
+func (s *DoDashboardService) GetFclQuality(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoFclQualityResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFclQuality(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("DoGetFclQuality error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetFdrFragment godoc
+//
+//	@Summary	DO FDR 碎片率（P95/均值/最大值）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoFdrFragmentResponse
+//	@Router		/dashboard/v1/do/fdr_fragment [GET]
+func (s *DoDashboardService) GetFdrFragment(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoFdrFragmentResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFdrFragment(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("DoGetFdrFragment error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}

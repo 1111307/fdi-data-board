@@ -14,6 +14,7 @@ func RegisterHttpService(
 	vehicleService *service.GreeterApiService,
 	foDashboardService *service.FoDashboardService,
 	doDashboardService *service.DoDashboardService,
+	aiDashboardService *service.AiDashboardService,
 	etlService *service.EtlService,
 	alertService *service.AlertService,
 	issueReportService *service.IssueReportService,
@@ -24,6 +25,7 @@ func RegisterHttpService(
 	routes = append(routes, RegisterGreeterService(vehicleService, cd))
 	routes = append(routes, RegisterFoDashboardService(foDashboardService, cd)...)
 	routes = append(routes, RegisterDoDashboardService(doDashboardService, cd)...)
+	routes = append(routes, RegisterAiDashboardService(aiDashboardService, cd)...)
 	routes = append(routes, RegisterEtlService(etlService)...)
 	routes = append(routes, RegisterAlertService(alertService)...)
 	routes = append(routes, RegisterIssueReportService(issueReportService)...)

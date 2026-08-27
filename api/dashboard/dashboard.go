@@ -1,5 +1,7 @@
 package dashboard_api
 
+import "encoding/json"
+
 // BaseResponse 统一响应基础结构，实现 api.HttpResponse 接口
 type BaseResponse struct {
 	Code    int32  `json:"code"`
@@ -33,13 +35,18 @@ type FffRunningItem struct {
 
 // FffRunningRequest 筛选器运行明细查询请求
 type FffRunningRequest struct {
-	FilterName  string `form:"filter_name"`
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"`
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	SwitchOn     *int   `form:"switch_on"`     // 开关:1=开启 0=关闭(有索引)
+	SwVersion    string `form:"sw_version"`    // 软件版本(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FffRunningResponse 筛选器运行明细响应
@@ -85,14 +92,20 @@ type FffTriggerItem struct {
 
 // FffTriggerRequest 筛选器触发明细查询请求
 type FffTriggerRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	Status       string `form:"status"`        // 状态(有索引)
+	TriggerType  string `form:"trigger_type"`  // 触发类型(有索引)
+	Tags         string `form:"tags"`          // 标签(分词索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FffTriggerResponse 筛选器触发明细响应
@@ -124,13 +137,17 @@ type FffCloseItem struct {
 
 // FffCloseRequest 筛选器关闭明细查询请求
 type FffCloseRequest struct {
-	FilterName  string `form:"filter_name"`
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	FilterName   string `form:"filter_name"`
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Reason       string `form:"reason"`        // 关闭原因(分词索引)
+	Version      string `form:"version"`       // 筛选器版本(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FffCloseResponse 筛选器关闭明细响应
@@ -172,14 +189,19 @@ type FdrTriggerItem struct {
 
 // FdrTriggerRequest FDR 落盘明细查询请求
 type FdrTriggerRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	Status       string `form:"status"`        // 状态(有索引)
+	Detail       string `form:"detail"`        // 详情(分词索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FdrTriggerResponse FDR 落盘明细响应
@@ -217,14 +239,18 @@ type FclTriggerItem struct {
 
 // FclTriggerRequest FCL 上传明细查询请求
 type FclTriggerRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	Status       string `form:"status"`        // 状态(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FclTriggerResponse FCL 上传明细响应
@@ -277,16 +303,22 @@ type UuidDetailItem struct {
 // UuidDetailRequest 全链路明细查询请求
 // 筛选参数来自「筛选器诊断」filter bar（diag*），而非「明细分析」filter bar（daily*）
 type UuidDetailRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败
-	StageFilter string `form:"stage_filter"` // fff_discard/fdr_discard/fcl_discard/fcl_success
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
+	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
+	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	FffStatus    string `form:"fff_status"`    // FFF 阶段状态(有索引)
+	FdrStatus    string `form:"fdr_status"`    // FDR 阶段状态(有索引)
+	FclStatus    string `form:"fcl_status"`    // FCL 阶段状态(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	OnlyFail     int    `form:"only_fail"`    // 1=仅看失败
+	StageFilter  string `form:"stage_filter"` // fff_discard/fdr_discard/fcl_discard/fcl_success
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // UuidDetailResponse 全链路明细响应
@@ -378,6 +410,7 @@ type CloseReasonItem struct {
 // CloseReasonRequest 算子关闭原因分布请求
 type CloseReasonRequest struct {
 	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"`
 	ProjectName string `form:"project_name"`
 	CarTypes    string `form:"car_types"`
 	StartDt     string `form:"start_dt"`
@@ -436,6 +469,11 @@ type DoTrendResponse struct {
 	Dates         []string  `json:"dates"`
 	SuccessCounts []int64   `json:"success_counts"`
 	SuccessRates  []float64 `json:"success_rates"`
+}
+
+// DimensionsRequest 下拉维度请求(project_name 非空时 car_types 联动过滤)
+type DimensionsRequest struct {
+	ProjectName string `form:"project_name"`
 }
 
 // DimensionsResponse FO/DO Dashboard 公共下拉维度响应
@@ -626,6 +664,57 @@ type DoFailReasonRequest struct {
 	EndDt       string `form:"end_dt"`
 }
 
+// AiSummaryRequest AI 看板总结请求(SSE 流式响应),参数与其他看板接口一致
+type AiSummaryRequest struct {
+	FilterName  string `form:"filter_name"`
+	EventNames  string `form:"event_names"` // 多选，逗号分隔
+	ProjectName string `form:"project_name"`
+	CarTypes    string `form:"car_types"` // 多选，逗号分隔
+	StartDt     string `form:"start_dt"`
+	EndDt       string `form:"end_dt"`
+}
+
+// AiChatRequest AI 问答请求(SSE 流式响应);历史由前端持有并回传,后端无状态
+type AiChatRequest struct {
+	Question string                     `json:"question"` // 本轮提问
+	Messages []AiChatHistoryMessageView `json:"messages"` // 之前的会话历史(含工具调用/确认结果)
+}
+
+// AiChatHistoryMessageView 会话历史消息(API 视图)
+type AiChatHistoryMessageView struct {
+	Role        string                 `json:"role"` // user / assistant
+	Text        string                 `json:"text,omitempty"`
+	ToolCalls   []AiChatToolCallView   `json:"tool_calls,omitempty"`
+	ToolResults []AiChatToolResultView `json:"tool_results,omitempty"`
+}
+
+type AiChatToolCallView struct {
+	ID   string         `json:"id"`
+	Name string         `json:"name"`
+	Args map[string]any `json:"args"`
+}
+
+type AiChatToolResultView struct {
+	ID string `json:"id"`
+	// Content 兼容字符串或任意 JSON 对象(前端可能直接透传结构化结果)
+	Content json.RawMessage `json:"content"`
+	IsError bool            `json:"is_error"`
+}
+
+// StringContent 返回文本形态的 content(对象则序列化为 JSON 字符串)
+func (v AiChatToolResultView) StringContent() string {
+	if len(v.Content) == 0 {
+		return ""
+	}
+	if v.Content[0] == '"' {
+		var s string
+		if err := json.Unmarshal(v.Content, &s); err == nil {
+			return s
+		}
+	}
+	return string(v.Content)
+}
+
 // DoFailReasonResponse 失败原因分析响应
 type DoFailReasonResponse struct {
 	BaseResponse
@@ -640,15 +729,67 @@ type EtlStatusResponse struct {
 
 // FffRunningTrendRequest 算子活跃车辆趋势请求
 type FffRunningTrendRequest struct {
-	FilterName  string `form:"filter_name"`  // 必填：算子名称
+	FilterName  string `form:"filter_name"`  // 必填：事件名，会先解析为真实 running filter_name
 	StartDt     string `form:"start_dt"`     // 必填：开始日期 YYYY-MM-DD
 	EndDt       string `form:"end_dt"`       // 必填：结束日期 YYYY-MM-DD
 	ProjectName string `form:"project_name"` // 选填：项目名称
+	CarTypes    string `form:"car_types"`    // 选填：车型，多选逗号分隔
 }
 
 // FffRunningTrendResponse 算子活跃车辆趋势响应（按天聚合）
 type FffRunningTrendResponse struct {
 	BaseResponse
 	Dates  []string `json:"dates"`  // 日期列表 YYYY-MM-DD
-	Counts []int64  `json:"counts"` // 对应日期的活跃车辆数（switch_on=1 的去重车辆数）
+	Counts []int64  `json:"counts"` // 对应日期的活跃车辆数（switch_on=1 的分组去重车辆数）
+}
+
+// DoFdrQualityResponse FDR 质量 P95 响应
+type DoFdrQualityResponse struct {
+	BaseResponse
+	TdMbP95       float64 `json:"td_mb_p95"`        // TD 磁盘大小 P95（MB）
+	TmMbP95       float64 `json:"tm_mb_p95"`        // TM 内存大小 P95（MB）
+	TimeCostMsP95 float64 `json:"time_cost_ms_p95"` // 落盘耗时 P95（ms）
+	FdrTotal      int64   `json:"fdr_total"`        // FDR 落盘总数
+	FdrSuccess    int64   `json:"fdr_success"`      // FDR 成功数
+}
+
+// DoFclQualityResponse FCL Bag 大小质量响应
+type DoFclQualityResponse struct {
+	BaseResponse
+	BagSizeP95  float64 `json:"bag_size_p95"` // Bag 大小 P95（字节）
+	BagSizeAvg  float64 `json:"bag_size_avg"` // Bag 大小均值（字节）
+	BagSizeMax  float64 `json:"bag_size_max"` // Bag 大小最大值（字节）
+	UploadTotal int64   `json:"upload_total"` // 上传总数
+}
+
+// DoFdrFragmentResponse FDR 碎片率响应
+type DoFdrFragmentResponse struct {
+	BaseResponse
+	FragmentP95 float64 `json:"fragment_p95"` // 碎片率 P95
+	FragmentAvg float64 `json:"fragment_avg"` // 碎片率均值
+	FragmentMax float64 `json:"fragment_max"` // 碎片率最大值
+}
+
+// FoRunningOverviewResponse 筛选器运行健康概览响应
+type FoRunningOverviewResponse struct {
+	BaseResponse
+	RunningTotal   int64   `json:"running_total"`    // 运行记录数
+	VehicleTotal   int64   `json:"vehicle_total"`    // switch_on=1 运行车辆数（ADS event_name 口径）
+	SwitchOnTotal  int64   `json:"switch_on_total"`  // 开启次数
+	SwitchOffTotal int64   `json:"switch_off_total"` // 关闭次数
+	SwitchOnRatio  float64 `json:"switch_on_ratio"`  // 开启占比（%）
+	RunningSuccess int64   `json:"running_success"`  // 运行成功数
+	RunningFailed  int64   `json:"running_failed"`   // 运行失败数
+	FilterCount    int64   `json:"filter_count"`     // 运行筛选器数量
+}
+
+// FoFffOverviewResponse FFF 触发概览响应
+type FoFffOverviewResponse struct {
+	BaseResponse
+	TriggerTotal       int64   `json:"trigger_total"`        // 触发总数
+	TriggerSuccess     int64   `json:"trigger_success"`      // 触发成功数
+	TriggerFailed      int64   `json:"trigger_failed"`       // 触发失败数
+	TriggerSuccessRate float64 `json:"trigger_success_rate"` // 触发成功率（%）
+	TriggerFilterCount int64   `json:"trigger_filter_count"` // 触发筛选器去重数
+	CloseFilterCount   int64   `json:"close_filter_count"`   // 关闭筛选器去重数
 }

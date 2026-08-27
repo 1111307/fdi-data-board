@@ -35,6 +35,9 @@ func RegisterDoDashboardService(s *service.DoDashboardService, cd *conf.Data) []
 				{JsonHandlerFunc: s.GetDiskTop, Path: "disk_top", Method: GET},
 				{JsonHandlerFunc: s.GetCloseTop, Path: "close_top", Method: GET},
 				{JsonHandlerFunc: s.GetDoFunnel, Path: "funnel", Method: GET},
+				{JsonHandlerFunc: s.GetFdrQuality, Path: "fdr_quality", Method: GET},
+				{JsonHandlerFunc: s.GetFclQuality, Path: "fcl_quality", Method: GET},
+				{JsonHandlerFunc: s.GetFdrFragment, Path: "fdr_fragment", Method: GET},
 			},
 		},
 	}
@@ -68,6 +71,9 @@ func RegisterFoDashboardService(s *service.FoDashboardService, cd *conf.Data) []
 				{JsonHandlerFunc: s.GetStageTrend, Path: "diag/stage_trend", Method: GET},
 				{JsonHandlerFunc: s.GetCloseReason, Path: "diag/close_reason", Method: GET},
 				{JsonHandlerFunc: s.GetFffRunningTrend, Path: "running/trend", Method: GET},
+				{JsonHandlerFunc: s.GetRunningOverview, Path: "running/overview", Method: GET},
+				{JsonHandlerFunc: s.GetFffOverview, Path: "fff/overview", Method: GET},
+				{JsonHandlerFunc: s.GetFffFailReason, Path: "fff/fail_reason", Method: GET},
 			},
 		},
 	}

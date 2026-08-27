@@ -196,3 +196,23 @@ type FffRunningTrendData struct {
 	Dates  []string
 	Counts []int64
 }
+
+// FoRunningOverviewData 筛选器运行健康概览（领域对象）
+type FoRunningOverviewData struct {
+	RunningTotal   int64
+	VehicleTotal   int64
+	SwitchOnTotal  int64
+	SwitchOffTotal int64
+	RunningSuccess int64
+	RunningFailed  int64
+	FilterCount    int64
+}
+
+// FoFffOverviewData FFF 触发概览（领域对象）
+type FoFffOverviewData struct {
+	TriggerTotal       int64
+	TriggerSuccess     int64
+	TriggerFailed      int64
+	TriggerFilterCount int64
+	CloseFilterCount   int64
+}

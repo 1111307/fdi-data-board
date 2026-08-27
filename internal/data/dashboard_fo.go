@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/google/wire"
 	"golang.org/x/sync/singleflight"
+	"gorm.io/gorm"
 
 	"fdi_data_board/internal/biz"
 )
@@ -139,10 +141,82 @@ func buildFffRunningWhere(param *biz.FffRunningParam) (string, []interface{}) {
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
+	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
+
 	if len(conds) == 0 {
 		return "", args
 	}
+	if param.SwitchOn != nil {
+		conds = append(conds, "switch_on = ?")
+		args = append(args, *param.SwitchOn)
+	}
+	if param.SwVersion != "" {
+		conds = append(conds, "sw_version = ?")
+		args = append(args, param.SwVersion)
+	}
+
 	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func appendFffRunningEventNamesAsFilterNames(conds []string, args []interface{}, rawEventNames []string) ([]string, []interface{}) {
+	eventNames := nonAllValues(rawEventNames)
+	if len(eventNames) == 0 {
+		return conds, args
+	}
+
+	return appendMultiCond(conds, args, "filter_name", eventNames)
+}
+
+func buildFffRunningVehicleWhere(param *biz.FffRunningParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	// running 相关查询保留原口径：未传日期时默认今天
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else {
+		conds = append(conds, "dt = CURDATE()")
+	}
+
+	// _agg 表 event_name 列混存事件名(trigger 源)和筛选器名(running/close 源),
+	// 前端统一传 event_name(可能是事件名也可能是筛选器名),直接查此列;
+	// filter_name 旧参数保留兼容(语义同 event_name,都查 event_name 列)
+	names := nonAllValues(param.EventNames)
+	if param.FilterName != "" {
+		names = append(names, param.FilterName)
+	}
+	if len(names) > 0 {
+		eventCond, eventArgs := buildAggEventCondition(names)
+		conds = append(conds, eventCond)
+		args = append(args, eventArgs...)
+	}
+
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func nonAllValues(values []string) []string {
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value != "" && value != aggAllValue {
+			result = append(result, value)
+		}
+	}
+	return result
 }
 
 func toFffRunningItem(row *fffRunningRow) *biz.FffRunningItem {
@@ -291,6 +365,82 @@ func buildFffTriggerWhere(param *biz.FffTriggerParam) (string, []interface{}) {
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
+
+	if param.Uuid != "" {
+		conds = append(conds, "uuid = ?")
+		args = append(args, param.Uuid)
+	}
+	if param.Status != "" {
+		conds = append(conds, "status = ?")
+		args = append(args, param.Status)
+	}
+	if param.TriggerType != "" {
+		conds = append(conds, "trigger_type = ?")
+		args = append(args, param.TriggerType)
+	}
+	if param.Tags != "" {
+		conds = append(conds, "tags LIKE ?")
+		args = append(args, "%"+param.Tags+"%")
+	}
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func buildFffTriggerReasonWhere(param *biz.FffTriggerParam) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if param.StartDt != "" && param.EndDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, param.StartDt, param.EndDt)
+	} else if param.StartDt != "" {
+		conds = append(conds, "dt >= ?")
+		args = append(args, param.StartDt)
+	} else if param.EndDt != "" {
+		conds = append(conds, "dt <= ?")
+		args = append(args, param.EndDt)
+	} else {
+		// 日期默认与全看板一致：未传时近 7 天
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
+	}
+
+	if len(param.EventNames) == 0 {
+		conds = append(conds, "event_name = ?")
+		args = append(args, aggAllValue)
+	} else if len(param.EventNames) == 1 {
+		conds = append(conds, "event_name = ?")
+		args = append(args, param.EventNames[0])
+	} else {
+		placeholders := strings.Repeat("?,", len(param.EventNames))
+		placeholders = placeholders[:len(placeholders)-1]
+		conds = append(conds, "event_name IN ("+placeholders+")")
+		for _, e := range param.EventNames {
+			args = append(args, e)
+		}
+	}
+
+	// filter_name 条件:不再强制 filter_name='__ALL__',也不再映射 event_names→filter_name。
+	// reason 粒度的 filter_name 列实测全部是 __ALL__(9944 行无一例外):
+	// - 传事件名 → event_name=? 命中 __ALL__ 行,有数据;若再拼 filter_name IN ('事件名')
+	//   反而不命中 __ALL__ → 查空(上一版踩的坑)
+	// - 传筛选器名 → event_name=? 不命中(reason 粒度没有该 event_name)→ 0,如实
+	conds = append(conds, "filter_name = ?")
+	args = append(args, aggAllValue)
+
+	if param.ProjectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, param.ProjectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
@@ -421,6 +571,24 @@ func buildFffCloseWhere(param *biz.FffCloseParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
+
+	if param.Reason != "" {
+		conds = append(conds, "reason LIKE ?")
+		args = append(args, "%"+param.Reason+"%")
+	}
+	if param.Version != "" {
+		conds = append(conds, "version = ?")
+		args = append(args, param.Version)
+	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -561,6 +729,28 @@ func buildFdrTriggerWhere(param *biz.FdrTriggerParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
+
+	if param.Uuid != "" {
+		conds = append(conds, "uuid = ?")
+		args = append(args, param.Uuid)
+	}
+	if param.Status != "" {
+		conds = append(conds, "status = ?")
+		args = append(args, param.Status)
+	}
+	if param.Detail != "" {
+		conds = append(conds, "detail LIKE ?")
+		args = append(args, "%"+param.Detail+"%")
+	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -706,6 +896,24 @@ func buildFclTriggerWhere(param *biz.FclTriggerParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
+
+	if param.Uuid != "" {
+		conds = append(conds, "uuid = ?")
+		args = append(args, param.Uuid)
+	}
+	if param.Status != "" {
+		conds = append(conds, "status = ?")
+		args = append(args, param.Status)
+	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
@@ -862,6 +1070,15 @@ func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
 		args = append(args, param.ProjectName)
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
+
+	if len(param.AnonymousIds) > 0 {
+		ph := strings.Repeat("?,", len(param.AnonymousIds))
+		ph = ph[:len(ph)-1]
+		conds = append(conds, "anonymous_id IN ("+ph+")")
+		for _, a := range param.AnonymousIds {
+			args = append(args, a)
+		}
+	}
 	if param.OnlyFail {
 		conds = append(conds, "fcl_status != 'success'")
 	}
@@ -878,6 +1095,23 @@ func buildUuidDetailWhere(param *biz.UuidDetailParam) (string, []interface{}) {
 		conds = append(conds, "fcl_status = 'success'")
 	case "fcl_discard":
 		conds = append(conds, "fcl_status = 'discard'")
+	}
+
+	if param.Uuid != "" {
+		conds = append(conds, "uuid = ?")
+		args = append(args, param.Uuid)
+	}
+	if param.FffStatus != "" {
+		conds = append(conds, "fff_status = ?")
+		args = append(args, param.FffStatus)
+	}
+	if param.FdrStatus != "" {
+		conds = append(conds, "fdr_status = ?")
+		args = append(args, param.FdrStatus)
+	}
+	if param.FclStatus != "" {
+		conds = append(conds, "fcl_status = ?")
+		args = append(args, param.FclStatus)
 	}
 
 	return " WHERE " + strings.Join(conds, " AND "), args
@@ -926,6 +1160,44 @@ type closeReasonRow struct {
 }
 
 func (r *foDashboardRepo) GetCloseReason(ctx context.Context, param *biz.CloseReasonParam) ([]*biz.CloseReasonItem, error) {
+	// reason 粒度没有 filter_name，传了 filter_name 回退明细表
+	if param.FilterName != "" {
+		return r.getCloseReasonFromDetail(ctx, param)
+	}
+	return r.getCloseReasonFromSummary(ctx, param)
+}
+
+// getCloseReasonFromSummary 未传 filter_name：查 fff_close 汇总表 reason 粒度
+func (r *foDashboardRepo) getCloseReasonFromSummary(ctx context.Context, param *biz.CloseReasonParam) ([]*biz.CloseReasonItem, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	where, args := buildCloseReasonWhere(param)
+
+	sql := fmt.Sprintf(`
+		SELECT close_reason_tag AS category, SUM(close_count) AS cnt
+		FROM %s%s
+		AND summary_grain = 'reason'
+		AND close_reason_tag != '%s' AND close_reason_tag != ''
+		GROUP BY close_reason_tag
+		ORDER BY cnt DESC`, tableFffCloseDailySummary, where, aggAllValue)
+
+	var rows []*closeReasonRow
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	list := make([]*biz.CloseReasonItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, &biz.CloseReasonItem{
+			Name:  row.Category,
+			Value: row.Cnt,
+		})
+	}
+	return list, nil
+}
+
+// getCloseReasonFromDetail 传了 filter_name 时回退明细表（dwd_cfdi_basic_fff_close）
+func (r *foDashboardRepo) getCloseReasonFromDetail(ctx context.Context, param *biz.CloseReasonParam) ([]*biz.CloseReasonItem, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 	where, args := buildCloseReasonWhere(param)
@@ -980,6 +1252,8 @@ func buildCloseReasonWhere(param *biz.CloseReasonParam) (string, []interface{}) 
 		conds = append(conds, "filter_name = ?")
 		args = append(args, param.FilterName)
 	}
+	// close 汇总表只有 filter_name 列，event_names 的值当 filter_name 用
+	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, param.EventNames)
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
@@ -1012,7 +1286,7 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 		SUM(cnt) AS fff_total,
 		SUM(CASE WHEN fff_status!='discard' THEN cnt ELSE 0 END) AS fff_allow,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' THEN cnt ELSE 0 END) AS fdr_fail,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` THEN cnt ELSE 0 END) AS fdr_fail,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS fcl_success,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' THEN cnt ELSE 0 END) AS fcl_fail` + base
 
@@ -1020,7 +1294,7 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 		` AND fff_status = 'discard' GROUP BY fff_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	fdrFailSQL := `SELECT fdr_detail_tag AS name, SUM(cnt) AS cnt` + base +
-		` AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
+		` AND ` + fdrStageFailedCondition() + ` GROUP BY fdr_detail_tag ORDER BY cnt DESC LIMIT 10`
 
 	fclFailSQL := `SELECT fcl_detail_tag AS name, SUM(cnt) AS cnt` + base +
 		` AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' GROUP BY fcl_detail_tag ORDER BY cnt DESC LIMIT 10`
@@ -1081,7 +1355,266 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 	}, nil
 }
 
+// stageTrendRow 阶段趋势失败原因行（汇总表 reason 粒度）
+type stageTrendRow struct {
+	Name  string    `gorm:"column:name"`
+	Dt    time.Time `gorm:"column:dt"`
+	Count int64     `gorm:"column:count"`
+}
+
+// fffOverviewRow FFF overview 粒度逐日成功/失败
+type fffOverviewRow struct {
+	Dt         time.Time `gorm:"column:dt"`
+	FffSuccess int64     `gorm:"column:fff_success"`
+	FffFailed  int64     `gorm:"column:fff_failed"`
+}
+
+// stageSuccessFailedRow 阶段 overview 粒度逐日成功/失败（FDR/FCL 趋势）
+type stageSuccessFailedRow struct {
+	Dt      time.Time `gorm:"column:dt"`
+	Success int64     `gorm:"column:success"`
+	Failed  int64     `gorm:"column:failed"`
+}
+
+func fffStageTrendNames() []string {
+	return []string{
+		"success",
+		"check_is_no_need_cooldown",
+		"check_drm_quota",
+		"check_need_acquire_data",
+		"check_not_reach_trigger_maximum",
+		"bag_invalid",
+		"event_not_recognized",
+		"tls_error",
+		"query cloud DISCARD, detail:Filter quota exceeded",
+		"query cloud DISCARD, detail:EventName is in blacklist",
+		"other",
+	}
+}
+
+func fdrStageTrendNames() []string {
+	return []string{
+		"success",
+		"because of full gc",
+		"mem pool water line",
+		"Disk overrun",
+		"Exceeds the maximum number of files",
+		"bag_invalid",
+		"bag_dir_missing",
+		"event_not_recognized",
+		"unauthorized",
+		"other",
+	}
+}
+
+func fclStageTrendNames() []string {
+	return []string{
+		"success",
+		"query cloud DISCARD, detail:Filter quota exceeded",
+		"reach upload limit",
+		"query cloud DISCARD, detail:EventName is in blacklist",
+		"geofence_error",
+		"unexpected geofence cause",
+		"tls_error",
+		"bag not exist",
+		"meta file lost",
+		"meta file empty",
+		"unexpected bag_upload_query cause",
+		"s3 upload force quit",
+		"create socket failed",
+		"http request failed",
+		"transfer dns failed",
+		"other",
+	}
+}
+
 func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
+	// 专项分析走汇总表；失败原因拆分依赖 reason 粒度（无 filter_name），传了 filter_name 回退明细表
+	if param.FilterName != "" {
+		return r.getStageTrendFromDetail(ctx, param)
+	}
+	return r.getStageTrendFromSummary(ctx, param)
+}
+
+func (r *foDashboardRepo) getStageTrendFromSummary(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+
+	whereFffOverview, argsFffOverview := buildAggCommonWhere("overview", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fffOverviewSQL := `SELECT dt,
+		SUM(success_count) AS fff_success,
+		SUM(failed_count) AS fff_failed
+		FROM ` + tableFffTriggerDailySummary + whereFffOverview + `
+		GROUP BY dt ORDER BY dt ASC`
+
+	whereFffReason, argsFffReason := buildAggCommonWhere("reason", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fffReasonSQL := `SELECT detail_tag AS name, dt, SUM(failed_count) AS count
+		FROM ` + tableFffTriggerDailySummary + whereFffReason + `
+		AND detail_tag != '` + aggAllValue + `' AND detail_tag != ''
+		GROUP BY dt, detail_tag`
+
+	whereFdr, argsFdr := buildAggCommonWhere("overview", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fdrSQL := `SELECT dt, SUM(success_count) AS success, SUM(failed_count) AS failed
+		FROM ` + tableFdrTriggerDailySummary + whereFdr + `
+		GROUP BY dt ORDER BY dt ASC`
+
+	whereFcl, argsFcl := buildAggCommonWhere("overview", "", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	fclSQL := `SELECT dt, SUM(success_count) AS success, SUM(failed_count) AS failed
+		FROM ` + tableFclTriggerDailySummary + whereFcl + `
+		GROUP BY dt ORDER BY dt ASC`
+
+	var (
+		fffOverviewRows []*fffOverviewRow
+		fffReasonRows   []*stageTrendRow
+		fdrRows         []*stageSuccessFailedRow
+		fclRows         []*stageSuccessFailedRow
+		e1, e2, e3, e4  error
+	)
+	var wg sync.WaitGroup
+	wg.Add(4)
+	go func() { defer wg.Done(); e1 = db.Raw(fffOverviewSQL, argsFffOverview...).Scan(&fffOverviewRows).Error }()
+	go func() { defer wg.Done(); e2 = db.Raw(fffReasonSQL, argsFffReason...).Scan(&fffReasonRows).Error }()
+	go func() { defer wg.Done(); e3 = db.Raw(fdrSQL, argsFdr...).Scan(&fdrRows).Error }()
+	go func() { defer wg.Done(); e4 = db.Raw(fclSQL, argsFcl...).Scan(&fclRows).Error }()
+	wg.Wait()
+	for _, e := range []error{e1, e2, e3, e4} {
+		if e != nil {
+			return nil, e
+		}
+	}
+
+	dates := buildTrendDates(param.StartDt, param.EndDt)
+	if len(dates) == 0 {
+		dates = collectTrendDates(fffOverviewRows, fffReasonRows, fdrRows, fclRows)
+	}
+
+	fffSucc := make(map[string]int64, len(fffOverviewRows))
+	fffFailed := make(map[string]int64, len(fffOverviewRows))
+	for _, row := range fffOverviewRows {
+		dt := row.Dt.Format("2006-01-02")
+		fffSucc[dt] = row.FffSuccess
+		fffFailed[dt] = row.FffFailed
+	}
+
+	fffNames := fffStageTrendNames()
+	fdrNames := []string{"success", "failed"}
+	fclNames := []string{"success", "failed"}
+
+	return &biz.StageTrendData{
+		Dates: dates,
+		Fff:   buildStageSeries(dates, assembleFffStageVals(dates, fffSucc, fffFailed, fffReasonRows, fffNames), fffNames),
+		Fdr:   buildStageSeries(dates, assembleSuccessFailedVals(dates, fdrRows), fdrNames),
+		Fcl:   buildStageSeries(dates, assembleSuccessFailedVals(dates, fclRows), fclNames),
+	}, nil
+}
+
+func buildTrendDates(startDt, endDt string) []string {
+	if startDt == "" || endDt == "" {
+		return nil
+	}
+	start, err1 := time.Parse("2006-01-02", startDt)
+	end, err2 := time.Parse("2006-01-02", endDt)
+	if err1 != nil || err2 != nil {
+		return nil
+	}
+	if start.After(end) {
+		start, end = end, start
+	}
+	dates := make([]string, 0, int(end.Sub(start).Hours()/24)+1)
+	for dt := start; !dt.After(end); dt = dt.AddDate(0, 0, 1) {
+		dates = append(dates, dt.Format("2006-01-02"))
+	}
+	return dates
+}
+
+func collectTrendDates(fffOverviewRows []*fffOverviewRow, fffReasonRows []*stageTrendRow, fdrRows, fclRows []*stageSuccessFailedRow) []string {
+	seen := map[string]struct{}{}
+	for _, row := range fffOverviewRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	for _, row := range fffReasonRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	for _, row := range fdrRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	for _, row := range fclRows {
+		seen[row.Dt.Format("2006-01-02")] = struct{}{}
+	}
+	dates := make([]string, 0, len(seen))
+	for dt := range seen {
+		dates = append(dates, dt)
+	}
+	sort.Strings(dates)
+	return dates
+}
+
+func assembleFffStageVals(dates []string, success map[string]int64, failed map[string]int64, rows []*stageTrendRow, names []string) map[string][]int64 {
+	out := assembleStageVals(dates, success, rows, names)
+	otherIdx := -1
+	for i, name := range names {
+		if name == "other" {
+			otherIdx = i
+			break
+		}
+	}
+	if otherIdx < 0 {
+		return out
+	}
+	for _, dt := range dates {
+		vals := out[dt]
+		var reasonTotal int64
+		for i := 1; i < len(vals); i++ {
+			reasonTotal += vals[i]
+		}
+		if missing := failed[dt] - reasonTotal; missing > 0 {
+			vals[otherIdx] += missing
+		}
+	}
+	return out
+}
+
+// assembleStageVals 把 success 量 + 各 detail_tag 失败量组装成 map[dt][]int64（顺序对齐 names）
+func assembleStageVals(dates []string, succ map[string]int64, rows []*stageTrendRow, names []string) map[string][]int64 {
+	tagDt := make(map[string]map[string]int64, len(rows))
+	for _, r := range rows {
+		dt := r.Dt.Format("2006-01-02")
+		m, ok := tagDt[r.Name]
+		if !ok {
+			m = map[string]int64{}
+			tagDt[r.Name] = m
+		}
+		m[dt] += r.Count
+	}
+	out := make(map[string][]int64, len(dates))
+	for _, dt := range dates {
+		vals := make([]int64, len(names))
+		vals[0] = succ[dt]
+		for j := 1; j < len(names); j++ {
+			if m, ok := tagDt[names[j]]; ok {
+				vals[j] = m[dt]
+			}
+		}
+		out[dt] = vals
+	}
+	return out
+}
+
+func assembleSuccessFailedVals(dates []string, rows []*stageSuccessFailedRow) map[string][]int64 {
+	dtMap := make(map[string][2]int64, len(rows))
+	for _, r := range rows {
+		dtMap[r.Dt.Format("2006-01-02")] = [2]int64{r.Success, r.Failed}
+	}
+	out := make(map[string][]int64, len(dates))
+	for _, dt := range dates {
+		v := dtMap[dt]
+		out[dt] = []int64{v[0], v[1]}
+	}
+	return out
+}
+
+// getStageTrendFromDetail 传了 filter_name 时回退明细表（ads_do_cfdi_daily）
+func (r *foDashboardRepo) getStageTrendFromDetail(ctx context.Context, param *biz.StageTrendParam) (*biz.StageTrendData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
 	where, args := buildDoCommonWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
@@ -1100,62 +1633,78 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		FffBlacklist        int64     `gorm:"column:fff_blacklist"`
 		FffOther            int64     `gorm:"column:fff_other"`
 		FdrSuccess          int64     `gorm:"column:fdr_success"`
-		FdrMemory           int64     `gorm:"column:fdr_memory"`
-		FdrDisk             int64     `gorm:"column:fdr_disk"`
+		FdrFullGC           int64     `gorm:"column:fdr_full_gc"`
+		FdrMemPoolWaterLine int64     `gorm:"column:fdr_mem_pool_water_line"`
+		FdrDiskOverrun      int64     `gorm:"column:fdr_disk_overrun"`
+		FdrMaxFiles         int64     `gorm:"column:fdr_max_files"`
 		FdrBagInvalid       int64     `gorm:"column:fdr_bag_invalid"`
 		FdrBagDirMissing    int64     `gorm:"column:fdr_bag_dir_missing"`
 		FdrEventNotRec      int64     `gorm:"column:fdr_event_not_recognized"`
 		FdrUnauthorized     int64     `gorm:"column:fdr_unauthorized"`
 		FdrOther            int64     `gorm:"column:fdr_other"`
 		FclSuccess          int64     `gorm:"column:fcl_success"`
-		FclQuotaExceeded    int64     `gorm:"column:fcl_quota_exceeded"`
+		FclFilterQuota      int64     `gorm:"column:fcl_filter_quota"`
 		FclReachUploadLimit int64     `gorm:"column:fcl_reach_upload_limit"`
-		FclBlacklist        int64     `gorm:"column:fcl_blacklist"`
-		FclGeofence         int64     `gorm:"column:fcl_geofence"`
+		FclEventBlacklist   int64     `gorm:"column:fcl_event_blacklist"`
+		FclGeofenceError    int64     `gorm:"column:fcl_geofence_error"`
+		FclUnexpectedGeo    int64     `gorm:"column:fcl_unexpected_geofence"`
 		FclTlsError         int64     `gorm:"column:fcl_tls_error"`
-		FclBagMissing       int64     `gorm:"column:fcl_bag_missing"`
-		FclUploadError      int64     `gorm:"column:fcl_upload_error"`
-		FclNetworkError     int64     `gorm:"column:fcl_network_error"`
+		FclBagNotExist      int64     `gorm:"column:fcl_bag_not_exist"`
+		FclMetaFileLost     int64     `gorm:"column:fcl_meta_file_lost"`
+		FclMetaFileEmpty    int64     `gorm:"column:fcl_meta_file_empty"`
+		FclBagUploadQuery   int64     `gorm:"column:fcl_bag_upload_query"`
+		FclS3ForceQuit      int64     `gorm:"column:fcl_s3_force_quit"`
+		FclCreateSocket     int64     `gorm:"column:fcl_create_socket"`
+		FclHTTPRequest      int64     `gorm:"column:fcl_http_request"`
+		FclTransferDNS      int64     `gorm:"column:fcl_transfer_dns"`
 		FclOther            int64     `gorm:"column:fcl_other"`
 	}
 
 	sql := `SELECT dt,
 		SUM(CASE WHEN fff_status != 'discard' THEN cnt ELSE 0 END) AS fff_success,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='cooldown' THEN cnt ELSE 0 END) AS fff_cooldown,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='drm_quota' THEN cnt ELSE 0 END) AS fff_drm_quota,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='acquire_data' THEN cnt ELSE 0 END) AS fff_no_acquire,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='trigger_maximum' THEN cnt ELSE 0 END) AS fff_trigger_max,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_is_no_need_cooldown' THEN cnt ELSE 0 END) AS fff_cooldown,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_drm_quota' THEN cnt ELSE 0 END) AS fff_drm_quota,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_need_acquire_data' THEN cnt ELSE 0 END) AS fff_no_acquire,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='check_not_reach_trigger_maximum' THEN cnt ELSE 0 END) AS fff_trigger_max,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fff_bag_invalid,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fff_event_not_recognized,
 		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fff_tls_error,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fff_quota_exceeded,
-		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fff_blacklist,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='query cloud DISCARD, detail:Filter quota exceeded' THEN cnt ELSE 0 END) AS fff_quota_exceeded,
+		SUM(CASE WHEN fff_status='discard' AND fff_detail_tag='query cloud DISCARD, detail:EventName is in blacklist' THEN cnt ELSE 0 END) AS fff_blacklist,
 		SUM(CASE WHEN fff_status='discard'
-			AND fff_detail_tag NOT IN ('cooldown','drm_quota','acquire_data','trigger_maximum','bag_invalid','event_not_recognized','tls_error','quota_exceeded','event_in_blacklist')
+			AND fff_detail_tag NOT IN ('check_is_no_need_cooldown','check_drm_quota','check_need_acquire_data','check_not_reach_trigger_maximum','bag_invalid','event_not_recognized','tls_error','query cloud DISCARD, detail:Filter quota exceeded','query cloud DISCARD, detail:EventName is in blacklist')
 			THEN cnt ELSE 0 END) AS fff_other,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END) AS fdr_success,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='memory' THEN cnt ELSE 0 END) AS fdr_memory,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='disk' THEN cnt ELSE 0 END) AS fdr_disk,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fdr_bag_invalid,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='bag_dir_missing' THEN cnt ELSE 0 END) AS fdr_bag_dir_missing,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fdr_event_not_recognized,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = '' AND fdr_detail_tag='unauthorized' THEN cnt ELSE 0 END) AS fdr_unauthorized,
-		SUM(CASE WHEN fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
-			AND fdr_detail_tag NOT IN ('memory','disk','bag_invalid','bag_dir_missing','event_not_recognized','unauthorized')
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='because of full gc' THEN cnt ELSE 0 END) AS fdr_full_gc,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='mem pool water line' THEN cnt ELSE 0 END) AS fdr_mem_pool_water_line,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='Disk overrun' THEN cnt ELSE 0 END) AS fdr_disk_overrun,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='Exceeds the maximum number of files' THEN cnt ELSE 0 END) AS fdr_max_files,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='bag_invalid' THEN cnt ELSE 0 END) AS fdr_bag_invalid,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='bag_dir_missing' THEN cnt ELSE 0 END) AS fdr_bag_dir_missing,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='event_not_recognized' THEN cnt ELSE 0 END) AS fdr_event_not_recognized,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + ` AND fdr_detail_tag='unauthorized' THEN cnt ELSE 0 END) AS fdr_unauthorized,
+		SUM(CASE WHEN ` + fdrStageFailedCondition() + `
+			AND fdr_detail_tag NOT IN ('because of full gc','mem pool water line','Disk overrun','Exceeds the maximum number of files','bag_invalid','bag_dir_missing','event_not_recognized','unauthorized')
 			THEN cnt ELSE 0 END) AS fdr_other,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status != 'discard' THEN cnt ELSE 0 END) AS fcl_success,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='quota_exceeded' THEN cnt ELSE 0 END) AS fcl_quota_exceeded,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='reach_upload_limit' THEN cnt ELSE 0 END) AS fcl_reach_upload_limit,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='event_in_blacklist' THEN cnt ELSE 0 END) AS fcl_blacklist,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='geofence_error' THEN cnt ELSE 0 END) AS fcl_geofence,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='query cloud DISCARD, detail:Filter quota exceeded' THEN cnt ELSE 0 END) AS fcl_filter_quota,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='reach upload limit' THEN cnt ELSE 0 END) AS fcl_reach_upload_limit,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='query cloud DISCARD, detail:EventName is in blacklist' THEN cnt ELSE 0 END) AS fcl_event_blacklist,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='geofence_error' THEN cnt ELSE 0 END) AS fcl_geofence_error,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='unexpected geofence cause' THEN cnt ELSE 0 END) AS fcl_unexpected_geofence,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='tls_error' THEN cnt ELSE 0 END) AS fcl_tls_error,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='bag_missing' THEN cnt ELSE 0 END) AS fcl_bag_missing,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='upload_error' THEN cnt ELSE 0 END) AS fcl_upload_error,
-		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='network_error' THEN cnt ELSE 0 END) AS fcl_network_error,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='bag not exist' THEN cnt ELSE 0 END) AS fcl_bag_not_exist,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='meta file lost' THEN cnt ELSE 0 END) AS fcl_meta_file_lost,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='meta file empty' THEN cnt ELSE 0 END) AS fcl_meta_file_empty,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='unexpected bag_upload_query cause' THEN cnt ELSE 0 END) AS fcl_bag_upload_query,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='s3 upload force quit' THEN cnt ELSE 0 END) AS fcl_s3_force_quit,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='create socket failed' THEN cnt ELSE 0 END) AS fcl_create_socket,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='http request failed' THEN cnt ELSE 0 END) AS fcl_http_request,
+		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard' AND fcl_detail_tag='transfer dns failed' THEN cnt ELSE 0 END) AS fcl_transfer_dns,
 		SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard'
-			AND fcl_detail_tag NOT IN ('quota_exceeded','reach_upload_limit','event_in_blacklist','geofence_error','tls_error','bag_missing','upload_error','network_error')
+			AND fcl_detail_tag NOT IN ('query cloud DISCARD, detail:Filter quota exceeded','reach upload limit','query cloud DISCARD, detail:EventName is in blacklist','geofence_error','unexpected geofence cause','tls_error','bag not exist','meta file lost','meta file empty','unexpected bag_upload_query cause','s3 upload force quit','create socket failed','http request failed','transfer dns failed')
 			THEN cnt ELSE 0 END) AS fcl_other
-		FROM ads_do_cfdi_daily` + where + ` AND event_name != 'Forever_log'
+		FROM ads_do_cfdi_daily` + where + ` AND event_name != '` + aggForeverLogValue + `'
 		GROUP BY dt ORDER BY dt ASC`
 
 	var rows []*stageAllRow
@@ -1163,9 +1712,9 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		return nil, err
 	}
 
-	fffNames := []string{"success", "cooldown", "drm_quota", "acquire_data", "trigger_maximum", "bag_invalid", "event_not_recognized", "tls_error", "quota_exceeded", "event_in_blacklist", "other"}
-	fdrNames := []string{"success", "memory", "disk", "bag_invalid", "bag_dir_missing", "event_not_recognized", "unauthorized", "other"}
-	fclNames := []string{"success", "quota_exceeded", "reach_upload_limit", "event_in_blacklist", "geofence_error", "tls_error", "bag_missing", "upload_error", "network_error", "other"}
+	fffNames := fffStageTrendNames()
+	fdrNames := fdrStageTrendNames()
+	fclNames := fclStageTrendNames()
 
 	fffVals := make(map[string][]int64, len(rows))
 	fdrVals := make(map[string][]int64, len(rows))
@@ -1175,8 +1724,8 @@ func (r *foDashboardRepo) GetStageTrend(ctx context.Context, param *biz.StageTre
 		dt := row.Dt.Format("2006-01-02")
 		dates = append(dates, dt)
 		fffVals[dt] = []int64{row.FffSuccess, row.FffCooldown, row.FffDrmQuota, row.FffNoAcquire, row.FffTriggerMax, row.FffBagInvalid, row.FffEventNotRec, row.FffTlsError, row.FffQuotaExceeded, row.FffBlacklist, row.FffOther}
-		fdrVals[dt] = []int64{row.FdrSuccess, row.FdrMemory, row.FdrDisk, row.FdrBagInvalid, row.FdrBagDirMissing, row.FdrEventNotRec, row.FdrUnauthorized, row.FdrOther}
-		fclVals[dt] = []int64{row.FclSuccess, row.FclQuotaExceeded, row.FclReachUploadLimit, row.FclBlacklist, row.FclGeofence, row.FclTlsError, row.FclBagMissing, row.FclUploadError, row.FclNetworkError, row.FclOther}
+		fdrVals[dt] = []int64{row.FdrSuccess, row.FdrFullGC, row.FdrMemPoolWaterLine, row.FdrDiskOverrun, row.FdrMaxFiles, row.FdrBagInvalid, row.FdrBagDirMissing, row.FdrEventNotRec, row.FdrUnauthorized, row.FdrOther}
+		fclVals[dt] = []int64{row.FclSuccess, row.FclFilterQuota, row.FclReachUploadLimit, row.FclEventBlacklist, row.FclGeofenceError, row.FclUnexpectedGeo, row.FclTlsError, row.FclBagNotExist, row.FclMetaFileLost, row.FclMetaFileEmpty, row.FclBagUploadQuery, row.FclS3ForceQuit, row.FclCreateSocket, row.FclHTTPRequest, row.FclTransferDNS, row.FclOther}
 	}
 
 	return &biz.StageTrendData{
@@ -1251,6 +1800,31 @@ func (r *foDashboardRepo) GetDimensions(ctx context.Context) (*biz.FoDimensions,
 }
 
 // fetchDimensions 并发查询 Doris 获取四类维度枚举值
+// GetCarTypesByProject 查指定项目下的车型列表(近3个月,联动场景专用,不走缓存)。
+// 用 _agg 车辆日汇总表(普通表 ads_cfdi_vehicle_daily_summary 计划下线,不依赖);
+// 90 天全量约 470 万行、单项目 5.5 万行,DISTINCT 秒回。
+// 不用 fff_running(亿级明细且 project_name 无索引,90 天扫描数十秒)。
+func (r *foDashboardRepo) GetCarTypesByProject(ctx context.Context, projectName string) ([]string, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+
+	var rows []struct{ Val string }
+	err := db.Raw(`SELECT DISTINCT car_type AS val
+		FROM ` + tableVehicleDailySummaryAgg + `
+		WHERE dt >= DATE_SUB(CURDATE(), INTERVAL 90 DAY)
+		AND project_name = ?
+		AND car_type IS NOT NULL AND car_type != ''
+		ORDER BY val`, projectName).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, r.Val)
+	}
+	return out, nil
+}
+
 func (r *foDashboardRepo) fetchDimensions(ctx context.Context) (*biz.FoDimensions, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
@@ -1355,8 +1929,8 @@ func (r *foDashboardRepo) GetFffRunningTrend(ctx context.Context, param *biz.Fff
 	defer cancel()
 
 	where, args := buildFffRunningTrendWhere(param)
-	sql := `SELECT dt, COUNT(DISTINCT anonymous_id) AS vehicle_count
-		FROM dwd_cfdi_basic_fff_running` + where + ` GROUP BY dt ORDER BY dt`
+	sql := `SELECT dt, SUM(running_switch_on_vehicle_count) AS vehicle_count
+		FROM ` + tableVehicleDailySummaryAgg + where + ` GROUP BY dt ORDER BY dt`
 
 	var rows []runningTrendRow
 	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
@@ -1372,10 +1946,13 @@ func (r *foDashboardRepo) GetFffRunningTrend(ctx context.Context, param *biz.Fff
 	return &biz.FffRunningTrendData{Dates: dates, Counts: counts}, nil
 }
 
+// buildFffRunningTrendWhere 构建 _agg 车辆汇总表的 WHERE。
+// running/trend 需要的是「去重车辆数」，fff_running 汇总表的 vehicle_count 会因
+// on_autopilot/function_mode 等易变维度重复计数（同车拆多行），改用
+// ads_cfdi_vehicle_daily_summary_agg 的 running_switch_on_vehicle_count（车辆粒度，SUM 不重复）。
 func buildFffRunningTrendWhere(param *biz.FffRunningTrendParam) (string, []interface{}) {
 	conds := []string{
-		"switch_on = 1",
-		"filter_name = ?",
+		"event_name = ?",
 		"dt BETWEEN ? AND ?",
 	}
 	args := []interface{}{param.FilterName, param.StartDt, param.EndDt}
@@ -1384,5 +1961,189 @@ func buildFffRunningTrendWhere(param *biz.FffRunningTrendParam) (string, []inter
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
 	}
+	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 	return " WHERE " + strings.Join(conds, " AND "), args
 }
+
+func buildRunningOverviewSQL(param *biz.FffRunningParam) (string, []interface{}) {
+	where, args := buildFffRunningWhere(param)
+	vehicleWhere, vehicleArgs := buildFffRunningVehicleWhere(param)
+	// vehicle_total:区间内峰值日活跃车辆数——每天按天聚合(消除 sw_version 展开)，
+	// 再取区间 MAX(消除跨天膨胀);event_name 维度由 vehicleWhere 决定(前端传啥查啥)
+	sql := `SELECT
+		COALESCE(SUM(running_count), 0) AS running_total,
+		(
+			SELECT COALESCE(MAX(daily_count), 0) FROM (
+				SELECT SUM(running_switch_on_vehicle_count) AS daily_count
+				FROM ` + tableVehicleDailySummaryAgg + vehicleWhere + `
+				GROUP BY dt
+			) t
+		) AS vehicle_total,
+		COALESCE(SUM(switch_on_count), 0) AS switch_on_total,
+		COALESCE(SUM(switch_off_count), 0) AS switch_off_total,
+		COALESCE(SUM(running_success_count), 0) AS running_success,
+		COALESCE(SUM(running_failed_count), 0) AS running_failed,
+		COUNT(DISTINCT filter_name) AS filter_count
+		FROM ` + tableFffRunningDailySummary + where + `
+		AND summary_grain = 'filter'
+		AND filter_name != '` + aggAllValue + `' AND filter_name != ''`
+	args = append(vehicleArgs, args...)
+	return sql, args
+}
+
+// GetRunningOverview 筛选器运行健康概览（运行记录数/车辆数/开关占比）
+func (r *foDashboardRepo) GetRunningOverview(ctx context.Context, param *biz.FffRunningParam) (*biz.FoRunningOverviewData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	sql, args := buildRunningOverviewSQL(param)
+
+	type scanRow struct {
+		RunningTotal   int64 `gorm:"column:running_total"`
+		VehicleTotal   int64 `gorm:"column:vehicle_total"`
+		SwitchOnTotal  int64 `gorm:"column:switch_on_total"`
+		SwitchOffTotal int64 `gorm:"column:switch_off_total"`
+		RunningSuccess int64 `gorm:"column:running_success"`
+		RunningFailed  int64 `gorm:"column:running_failed"`
+		FilterCount    int64 `gorm:"column:filter_count"`
+	}
+	var sr scanRow
+	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
+		return nil, err
+	}
+	return &biz.FoRunningOverviewData{
+		RunningTotal:   sr.RunningTotal,
+		VehicleTotal:   sr.VehicleTotal,
+		SwitchOnTotal:  sr.SwitchOnTotal,
+		SwitchOffTotal: sr.SwitchOffTotal,
+		RunningSuccess: sr.RunningSuccess,
+		RunningFailed:  sr.RunningFailed,
+		FilterCount:    sr.FilterCount,
+	}, nil
+}
+
+// GetFffOverview FFF 触发概览（触发总数/成功数/成功率）
+func (r *foDashboardRepo) GetFffOverview(ctx context.Context, param *biz.FffTriggerParam) (*biz.FoFffOverviewData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	sql, args := buildFffOverviewSQL(param)
+
+	type scanRow struct {
+		TriggerTotal       int64 `gorm:"column:trigger_total"`
+		TriggerSuccess     int64 `gorm:"column:trigger_success"`
+		TriggerFailed      int64 `gorm:"column:trigger_failed"`
+		TriggerFilterCount int64 `gorm:"column:trigger_filter_count"`
+		CloseFilterCount   int64 `gorm:"column:close_filter_count"`
+	}
+	var sr scanRow
+	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
+		return nil, err
+	}
+	return &biz.FoFffOverviewData{
+		TriggerTotal:       sr.TriggerTotal,
+		TriggerSuccess:     sr.TriggerSuccess,
+		TriggerFailed:      sr.TriggerFailed,
+		TriggerFilterCount: sr.TriggerFilterCount,
+		CloseFilterCount:   sr.CloseFilterCount,
+	}, nil
+}
+
+func buildFffOverviewSQL(param *biz.FffTriggerParam) (string, []interface{}) {
+	grain := grainForFilter(param.FilterName)
+	// 日期默认与全看板一致：未传时近 7 天
+	where, mainArgs := buildAggCommonWhere(
+		grain,
+		param.FilterName,
+		param.EventNames,
+		param.ProjectName,
+		param.CarTypes,
+		param.StartDt,
+		param.EndDt,
+	)
+
+	triggerFilterWhere, triggerFilterArgs := buildFffFilterCountWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	closeFilterWhere, closeFilterArgs := buildFffFilterCountWhere(param.FilterName, param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT
+		SUM(event_count) AS trigger_total,
+		SUM(success_count) AS trigger_success,
+		SUM(failed_count) AS trigger_failed,
+		(SELECT COUNT(DISTINCT filter_name) FROM ` + tableFffTriggerDailySummary + triggerFilterWhere + `) AS trigger_filter_count,
+		(SELECT COUNT(DISTINCT filter_name) FROM ` + tableFffCloseDailySummary + closeFilterWhere + `) AS close_filter_count
+		FROM ` + tableFffTriggerDailySummary + where
+
+	args := append(triggerFilterArgs, closeFilterArgs...)
+	args = append(args, mainArgs...)
+	return sql, args
+}
+
+// buildFffFilterCountWhere 汇总表 filter 粒度去重 filter_name 计数的 WHERE（日期/筛选器/项目/车型，与主查询口径一致）
+func buildFffFilterCountWhere(filterName string, eventNames []string, projectName string, carTypes []string, startDt, endDt string) (string, []interface{}) {
+	var conds []string
+	var args []interface{}
+
+	if startDt != "" && endDt != "" {
+		conds = append(conds, "dt BETWEEN ? AND ?")
+		args = append(args, startDt, endDt)
+	} else {
+		// 日期默认与全看板一致：未传时近 7 天
+		conds = append(conds, "dt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)")
+	}
+	conds = append(conds, "summary_grain = 'filter'")
+	conds = append(conds, "filter_name != '"+aggAllValue+"' AND filter_name != ''")
+	if filterName != "" {
+		conds = append(conds, "filter_name = ?")
+		args = append(args, filterName)
+	}
+	// 专项分析：event_names 即算子名，映射为 filter_name 过滤
+	conds, args = appendFffRunningEventNamesAsFilterNames(conds, args, eventNames)
+	if projectName != "" {
+		conds = append(conds, "project_name = ?")
+		args = append(args, projectName)
+	}
+	conds, args = appendMultiCond(conds, args, "car_type", carTypes)
+
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+func (r *foDashboardRepo) GetFffFailReason(ctx context.Context, param *biz.FffTriggerParam) ([]*biz.DoFailReasonItem, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	sql, args := buildFffFailReasonSQL(param)
+
+	return r.scanFffFailReason(ctx, db.Raw(sql, args...))
+}
+
+func buildFffFailReasonSQL(param *biz.FffTriggerParam) (string, []interface{}) {
+	where, args := buildFffTriggerReasonWhere(param)
+	sql := `SELECT detail_tag, SUM(failed_count) AS cnt
+		FROM ` + tableFffTriggerDailySummary + where + `
+		AND summary_grain = 'reason'
+		AND detail_tag != '` + aggAllValue + `' AND detail_tag != ''
+		GROUP BY detail_tag
+		HAVING cnt > 0
+		ORDER BY cnt DESC`
+
+	return sql, args
+}
+
+func (r *foDashboardRepo) scanFffFailReason(_ context.Context, tx *gorm.DB) ([]*biz.DoFailReasonItem, error) {
+	type row struct {
+		DetailTag string `gorm:"column:detail_tag"`
+		Cnt       int64  `gorm:"column:cnt"`
+	}
+	var rows []*row
+	if err := tx.Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	list := make([]*biz.DoFailReasonItem, 0, len(rows))
+	for _, row := range rows {
+		detail := strings.TrimSpace(row.DetailTag)
+		if detail == "" || detail == aggAllValue {
+			continue
+		}
+		list = append(list, &biz.DoFailReasonItem{Name: "FFF-" + detail, Value: row.Cnt})
+	}
+	return list, nil
+}
+

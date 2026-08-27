@@ -7,7 +7,8 @@ server:
     timeout: 35s
   gin:
     addr: 0.0.0.0:8080
-    timeout: 35s
+    # AI 总结 SSE 长流(thinking 模型生成 40~90s)需要更长上限;kratos Timeout 为 server 级,无法按路由豁免
+    timeout: 1200s
     run_mode: ${RUN_MODE:prd}
 data:
   mysql:
@@ -46,8 +47,17 @@ data:
   runtime:
     env: ${RUN_MODE:prd}
     domain: ${FUNC_SCOPE:fdi_cloud}
-  feishu:
-    webhook_url: ${FEISHU_WEBHOOK_URL:https://open.feishu.cn/open-apis/bot/v2/hook/c3f49363-67bb-421f-966c-a7bcf132c104}
+  llm:
+    # Anthropic Messages 协议网关;三项任一为空则 AI 总结退化为本地统计模式
+    base_url: ${LLM_BASE_URL:https://llm-gateway.momenta.works}
+    api_key: ${LLM_API_KEY:sk-Mwj6z4orGxezS5ZBADXzgQ}
+    model: ${LLM_MODEL:glm-5.3-flash}
+    max_tokens: ${LLM_MAX_TOKENS:16384}
+    timeout: ${LLM_TIMEOUT:360s}
+  fom:
+    host: ${FOM_HOST:https://filterscript-api.momenta.works}
+  ffm:
+    url: ${FFM_URL:https://fdi.momenta.works/fm}
   etl:
     on: ${ETL_ON:true}
     backfill_on: ${ETL_BACKFILL_ON:true}
@@ -56,3 +66,5 @@ data:
     lock_key: ${ETL_LOCK_KEY:fdi_data_board:etl:scheduler}
     lock_ttl: ${ETL_LOCK_TTL:120s}
     lock_refresh_interval: ${ETL_LOCK_REFRESH_INTERVAL:30s}
+  feishu:
+    webhook_url: ${FEISHU_WEBHOOK_URL:https://open.feishu.cn/open-apis/bot/v2/hook/c3f49363-67bb-421f-966c-a7bcf132c104}

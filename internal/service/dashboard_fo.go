@@ -370,7 +370,14 @@ func (s *FoDashboardService) GetDimensions(ctx *gin.Context) (api.HttpResponse, 
 	resp.Code = int32(gcode.CodeOK.Code())
 	resp.Message = gcode.CodeOK.Message()
 
-	result, err := s.uc.GetDimensions(ctx)
+	var req dashboard_api.DimensionsRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+
+	result, err := s.uc.GetDimensions(ctx, req.ProjectName)
 	if err != nil {
 		log.Errorf("GetDimensions error: %v", err)
 		resp.Code = int32(gcode.CodeInternalError.Code())
@@ -429,10 +436,11 @@ func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse,
 //	@Tags		FoDashboard
 //	@Produce	json
 //	@Security	OAuth2Password
-//	@Param		filter_name		query		string	true	"算子名称（必填）"
+//	@Param		filter_name		query		string	true	"事件名（必填，会先解析为真实 running filter_name）"
 //	@Param		start_dt		query		string	true	"开始日期 YYYY-MM-DD（必填）"
 //	@Param		end_dt			query		string	true	"结束日期 YYYY-MM-DD（必填）"
 //	@Param		project_name	query		string	false	"项目名称（选填）"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
 //	@Success	200				{object}	dashboard_api.FffRunningTrendResponse
 //	@Router		/dashboard/v1/fo/running/trend [GET]
 func (s *FoDashboardService) GetFffRunningTrend(ctx *gin.Context) (api.HttpResponse, error) {
@@ -460,5 +468,124 @@ func (s *FoDashboardService) GetFffRunningTrend(ctx *gin.Context) (api.HttpRespo
 		return resp, nil
 	}
 
+	return result, nil
+}
+
+// GetRunningOverview godoc
+//
+//	@Summary	筛选器运行健康概览（运行记录数/车辆数/开关占比）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.FoRunningOverviewResponse
+//	@Router		/dashboard/v1/fo/running/overview [GET]
+func (s *FoDashboardService) GetRunningOverview(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FoRunningOverviewResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffRunningRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetRunningOverview(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("GetRunningOverview error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetFffOverview godoc
+//
+//	@Summary	FFF 触发概览（触发总数/成功数/成功率）
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_name		query		string	false	"事件名"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.FoFffOverviewResponse
+//	@Router		/dashboard/v1/fo/fff/overview [GET]
+func (s *FoDashboardService) GetFffOverview(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.FoFffOverviewResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffTriggerRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFffOverview(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("GetFffOverview error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}
+
+// GetFffFailReason godoc
+//
+//	@Summary	FFF 触发失败原因分布
+//	@Tags		FoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		filter_name		query		string	false	"筛选器名称"
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
+//	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
+//	@Success	200				{object}	dashboard_api.DoFailReasonResponse
+//	@Router		/dashboard/v1/fo/fff/fail_reason [GET]
+func (s *FoDashboardService) GetFffFailReason(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoFailReasonResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.FffTriggerRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFffFailReason(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("GetFffFailReason error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
 	return result, nil
 }

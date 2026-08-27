@@ -91,9 +91,25 @@ message Data {
         google.protobuf.Duration lock_refresh_interval = 7;
     }
 
-    message Feishu {
-        string webhook_url = 2;
+    message LLM {
+        string base_url = 1;      // Anthropic 协议网关地址
+        string api_key = 2;       // 网关密钥(x-api-key)
+        string model = 3;         // 模型名,如 kimi-k3
+        int64 max_tokens = 4;     // 单次生成上限,默认 4096
+        google.protobuf.Duration timeout = 6; // 单次请求超时
     }
+
+    message Fom {
+        string host = 1; // FOM host,用于按热更新事件查询算子名
+    }
+
+    message Ffm {
+        string url = 1; // FFM host,用于按 C++ 事件查询 filter_name
+    }
+
+  message Feishu {
+    string webhook_url = 2;
+  }
 
     Mysql mysql = 1;
     Redis redis = 2;
@@ -102,5 +118,8 @@ message Data {
     Runtime runtime = 7;
     Doris doris = 8;
     Etl etl = 9;
-    Feishu feishu = 11;
+    LLM llm = 10;
+    Fom fom = 11;
+    Ffm ffm = 12;
+  Feishu feishu = 13;
 }
