@@ -69,7 +69,7 @@ func (r *LlmRepo) ChatStreamEx(ctx context.Context, params anthropic.MessageNewP
 		return nil, fmt.Errorf("llm repo disabled")
 	}
 	if params.Model == "" {
-		params.Model = r.Model()
+		params.Model = anthropic.Model(r.Model())
 	}
 	if params.MaxTokens == 0 {
 		params.MaxTokens = r.MaxTokens()
@@ -99,7 +99,7 @@ func (r *LlmRepo) newStream(ctx context.Context, systemPrompt, userPrompt string
 		maxTokens = 4096
 	}
 	return r.data.llmClient.Messages.NewStreaming(ctx, anthropic.MessageNewParams{
-		Model:     lc.GetModel(),
+		Model:     anthropic.Model(lc.GetModel()),
 		MaxTokens: maxTokens,
 		System: []anthropic.TextBlockParam{
 			{Text: systemPrompt},

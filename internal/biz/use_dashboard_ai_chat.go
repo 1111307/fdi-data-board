@@ -22,15 +22,15 @@ const aiMaxHistory = 40
 
 // ChatEvent SSE 下行事件(前端据此渲染:delta 文本/thinking 思考折叠块/tool_call 工具卡/clarify 确认卡/tool_result 结果与图表数据)
 type ChatEvent struct {
-	Type    string          `json:"type"` // delta / thinking / tool_call / tool_result / clarify / plan / done / error
-	Text    string          `json:"text,omitempty"`
-	ID      string          `json:"id,omitempty"`
-	Name    string          `json:"name,omitempty"`
-	Args    map[string]any  `json:"args,omitempty"`
-	Summary string          `json:"summary,omitempty"`
-	Data    interface{}     `json:"data,omitempty"` // tool_result 的完整内容(JSON 或纯文本,前端按需解析)
-	Stop    string          `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / plan / max_rounds
-	Error   string          `json:"error,omitempty"`
+	Type    string         `json:"type"` // delta / thinking / tool_call / tool_result / clarify / plan / done / error
+	Text    string         `json:"text,omitempty"`
+	ID      string         `json:"id,omitempty"`
+	Name    string         `json:"name,omitempty"`
+	Args    map[string]any `json:"args,omitempty"`
+	Summary string         `json:"summary,omitempty"`
+	Data    interface{}    `json:"data,omitempty"` // tool_result 的完整内容(JSON 或纯文本,前端按需解析)
+	Stop    string         `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / plan / max_rounds
+	Error   string         `json:"error,omitempty"`
 }
 
 // AiChatHistoryMessage 前端回传的会话历史(轻量结构,后端重建为 Anthropic content blocks)
@@ -76,7 +76,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 			return ctx.Err()
 		}
 		params := anthropic.MessageNewParams{
-			Model:     uc.llmModel(),
+			Model:     anthropic.Model(uc.llmModel()),
 			MaxTokens: uc.llmMaxTokens(), // 输出上限,走 data.llm.max_tokens 配置(默认16384)
 			System:    []anthropic.TextBlockParam{{Text: knowledgePrompt()}},
 			Messages:  msgs,
