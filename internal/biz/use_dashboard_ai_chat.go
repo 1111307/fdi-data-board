@@ -297,6 +297,10 @@ func dropOrphanToolResults(msgs []anthropic.MessageParam) []anthropic.MessagePar
 // sanitizeAnthropicMessages 强制 Anthropic 协议合法性:每个 assistant 消息的每个
 // tool_use 在紧随其后的 user 消息里恰好有一个 tool_result(去重+补缺+丢孤儿),
 // 防止前端历史脏数据导致 "each tool_use must have a single result" 400。
+func isReservedTool(name string) bool {
+	return name == aiClarifyToolName || name == aiSubmitPlanToolName
+}
+
 func sanitizeAnthropicMessages(msgs []anthropic.MessageParam) []anthropic.MessageParam {
 	out := make([]anthropic.MessageParam, 0, len(msgs))
 	for i := 0; i < len(msgs); i++ {
@@ -308,6 +312,7 @@ func sanitizeAnthropicMessages(msgs []anthropic.MessageParam) []anthropic.Messag
 		// assistant: tool_use 按 id 去重
 		seenUse := map[string]bool{}
 		var useIDs []string
+		idToName := map[string]string{}
 		dedupBlocks := m.Content[:0]
 		for _, b := range m.Content {
 			if tu := b.OfToolUse; tu != nil {
@@ -316,13 +321,16 @@ func sanitizeAnthropicMessages(msgs []anthropic.MessageParam) []anthropic.Messag
 				}
 				seenUse[tu.ID] = true
 				useIDs = append(useIDs, tu.ID)
+				idToName[tu.ID] = tu.Name
 			}
 			dedupBlocks = append(dedupBlocks, b)
 		}
 		m.Content = dedupBlocks
 		out = append(out, m)
 
-		// 紧随的 user 消息:tool_result 去重、丢孤儿、补缺失
+		// 紧随的 user 消息:tool_result 去重、丢孤儿、补缺失。
+		// 注意:保留工具(clarify/submit_plan)的"缺失"不补占位——它们的 result
+		// 由用户的确认消息(另一条 user 消息)提供,补占位会导致同一 id 两个 result 报 400。
 		if i+1 < len(msgs) && msgs[i+1].Role == anthropic.MessageParamRoleUser {
 			u := msgs[i+1]
 			seenRes := map[string]bool{}
@@ -337,7 +345,7 @@ func sanitizeAnthropicMessages(msgs []anthropic.MessageParam) []anthropic.Messag
 				kept = append(kept, b)
 			}
 			for _, id := range useIDs {
-				if !seenRes[id] {
+				if !seenRes[id] && !isReservedTool(idToName[id]) {
 					kept = append(kept, anthropic.NewToolResultBlock(id, "(该工具调用结果缺失)", false))
 				}
 			}
@@ -345,12 +353,17 @@ func sanitizeAnthropicMessages(msgs []anthropic.MessageParam) []anthropic.Messag
 			out = append(out, u)
 			i++
 		} else if len(useIDs) > 0 {
-			// assistant 有 tool_use 但下一条不是 user → 补一条 tool_result 消息
+			// assistant 有 tool_use 但下一条不是 user → 只为真实数据工具补 result;
+			// 保留工具(clarify/submit_plan)等用户确认,不补占位
 			var fill []anthropic.ContentBlockParamUnion
 			for _, id := range useIDs {
-				fill = append(fill, anthropic.NewToolResultBlock(id, "(该工具调用结果缺失)", false))
+				if !isReservedTool(idToName[id]) {
+					fill = append(fill, anthropic.NewToolResultBlock(id, "(该工具调用结果缺失)", false))
+				}
 			}
-			out = append(out, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: fill})
+			if len(fill) > 0 {
+				out = append(out, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: fill})
+			}
 		}
 	}
 	return out
