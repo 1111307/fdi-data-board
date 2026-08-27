@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -36,6 +37,11 @@ type FoDashboardRepo interface {
 	GetRunningOverview(ctx context.Context, param *FffRunningParam) (*FoRunningOverviewData, error)
 	GetFffOverview(ctx context.Context, param *FffTriggerParam) (*FoFffOverviewData, error)
 	GetFffFailReason(ctx context.Context, param *FffTriggerParam) ([]*DoFailReasonItem, error)
+}
+
+// RunningFilterNameResolver 将前端传入的事件名解析为 running 表/汇总表实际使用的 filter_name。
+type RunningFilterNameResolver interface {
+	ResolveRunningFilterNames(ctx context.Context, eventName string) ([]string, error)
 }
 
 // FunnelParam 数采全链路分析查询参数
@@ -87,83 +93,83 @@ type CloseReasonParam struct {
 
 // UuidDetailParam 全链路明细查询参数
 type UuidDetailParam struct {
-	FilterName  string
-	Uuid        string
-	FffStatus   string
-	FdrStatus   string
-	FclStatus   string
-	EventNames  []string // 多选
-	ProjectName string
-	CarTypes    []string
+	FilterName   string
+	Uuid         string
+	FffStatus    string
+	FdrStatus    string
+	FclStatus    string
+	EventNames   []string // 多选
+	ProjectName  string
+	CarTypes     []string
 	AnonymousIds []string
-	StartDt     string
-	EndDt       string
-	OnlyFail    bool
-	StageFilter string // fff_discard/fdr_discard/fcl_discard/fcl_success
-	Page        int
-	PageSize    int
+	StartDt      string
+	EndDt        string
+	OnlyFail     bool
+	StageFilter  string // fff_discard/fdr_discard/fcl_discard/fcl_success
+	Page         int
+	PageSize     int
 }
 
 // FclTriggerParam FCL 上传明细查询参数
 type FclTriggerParam struct {
-	FilterName  string
-	Uuid        string
-	Status      string
-	EventNames  []string
-	ProjectName string
-	CarTypes    []string
+	FilterName   string
+	Uuid         string
+	Status       string
+	EventNames   []string
+	ProjectName  string
+	CarTypes     []string
 	AnonymousIds []string
-	StartDt     string
-	EndDt       string
-	Page        int
-	PageSize    int
+	StartDt      string
+	EndDt        string
+	Page         int
+	PageSize     int
 }
 
 // FdrTriggerParam FDR 落盘明细查询参数
 type FdrTriggerParam struct {
-	FilterName  string
-	Uuid        string
-	Status      string
-	Detail      string
-	EventNames  []string
-	ProjectName string
-	CarTypes    []string
+	FilterName   string
+	Uuid         string
+	Status       string
+	Detail       string
+	EventNames   []string
+	ProjectName  string
+	CarTypes     []string
 	AnonymousIds []string
-	StartDt     string
-	EndDt       string
-	Page        int
-	PageSize    int
+	StartDt      string
+	EndDt        string
+	Page         int
+	PageSize     int
 }
 
 // FffCloseParam 筛选器关闭明细查询参数
 type FffCloseParam struct {
-	FilterName  string
-	Reason      string
-	Version     string
-	ProjectName string
-	CarTypes    []string
+	FilterName   string
+	Reason       string
+	Version      string
+	ProjectName  string
+	CarTypes     []string
 	AnonymousIds []string
-	StartDt     string
-	EndDt       string
-	Page        int
-	PageSize    int
+	StartDt      string
+	EndDt        string
+	Page         int
+	PageSize     int
 }
 
 // FffTriggerParam 筛选器触发明细查询参数
 type FffTriggerParam struct {
-	FilterName  string
-	Uuid        string
-	Status      string
-	TriggerType string
-	Tags        string
-	EventNames  []string
-	ProjectName string
-	CarTypes    []string
+	FilterName   string
+	Uuid         string
+	Status       string
+	TriggerType  string
+	Tags         string
+	EventNames   []string
+	ProjectName  string
+	CarTypes     []string
 	AnonymousIds []string
-	StartDt     string
-	EndDt       string
-	Page        int
-	PageSize    int
+	StartDt      string
+	EndDt        string
+	Page         int
+	PageSize     int
 }
 
 // FoDimensions 维度枚举数据（FO/DO 公共）
@@ -176,22 +182,22 @@ type FoDimensions struct {
 
 // FffRunningParam 筛选器运行明细查询参数
 type FffRunningParam struct {
-	FilterName  string
-	SwitchOn    *int
-	SwVersion   string
-	EventNames  []string
-	ProjectName string
-	CarTypes    []string
+	FilterName   string
+	SwitchOn     *int
+	SwVersion    string
+	EventNames   []string
+	ProjectName  string
+	CarTypes     []string
 	AnonymousIds []string
-	StartDt     string
-	EndDt       string
-	Page        int
-	PageSize    int
+	StartDt      string
+	EndDt        string
+	Page         int
+	PageSize     int
 }
 
 // FffRunningTrendParam 算子活跃车辆趋势查询参数
 type FffRunningTrendParam struct {
-	FilterName  string // 必填：算子名称
+	FilterName  string // 必填：真实 running filter_name
 	ProjectName string // 选填：项目名称
 	CarTypes    []string
 	StartDt     string // 必填：开始日期
@@ -200,11 +206,15 @@ type FffRunningTrendParam struct {
 
 // FoDashboardUseCase FO Dashboard 业务用例
 type FoDashboardUseCase struct {
-	repo FoDashboardRepo
+	repo                      FoDashboardRepo
+	runningFilterNameResolver RunningFilterNameResolver
 }
 
-func NewFoDashboardUseCase(repo FoDashboardRepo) *FoDashboardUseCase {
-	return &FoDashboardUseCase{repo: repo}
+func NewFoDashboardUseCase(repo FoDashboardRepo, runningFilterNameResolver RunningFilterNameResolver) *FoDashboardUseCase {
+	return &FoDashboardUseCase{
+		repo:                      repo,
+		runningFilterNameResolver: runningFilterNameResolver,
+	}
 }
 
 func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FffTriggerResponse, error) {
@@ -215,19 +225,19 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 	}
 
 	param := &FffTriggerParam{
-		FilterName:  req.FilterName,
-		EventNames:  splitEventNames(req.EventNames),
-		ProjectName: req.ProjectName,
-		CarTypes:    splitEventNames(req.CarTypes),
+		FilterName:   req.FilterName,
+		EventNames:   splitEventNames(req.EventNames),
+		ProjectName:  req.ProjectName,
+		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
-		Uuid:        req.Uuid,
-		Status:      req.Status,
-		TriggerType: req.TriggerType,
-		Tags:        req.Tags,
-		StartDt:     startDt,
-		EndDt:       endDt,
-		Page:        page,
-		PageSize:    pageSize,
+		Uuid:         req.Uuid,
+		Status:       req.Status,
+		TriggerType:  req.TriggerType,
+		Tags:         req.Tags,
+		StartDt:      startDt,
+		EndDt:        endDt,
+		Page:         page,
+		PageSize:     pageSize,
 	}
 
 	list, total, err := uc.repo.ListFffTrigger(ctx, param)
@@ -252,16 +262,16 @@ func (uc *FoDashboardUseCase) ListFffClose(ctx context.Context, req *dashboard_a
 	}
 
 	param := &FffCloseParam{
-		FilterName:  req.FilterName,
-		ProjectName: req.ProjectName,
-		CarTypes:    splitEventNames(req.CarTypes),
+		FilterName:   req.FilterName,
+		ProjectName:  req.ProjectName,
+		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
-		Reason:      req.Reason,
-		Version:     req.Version,
-		StartDt:     startDt,
-		EndDt:       endDt,
-		Page:        page,
-		PageSize:    pageSize,
+		Reason:       req.Reason,
+		Version:      req.Version,
+		StartDt:      startDt,
+		EndDt:        endDt,
+		Page:         page,
+		PageSize:     pageSize,
 	}
 
 	list, total, err := uc.repo.ListFffClose(ctx, param)
@@ -286,18 +296,18 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 	}
 
 	param := &FdrTriggerParam{
-		FilterName:  req.FilterName,
-		EventNames:  splitEventNames(req.EventNames),
-		ProjectName: req.ProjectName,
-		CarTypes:    splitEventNames(req.CarTypes),
+		FilterName:   req.FilterName,
+		EventNames:   splitEventNames(req.EventNames),
+		ProjectName:  req.ProjectName,
+		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
-		Uuid:        req.Uuid,
-		Status:      req.Status,
-		Detail:      req.Detail,
-		StartDt:     startDt,
-		EndDt:       endDt,
-		Page:        page,
-		PageSize:    pageSize,
+		Uuid:         req.Uuid,
+		Status:       req.Status,
+		Detail:       req.Detail,
+		StartDt:      startDt,
+		EndDt:        endDt,
+		Page:         page,
+		PageSize:     pageSize,
 	}
 
 	list, total, err := uc.repo.ListFdrTrigger(ctx, param)
@@ -322,17 +332,17 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 	}
 
 	param := &FclTriggerParam{
-		FilterName:  req.FilterName,
-		EventNames:  splitEventNames(req.EventNames),
-		ProjectName: req.ProjectName,
-		CarTypes:    splitEventNames(req.CarTypes),
+		FilterName:   req.FilterName,
+		EventNames:   splitEventNames(req.EventNames),
+		ProjectName:  req.ProjectName,
+		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
-		Uuid:        req.Uuid,
-		Status:      req.Status,
-		StartDt:     startDt,
-		EndDt:       endDt,
-		Page:        page,
-		PageSize:    pageSize,
+		Uuid:         req.Uuid,
+		Status:       req.Status,
+		StartDt:      startDt,
+		EndDt:        endDt,
+		Page:         page,
+		PageSize:     pageSize,
 	}
 
 	list, total, err := uc.repo.ListFclTrigger(ctx, param)
@@ -357,21 +367,21 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 	}
 
 	param := &UuidDetailParam{
-		FilterName:  req.FilterName,
-		EventNames:  splitEventNames(req.EventNames),
-		ProjectName: req.ProjectName,
-		CarTypes:    splitEventNames(req.CarTypes),
+		FilterName:   req.FilterName,
+		EventNames:   splitEventNames(req.EventNames),
+		ProjectName:  req.ProjectName,
+		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
-		Uuid:        req.Uuid,
-		FffStatus:   req.FffStatus,
-		FdrStatus:   req.FdrStatus,
-		FclStatus:   req.FclStatus,
-		StartDt:     startDt,
-		EndDt:       endDt,
-		OnlyFail:    req.OnlyFail == 1,
-		StageFilter: req.StageFilter,
-		Page:        page,
-		PageSize:    pageSize,
+		Uuid:         req.Uuid,
+		FffStatus:    req.FffStatus,
+		FdrStatus:    req.FdrStatus,
+		FclStatus:    req.FclStatus,
+		StartDt:      startDt,
+		EndDt:        endDt,
+		OnlyFail:     req.OnlyFail == 1,
+		StageFilter:  req.StageFilter,
+		Page:         page,
+		PageSize:     pageSize,
 	}
 
 	list, total, err := uc.repo.ListUuidDetail(ctx, param)
@@ -503,17 +513,17 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 	}
 
 	param := &FffRunningParam{
-		FilterName:  req.FilterName,
-		EventNames:  splitEventNames(req.EventNames),
-		ProjectName: req.ProjectName,
-		CarTypes:    splitEventNames(req.CarTypes),
+		FilterName:   req.FilterName,
+		EventNames:   splitEventNames(req.EventNames),
+		ProjectName:  req.ProjectName,
+		CarTypes:     splitEventNames(req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
-		SwitchOn:    req.SwitchOn,
-		SwVersion:   req.SwVersion,
-		StartDt:     startDt,
-		EndDt:       endDt,
-		Page:        page,
-		PageSize:    pageSize,
+		SwitchOn:     req.SwitchOn,
+		SwVersion:    req.SwVersion,
+		StartDt:      startDt,
+		EndDt:        endDt,
+		Page:         page,
+		PageSize:     pageSize,
 	}
 
 	list, total, err := uc.repo.ListFffRunning(ctx, param)
@@ -531,7 +541,8 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 }
 
 func (uc *FoDashboardUseCase) GetFffRunningTrend(ctx context.Context, req *dashboard_api.FffRunningTrendRequest) (*dashboard_api.FffRunningTrendResponse, error) {
-	if req.FilterName == "" {
+	eventName := strings.TrimSpace(req.FilterName)
+	if eventName == "" {
 		return nil, ErrMissingRequired
 	}
 	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
@@ -542,14 +553,25 @@ func (uc *FoDashboardUseCase) GetFffRunningTrend(ctx context.Context, req *dashb
 		return nil, ErrMissingRequired
 	}
 
-	param := &FffRunningTrendParam{
-		FilterName:  req.FilterName,
+	filterNames := []string{eventName}
+	if uc.runningFilterNameResolver != nil {
+		filterNames, err = uc.runningFilterNameResolver.ResolveRunningFilterNames(ctx, eventName)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if len(filterNames) == 0 {
+		return &dashboard_api.FffRunningTrendResponse{
+			BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		}, nil
+	}
+
+	data, err := uc.getFffRunningTrendByFilterNames(ctx, filterNames, &FffRunningTrendParam{
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     startDt,
 		EndDt:       endDt,
-	}
-	data, err := uc.repo.GetFffRunningTrend(ctx, param)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -560,14 +582,52 @@ func (uc *FoDashboardUseCase) GetFffRunningTrend(ctx context.Context, req *dashb
 	}, nil
 }
 
+func (uc *FoDashboardUseCase) getFffRunningTrendByFilterNames(ctx context.Context, filterNames []string, base *FffRunningTrendParam) (*FffRunningTrendData, error) {
+	if len(filterNames) == 1 {
+		param := *base
+		param.FilterName = filterNames[0]
+		return uc.repo.GetFffRunningTrend(ctx, &param)
+	}
+
+	countByDate := make(map[string]int64)
+	for _, filterName := range filterNames {
+		param := *base
+		param.FilterName = filterName
+		data, err := uc.repo.GetFffRunningTrend(ctx, &param)
+		if err != nil {
+			return nil, err
+		}
+		for i, dt := range data.Dates {
+			if i < len(data.Counts) {
+				countByDate[dt] += data.Counts[i]
+			}
+		}
+	}
+
+	dates := make([]string, 0, len(countByDate))
+	for dt := range countByDate {
+		dates = append(dates, dt)
+	}
+	sort.Strings(dates)
+	counts := make([]int64, 0, len(dates))
+	for _, dt := range dates {
+		counts = append(counts, countByDate[dt])
+	}
+	return &FffRunningTrendData{Dates: dates, Counts: counts}, nil
+}
+
 func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashboard_api.FffRunningRequest) (*dashboard_api.FoRunningOverviewResponse, error) {
 	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
 	if err != nil {
 		return nil, err
 	}
+	eventNames, err := uc.resolveRunningOverviewEventNames(ctx, splitEventNames(req.EventNames))
+	if err != nil {
+		return nil, err
+	}
 	param := &FffRunningParam{
 		FilterName:  req.FilterName,
-		EventNames:  splitEventNames(req.EventNames),
+		EventNames:  eventNames,
 		ProjectName: req.ProjectName,
 		CarTypes:    splitEventNames(req.CarTypes),
 		StartDt:     startDt,
@@ -593,6 +653,30 @@ func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashb
 		RunningFailed:  data.RunningFailed,
 		FilterCount:    data.FilterCount,
 	}, nil
+}
+
+func (uc *FoDashboardUseCase) resolveRunningOverviewEventNames(ctx context.Context, eventNames []string) ([]string, error) {
+	if uc.runningFilterNameResolver == nil || len(eventNames) == 0 {
+		return eventNames, nil
+	}
+
+	resolved := make([]string, 0, len(eventNames))
+	for _, eventName := range eventNames {
+		if eventName == "" || eventName == "__ALL__" {
+			resolved = append(resolved, eventName)
+			continue
+		}
+		filterNames, err := uc.runningFilterNameResolver.ResolveRunningFilterNames(ctx, eventName)
+		if err != nil {
+			return nil, err
+		}
+		if len(filterNames) == 0 {
+			resolved = append(resolved, eventName)
+			continue
+		}
+		resolved = append(resolved, filterNames...)
+	}
+	return uniqueNonEmptyValues(resolved), nil
 }
 
 func (uc *FoDashboardUseCase) GetFffOverview(ctx context.Context, req *dashboard_api.FffTriggerRequest) (*dashboard_api.FoFffOverviewResponse, error) {
@@ -743,6 +827,23 @@ func splitEventNames(raw string) []string {
 		if e = strings.TrimSpace(e); e != "" {
 			result = append(result, e)
 		}
+	}
+	return result
+}
+
+func uniqueNonEmptyValues(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
 	}
 	return result
 }

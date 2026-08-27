@@ -2468,6 +2468,38 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/vehicle.GetHostnameByHostnameListReply'
+    /vm/v1/vehicle/rpc/tenant_list:
+        get:
+            tags:
+                - Vehicle
+            description: 获取租户列表（供集群内其他模块调用）
+            operationId: Vehicle_GetTenantList
+            parameters:
+                - name: projectName
+                  in: query
+                  schema:
+                    type: string
+                - name: vehicleSource
+                  in: query
+                  schema:
+                    type: string
+                - name: pageSize
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageIndex
+                  in: query
+                  schema:
+                    type: integer
+                    format: int32
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/vehicle.GetTenantListReply'
     /vm/v1/vehicle/user_list_by_anonymous:
         get:
             tags:
@@ -3100,6 +3132,8 @@ components:
                     items:
                         type: string
                     description: 申请文档
+                changeDesc:
+                    type: string
             description: 创建算子请求
         api.stress_test_config.v1.CreateScriptResponse:
             type: object
@@ -3171,6 +3205,8 @@ components:
                     type: number
                     description: 最大负载
                     format: double
+                changeDesc:
+                    type: string
             description: 算子压测信息配置
         api.stress_test_config.v1.UpdateScriptRequest:
             type: object
@@ -3235,6 +3271,8 @@ components:
                     items:
                         type: string
                     description: 申请文档
+                changeDesc:
+                    type: string
             description: 更新算子基础信息请求
         api.stress_test_config.v1.UpdateScriptResponse:
             type: object
@@ -3324,6 +3362,8 @@ components:
                     type: string
                 bagName:
                     type: string
+                md5:
+                    type: string
         data_catch.CatchTaskDetailData:
             type: object
             properties:
@@ -3397,6 +3437,8 @@ components:
                 taskType:
                     type: string
                 fdiType:
+                    type: string
+                projectName:
                     type: string
             description: 创建抓取任务
         data_catch.GetCatchTaskDetailResponse:
@@ -6185,6 +6227,25 @@ components:
                     type: array
                     items:
                         type: string
+        vehicle.GetTenantListData:
+            type: object
+            properties:
+                tenantList:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/vehicle.VehicleTenantInfo'
+                page:
+                    $ref: '#/components/schemas/common.PageResponse'
+        vehicle.GetTenantListReply:
+            type: object
+            properties:
+                code:
+                    type: integer
+                    format: int32
+                message:
+                    type: string
+                data:
+                    $ref: '#/components/schemas/vehicle.GetTenantListData'
         vehicle.GetUserListByAnonymousReply:
             type: object
             properties:
@@ -6301,6 +6362,9 @@ components:
                     type: string
                 tenantId:
                     type: string
+                countOnly:
+                    type: boolean
+                    description: 为true时只返回符合条件的总数，不返回车辆列表；且只允许 property 和 tags 过滤，其余字段非零值报错
         vehicle.RemoveVehicleTagReply:
             type: object
             properties:
@@ -6593,6 +6657,21 @@ components:
                     type: array
                     items:
                         type: string
+        vehicle.VehicleTenantInfo:
+            type: object
+            properties:
+                id:
+                    type: string
+                tenantId:
+                    type: string
+                projectName:
+                    type: string
+                creator:
+                    type: string
+                createdAt:
+                    type: string
+                vehicleSource:
+                    type: string
         vehicle.VehicleUnusedTagsReply:
             type: object
             properties:

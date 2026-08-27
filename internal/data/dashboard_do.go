@@ -210,7 +210,7 @@ func (r *doDashboardRepo) GetCoolTop(ctx context.Context, param *biz.DoCommonPar
 	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
 
 	sql := `SELECT filter_name, SUM(cnt) AS cnt
-		FROM ads_do_cfdi_daily` + where + ` AND fff_status != 'success' AND fff_detail_tag = 'cooldown' AND filter_name IS NOT NULL
+		FROM ads_do_cfdi_daily` + where + ` AND fff_status != 'success' AND fff_detail_tag = 'check_is_no_need_cooldown' AND filter_name IS NOT NULL
 		GROUP BY filter_name
 		ORDER BY cnt DESC
 		LIMIT 20`
@@ -361,8 +361,8 @@ func (r *doDashboardRepo) GetMemTop(ctx context.Context, param *biz.DoCommonPara
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
 		FROM ads_do_cfdi_daily` + where + `
-		AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
-		AND fdr_detail_tag = 'memory'
+		AND ` + fdrStageFailedCondition() + `
+		AND fdr_detail_tag IN ('because of full gc', 'mem pool water line')
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
@@ -388,8 +388,8 @@ func (r *doDashboardRepo) GetDiskTop(ctx context.Context, param *biz.DoCommonPar
 
 	sql := `SELECT event_name, SUM(cnt) AS cnt
 		FROM ads_do_cfdi_daily` + where + `
-		AND fff_status != 'discard' AND fdr_status != 'success' AND fcl_status = ''
-		AND fdr_detail_tag = 'disk'
+		AND ` + fdrStageFailedCondition() + `
+		AND fdr_detail_tag IN ('Disk overrun', 'Exceeds the maximum number of files')
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 
@@ -446,7 +446,7 @@ func (r *doDashboardRepo) GetQuotaTop(ctx context.Context, param *biz.DoCommonPa
 	sql := `SELECT event_name, SUM(cnt) AS cnt
 		FROM ads_do_cfdi_daily` + where + `
 		AND fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') AND fcl_status = 'discard'
-		AND fcl_detail_tag = 'quota_exceeded'
+		AND fcl_detail_tag = 'query cloud DISCARD, detail:Filter quota exceeded'
 		AND event_name IS NOT NULL AND event_name != ''
 		GROUP BY event_name ORDER BY cnt DESC LIMIT 20`
 

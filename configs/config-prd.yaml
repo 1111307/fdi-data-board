@@ -54,6 +54,10 @@ data:
     model: ${LLM_MODEL:deepseek-v4-flash}
     max_tokens: ${LLM_MAX_TOKENS:16384}
     timeout: ${LLM_TIMEOUT:360s}
+  fom:
+    host: ${FOM_HOST:https://filterscript-api.momenta.works}
+  ffm:
+    url: ${FFM_URL:https://fdi.momenta.works/fm}
   etl:
     on: ${ETL_ON:true}
     backfill_on: ${ETL_BACKFILL_ON:true}

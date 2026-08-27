@@ -28,21 +28,23 @@ SELECT
     COALESCE(fdr_status, '')     AS fdr_status,
     COALESCE(fcl_status, '')     AS fcl_status,
     CASE
-        WHEN fff_detail = 'check_is_no_need_cooldown'                             THEN 'cooldown'
-        WHEN fff_detail IN ('check_drm_quota', 'check_drm_quota_weight')          THEN 'drm_quota'
-        WHEN fff_detail = 'check_need_acquire_data'                               THEN 'acquire_data'
-        WHEN fff_detail = 'check_not_reach_trigger_maximum'                       THEN 'trigger_maximum'
+        WHEN fff_detail = 'check_is_no_need_cooldown'                             THEN 'check_is_no_need_cooldown'
+        WHEN fff_detail IN ('check_drm_quota', 'check_drm_quota_weight')          THEN 'check_drm_quota'
+        WHEN fff_detail = 'check_need_acquire_data'                               THEN 'check_need_acquire_data'
+        WHEN fff_detail = 'check_not_reach_trigger_maximum'                       THEN 'check_not_reach_trigger_maximum'
         WHEN fff_detail LIKE 'Bag invalid:%'                                      THEN 'bag_invalid'
         WHEN fff_detail LIKE 'event_name do not recognized%'                      THEN 'event_not_recognized'
         WHEN fff_detail LIKE 'tls%'                                               THEN 'tls_error'
-        WHEN fff_detail = 'query cloud DISCARD, detail:Filter quota exceeded'     THEN 'quota_exceeded'
-        WHEN fff_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'event_in_blacklist'
+        WHEN fff_detail = 'query cloud DISCARD, detail:Filter quota exceeded'     THEN 'query cloud DISCARD, detail:Filter quota exceeded'
+        WHEN fff_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'query cloud DISCARD, detail:EventName is in blacklist'
         WHEN fff_detail IS NULL OR fff_detail = ''                                THEN ''
         ELSE 'other'
     END AS fff_detail_tag,
     CASE
-        WHEN fdr_detail IN ('because of full gc', 'mem pool water line')           THEN 'memory'
-        WHEN fdr_detail IN ('Disk overrun', 'Exceeds the maximum number of files') THEN 'disk'
+        WHEN fdr_detail = 'because of full gc'                                    THEN 'because of full gc'
+        WHEN fdr_detail = 'mem pool water line'                                   THEN 'mem pool water line'
+        WHEN fdr_detail = 'Disk overrun'                                          THEN 'Disk overrun'
+        WHEN fdr_detail = 'Exceeds the maximum number of files'                   THEN 'Exceeds the maximum number of files'
         WHEN fdr_detail LIKE 'Bag invalid:%'                                       THEN 'bag_invalid'
         WHEN fdr_detail LIKE 'Dump bag dir missing%'                               THEN 'bag_dir_missing'
         WHEN fdr_detail LIKE 'event_name do not recognized%'                       THEN 'event_not_recognized'
@@ -51,16 +53,20 @@ SELECT
         ELSE 'other'
     END AS fdr_detail_tag,
     CASE
-        WHEN fcl_detail = 'query cloud DISCARD, detail:Filter quota exceeded'     THEN 'quota_exceeded'
-        WHEN fcl_detail = 'reach upload limit'                                    THEN 'reach_upload_limit'
-        WHEN fcl_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'event_in_blacklist'
-        WHEN fcl_detail LIKE 'geofence forbidden%' OR fcl_detail = 'unexpected geofence cause' THEN 'geofence_error'
+        WHEN fcl_detail = 'query cloud DISCARD, detail:Filter quota exceeded'     THEN 'query cloud DISCARD, detail:Filter quota exceeded'
+        WHEN fcl_detail = 'reach upload limit'                                    THEN 'reach upload limit'
+        WHEN fcl_detail = 'query cloud DISCARD, detail:EventName is in blacklist' THEN 'query cloud DISCARD, detail:EventName is in blacklist'
+        WHEN fcl_detail LIKE 'geofence forbidden%'                                THEN 'geofence_error'
+        WHEN fcl_detail = 'unexpected geofence cause'                             THEN 'unexpected geofence cause'
         WHEN fcl_detail LIKE 'tls%'                                               THEN 'tls_error'
-        WHEN fcl_detail IN ('bag not exist', 'meta file lost', 'meta file empty') THEN 'bag_missing'
-        WHEN fcl_detail IN ('unexpected bag_upload_query cause',
-                            's3 upload force quit')                               THEN 'upload_error'
-        WHEN fcl_detail IN ('create socket failed', 'http request failed',
-                            'transfer dns failed')                                THEN 'network_error'
+        WHEN fcl_detail = 'bag not exist'                                         THEN 'bag not exist'
+        WHEN fcl_detail = 'meta file lost'                                        THEN 'meta file lost'
+        WHEN fcl_detail = 'meta file empty'                                       THEN 'meta file empty'
+        WHEN fcl_detail = 'unexpected bag_upload_query cause'                     THEN 'unexpected bag_upload_query cause'
+        WHEN fcl_detail = 's3 upload force quit'                                  THEN 's3 upload force quit'
+        WHEN fcl_detail = 'create socket failed'                                  THEN 'create socket failed'
+        WHEN fcl_detail = 'http request failed'                                   THEN 'http request failed'
+        WHEN fcl_detail = 'transfer dns failed'                                   THEN 'transfer dns failed'
         WHEN fcl_detail IS NULL OR fcl_detail = ''                                THEN ''
         ELSE 'other'
     END AS fcl_detail_tag,

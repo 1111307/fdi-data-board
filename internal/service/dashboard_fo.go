@@ -436,7 +436,7 @@ func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse,
 //	@Tags		FoDashboard
 //	@Produce	json
 //	@Security	OAuth2Password
-//	@Param		filter_name		query		string	true	"算子名称（必填）"
+//	@Param		filter_name		query		string	true	"事件名（必填，会先解析为真实 running filter_name）"
 //	@Param		start_dt		query		string	true	"开始日期 YYYY-MM-DD（必填）"
 //	@Param		end_dt			query		string	true	"结束日期 YYYY-MM-DD（必填）"
 //	@Param		project_name	query		string	false	"项目名称（选填）"
