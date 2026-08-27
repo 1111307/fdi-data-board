@@ -35,18 +35,18 @@ type FffRunningItem struct {
 
 // FffRunningRequest 筛选器运行明细查询请求
 type FffRunningRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"`
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"`
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	SwitchOn    *int   `form:"switch_on"`     // 开关:1=开启 0=关闭(有索引)
-	SwVersion   string `form:"sw_version"`    // 软件版本(有索引)
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	SwitchOn     *int   `form:"switch_on"`     // 开关:1=开启 0=关闭(有索引)
+	SwVersion    string `form:"sw_version"`    // 软件版本(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FffRunningResponse 筛选器运行明细响应
@@ -92,20 +92,20 @@ type FffTriggerItem struct {
 
 // FffTriggerRequest 筛选器触发明细查询请求
 type FffTriggerRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
-	Status      string `form:"status"`      // 状态(有索引)
-	TriggerType string `form:"trigger_type"` // 触发类型(有索引)
-	Tags        string `form:"tags"`        // 标签(分词索引)
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	Status       string `form:"status"`        // 状态(有索引)
+	TriggerType  string `form:"trigger_type"`  // 触发类型(有索引)
+	Tags         string `form:"tags"`          // 标签(分词索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FffTriggerResponse 筛选器触发明细响应
@@ -137,17 +137,17 @@ type FffCloseItem struct {
 
 // FffCloseRequest 筛选器关闭明细查询请求
 type FffCloseRequest struct {
-	FilterName  string `form:"filter_name"`
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
+	FilterName   string `form:"filter_name"`
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	Reason      string `form:"reason"`       // 关闭原因(分词索引)
-	Version     string `form:"version"`      // 筛选器版本(有索引)
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	Reason       string `form:"reason"`        // 关闭原因(分词索引)
+	Version      string `form:"version"`       // 筛选器版本(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FffCloseResponse 筛选器关闭明细响应
@@ -189,19 +189,19 @@ type FdrTriggerItem struct {
 
 // FdrTriggerRequest FDR 落盘明细查询请求
 type FdrTriggerRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
-	Status      string `form:"status"`      // 状态(有索引)
-	Detail      string `form:"detail"`      // 详情(分词索引)
-	StartDt     string   `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	Status       string `form:"status"`        // 状态(有索引)
+	Detail       string `form:"detail"`        // 详情(分词索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FdrTriggerResponse FDR 落盘明细响应
@@ -239,18 +239,18 @@ type FclTriggerItem struct {
 
 // FclTriggerRequest FCL 上传明细查询请求
 type FclTriggerRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
-	Status      string `form:"status"`      // 状态(有索引)
-	StartDt          string   `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	Status       string `form:"status"`        // 状态(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // FclTriggerResponse FCL 上传明细响应
@@ -303,22 +303,22 @@ type UuidDetailItem struct {
 // UuidDetailRequest 全链路明细查询请求
 // 筛选参数来自「筛选器诊断」filter bar（diag*），而非「明细分析」filter bar（daily*）
 type UuidDetailRequest struct {
-	FilterName  string `form:"filter_name"`
-	EventNames  string `form:"event_names"` // 多选，逗号分隔
-	ProjectName string `form:"project_name"`
-	CarTypes    string `form:"car_types"`
+	FilterName   string `form:"filter_name"`
+	EventNames   string `form:"event_names"` // 多选，逗号分隔
+	ProjectName  string `form:"project_name"`
+	CarTypes     string `form:"car_types"`
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
-	Uuid        string `form:"uuid"`        // 链路UUID(有索引)
-	FffStatus   string `form:"fff_status"`  // FFF 阶段状态(有索引)
-	FdrStatus   string `form:"fdr_status"`  // FDR 阶段状态(有索引)
-	FclStatus   string `form:"fcl_status"`  // FCL 阶段状态(有索引)
-	StartDt     string `form:"start_dt"`
-	EndDt       string `form:"end_dt"`
-	OnlyFail    int    `form:"only_fail"`    // 1=仅看失败
-	StageFilter string `form:"stage_filter"` // fff_discard/fdr_discard/fcl_discard/fcl_success
-	Page        int    `form:"page"`
-	PageSize    int    `form:"page_size"`
+	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
+	FffStatus    string `form:"fff_status"`    // FFF 阶段状态(有索引)
+	FdrStatus    string `form:"fdr_status"`    // FDR 阶段状态(有索引)
+	FclStatus    string `form:"fcl_status"`    // FCL 阶段状态(有索引)
+	StartDt      string `form:"start_dt"`
+	EndDt        string `form:"end_dt"`
+	OnlyFail     int    `form:"only_fail"`    // 1=仅看失败
+	StageFilter  string `form:"stage_filter"` // fff_discard/fdr_discard/fcl_discard/fcl_success
+	Page         int    `form:"page"`
+	PageSize     int    `form:"page_size"`
 }
 
 // UuidDetailResponse 全链路明细响应
@@ -682,9 +682,9 @@ type AiChatRequest struct {
 
 // AiChatHistoryMessageView 会话历史消息(API 视图)
 type AiChatHistoryMessageView struct {
-	Role        string              `json:"role"` // user / assistant
-	Text        string              `json:"text,omitempty"`
-	ToolCalls   []AiChatToolCallView `json:"tool_calls,omitempty"`
+	Role        string                 `json:"role"` // user / assistant
+	Text        string                 `json:"text,omitempty"`
+	ToolCalls   []AiChatToolCallView   `json:"tool_calls,omitempty"`
 	ToolResults []AiChatToolResultView `json:"tool_results,omitempty"`
 }
 
@@ -729,7 +729,7 @@ type EtlStatusResponse struct {
 
 // FffRunningTrendRequest 算子活跃车辆趋势请求
 type FffRunningTrendRequest struct {
-	FilterName  string `form:"filter_name"`  // 必填：算子名称
+	FilterName  string `form:"filter_name"`  // 必填：事件名，会先解析为真实 running filter_name
 	StartDt     string `form:"start_dt"`     // 必填：开始日期 YYYY-MM-DD
 	EndDt       string `form:"end_dt"`       // 必填：结束日期 YYYY-MM-DD
 	ProjectName string `form:"project_name"` // 选填：项目名称

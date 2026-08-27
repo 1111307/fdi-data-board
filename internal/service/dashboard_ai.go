@@ -67,7 +67,7 @@ func (s *AiDashboardService) StreamSummary(c *gin.Context) {
 //	@Produce	text/event-stream
 //	@Security	OAuth2Password
 //	@Param		body	body		dashboard_api.AiChatRequest	true	"提问与会话历史"
-//	@Success	200		{string}	string	"text/event-stream: delta/tool_call/tool_result/clarify/done/error"
+//	@Success	200		{string}	string						"text/event-stream: delta/tool_call/tool_result/clarify/done/error"
 //	@Router		/dashboard/v1/ai/chat [POST]
 func (s *AiDashboardService) StreamChat(c *gin.Context) {
 	var req dashboard_api.AiChatRequest

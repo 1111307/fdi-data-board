@@ -72,7 +72,7 @@ type fakeLlmRepo struct {
 
 func (f *fakeLlmRepo) Enabled() bool { return true }
 
-func (f *fakeLlmRepo) Model() string { return "kimi-k3-test" }
+func (f *fakeLlmRepo) Model() string    { return "kimi-k3-test" }
 func (f *fakeLlmRepo) MaxTokens() int64 { return 16384 }
 
 func (f *fakeLlmRepo) ChatStreamEx(_ context.Context, params anthropic.MessageNewParams, onEvent func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error) {
@@ -88,8 +88,8 @@ func (f *fakeLlmRepo) ChatStream(_ context.Context, _, _ string, onDelta func(st
 
 type disabledLlmRepo struct{}
 
-func (disabledLlmRepo) Enabled() bool { return false }
-func (disabledLlmRepo) Model() string { return "" }
+func (disabledLlmRepo) Enabled() bool    { return false }
+func (disabledLlmRepo) Model() string    { return "" }
 func (disabledLlmRepo) MaxTokens() int64 { return 16384 }
 func (disabledLlmRepo) ChatStream(context.Context, string, string, func(string)) error {
 	return nil
@@ -99,7 +99,7 @@ func (disabledLlmRepo) ChatStreamEx(context.Context, anthropic.MessageNewParams,
 }
 
 func newAiUcForTest(llm LlmRepo) *AiDashboardUseCase {
-	return NewAiDashboardUseCase(NewFoDashboardUseCase(fakeFoRepo{}), NewDoDashboardUseCase(fakeDoRepo{}), llm)
+	return NewAiDashboardUseCase(NewFoDashboardUseCase(fakeFoRepo{}, nil), NewDoDashboardUseCase(fakeDoRepo{}), llm)
 }
 
 func TestStreamSummaryLlmModeForwardsDeltasInOrder(t *testing.T) {
