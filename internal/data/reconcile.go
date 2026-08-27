@@ -983,7 +983,7 @@ type reconcilePipelineEventLandRow struct {
 	Missing       int64 `gorm:"column:missing"`
 }
 
-// reconcilePipelineBagConds 构造 bag 级哨兵行（uuid=''）的过滤条件，project 用 record_project。
+// reconcilePipelineBagConds 构造 bag 级哨兵行（uuid=”）的过滤条件，project 用 record_project。
 func reconcilePipelineBagConds(date, project, md5 string) ([]string, []interface{}) {
 	conds := []string{"dt = ?", "uuid = ''"}
 	args := []interface{}{date}
@@ -998,7 +998,7 @@ func reconcilePipelineBagConds(date, project, md5 string) ([]string, []interface
 	return conds, args
 }
 
-// reconcilePipelineEventConds 构造 event 级行（uuid<>''）的过滤条件。
+// reconcilePipelineEventConds 构造 event 级行（uuid<>”）的过滤条件。
 // 合表后单表查询无需表别名前缀；project 用 decode_project（与 decode_send_status 同源）。
 func reconcilePipelineEventConds(date, project, moduleName, md5 string) ([]string, []interface{}) {
 	conds := []string{"dt = ?", "uuid <> ''"}

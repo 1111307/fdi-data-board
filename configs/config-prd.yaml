@@ -66,3 +66,5 @@ data:
     lock_key: ${ETL_LOCK_KEY:fdi_data_board:etl:scheduler}
     lock_ttl: ${ETL_LOCK_TTL:120s}
     lock_refresh_interval: ${ETL_LOCK_REFRESH_INTERVAL:30s}
+  feishu:
+    webhook_url: ${FEISHU_WEBHOOK_URL:https://open.feishu.cn/open-apis/bot/v2/hook/c3f49363-67bb-421f-966c-a7bcf132c104}

@@ -337,14 +337,14 @@ type ReconcileFailureReason struct {
 
 // ReconcilePipelineNode 全链路树形节点，递归结构
 type ReconcilePipelineNode struct {
-	Key            string                     `json:"key"`
-	Label          string                     `json:"label"`
-	Status         string                     `json:"status"` // root/success/failed/partial/unknown
-	Count          int64                      `json:"count"`
-	Rate           *float64                   `json:"rate,omitempty"`
-	Meta           map[string]int64           `json:"meta,omitempty"`
-	FailureReasons []*ReconcileFailureReason  `json:"failure_reasons,omitempty"`
-	Children       []*ReconcilePipelineNode   `json:"children,omitempty"`
+	Key            string                    `json:"key"`
+	Label          string                    `json:"label"`
+	Status         string                    `json:"status"` // root/success/failed/partial/unknown
+	Count          int64                     `json:"count"`
+	Rate           *float64                  `json:"rate,omitempty"`
+	Meta           map[string]int64          `json:"meta,omitempty"`
+	FailureReasons []*ReconcileFailureReason `json:"failure_reasons,omitempty"`
+	Children       []*ReconcilePipelineNode  `json:"children,omitempty"`
 }
 
 // ReconcilePipelineTreeFilters 树形接口生效的过滤条件回显，未传的为 null
