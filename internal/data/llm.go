@@ -20,7 +20,7 @@ type LlmRepo struct {
 
 var _ biz.LlmRepo = (*LlmRepo)(nil)
 
-func NewLlmRepo(data *Data) *LlmRepo {
+func NewLlmRepo(data *Data) biz.LlmRepo {
 	return &LlmRepo{data: data}
 }
 
