@@ -440,7 +440,7 @@ func (s *FoDashboardService) ListFffRunning(ctx *gin.Context) (api.HttpResponse,
 //	@Param		start_dt		query		string	true	"开始日期 YYYY-MM-DD（必填）"
 //	@Param		end_dt			query		string	true	"结束日期 YYYY-MM-DD（必填）"
 //	@Param		project_name	query		string	false	"项目名称（选填）"
-//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔;兼容单数 car_type"
 //	@Success	200				{object}	dashboard_api.FffRunningTrendResponse
 //	@Router		/dashboard/v1/fo/running/trend [GET]
 func (s *FoDashboardService) GetFffRunningTrend(ctx *gin.Context) (api.HttpResponse, error) {
@@ -479,7 +479,7 @@ func (s *FoDashboardService) GetFffRunningTrend(ctx *gin.Context) (api.HttpRespo
 //	@Security	OAuth2Password
 //	@Param		filter_name		query		string	false	"筛选器名称"
 //	@Param		project_name	query		string	false	"项目名称"
-//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔;兼容单数 car_type"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
 //	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
 //	@Success	200				{object}	dashboard_api.FoRunningOverviewResponse
@@ -519,7 +519,7 @@ func (s *FoDashboardService) GetRunningOverview(ctx *gin.Context) (api.HttpRespo
 //	@Param		filter_name		query		string	false	"筛选器名称"
 //	@Param		event_names		query		string	false	"事件名,多选逗号分隔;兼容单数 event_name"
 //	@Param		project_name	query		string	false	"项目名称"
-//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔;兼容单数 car_type"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
 //	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
 //	@Success	200				{object}	dashboard_api.FoFffOverviewResponse
@@ -559,7 +559,7 @@ func (s *FoDashboardService) GetFffOverview(ctx *gin.Context) (api.HttpResponse,
 //	@Param		filter_name		query		string	false	"筛选器名称"
 //	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
 //	@Param		project_name	query		string	false	"项目名称"
-//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔;兼容单数 car_type"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
 //	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
 //	@Success	200				{object}	dashboard_api.DoFailReasonResponse

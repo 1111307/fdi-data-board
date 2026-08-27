@@ -228,7 +228,7 @@ func (uc *FoDashboardUseCase) ListFffTrigger(ctx context.Context, req *dashboard
 		FilterName:   req.FilterName,
 		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
-		CarTypes:     splitEventNames(req.CarTypes),
+		CarTypes:     splitDetailCarTypes(req.CarType, req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		Uuid:         req.Uuid,
 		Status:       req.Status,
@@ -299,7 +299,7 @@ func (uc *FoDashboardUseCase) ListFdrTrigger(ctx context.Context, req *dashboard
 		FilterName:   req.FilterName,
 		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
-		CarTypes:     splitEventNames(req.CarTypes),
+		CarTypes:     splitDetailCarTypes(req.CarType, req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		Uuid:         req.Uuid,
 		Status:       req.Status,
@@ -335,7 +335,7 @@ func (uc *FoDashboardUseCase) ListFclTrigger(ctx context.Context, req *dashboard
 		FilterName:   req.FilterName,
 		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
-		CarTypes:     splitEventNames(req.CarTypes),
+		CarTypes:     splitDetailCarTypes(req.CarType, req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		Uuid:         req.Uuid,
 		Status:       req.Status,
@@ -370,7 +370,7 @@ func (uc *FoDashboardUseCase) ListUuidDetail(ctx context.Context, req *dashboard
 		FilterName:   req.FilterName,
 		EventNames:   splitDetailEventNames(req.EventName, req.EventNames),
 		ProjectName:  req.ProjectName,
-		CarTypes:     splitEventNames(req.CarTypes),
+		CarTypes:     splitDetailCarTypes(req.CarType, req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		Uuid:         req.Uuid,
 		FffStatus:    req.FffStatus,
@@ -520,7 +520,7 @@ func (uc *FoDashboardUseCase) ListFffRunning(ctx context.Context, req *dashboard
 		FilterName:   req.FilterName,
 		EventNames:   eventNames,
 		ProjectName:  req.ProjectName,
-		CarTypes:     splitEventNames(req.CarTypes),
+		CarTypes:     splitDetailCarTypes(req.CarType, req.CarTypes),
 		AnonymousIds: splitAnonymousIds(req.AnonymousIds, req.AnonymousId),
 		SwitchOn:     req.SwitchOn,
 		SwVersion:    req.SwVersion,
@@ -633,7 +633,7 @@ func (uc *FoDashboardUseCase) GetRunningOverview(ctx context.Context, req *dashb
 		FilterName:  req.FilterName,
 		EventNames:  eventNames,
 		ProjectName: req.ProjectName,
-		CarTypes:    splitEventNames(req.CarTypes),
+		CarTypes:    splitDetailCarTypes(req.CarType, req.CarTypes),
 		StartDt:     startDt,
 		EndDt:       endDt,
 	}
@@ -824,6 +824,15 @@ func splitAnonymousIds(plural, singular string) []string {
 // splitDetailEventNames 明细接口事件参数:兼容单数查询参数 event_name(与 event_names
 // 任取其一,复数优先)——单数此前被静默忽略,导致事件过滤不生效混入其他事件
 func splitDetailEventNames(single, multi string) []string {
+	if multi != "" {
+		return splitEventNames(multi)
+	}
+	return splitEventNames(single)
+}
+
+// splitDetailCarTypes 明细接口车型参数:兼容单数查询参数 car_type(与 car_types
+// 任取其一,复数优先)——与 event_name 单数兼容同款防呆
+func splitDetailCarTypes(single, multi string) []string {
 	if multi != "" {
 		return splitEventNames(multi)
 	}

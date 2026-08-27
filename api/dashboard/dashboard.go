@@ -40,6 +40,7 @@ type FffRunningRequest struct {
 	EventName    string `form:"event_name"` // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
+	CarType      string `form:"car_type"`      // 兼容单数写法;与 car_types 任取其一
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	SwitchOn     *int   `form:"switch_on"`     // 开关:1=开启 0=关闭(有索引)
@@ -98,6 +99,7 @@ type FffTriggerRequest struct {
 	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
+	CarType      string `form:"car_type"`      // 兼容单数写法;与 car_types 任取其一
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
@@ -196,6 +198,7 @@ type FdrTriggerRequest struct {
 	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
+	CarType      string `form:"car_type"`      // 兼容单数写法;与 car_types 任取其一
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
@@ -247,6 +250,7 @@ type FclTriggerRequest struct {
 	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
+	CarType      string `form:"car_type"`      // 兼容单数写法;与 car_types 任取其一
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
@@ -312,6 +316,7 @@ type UuidDetailRequest struct {
 	EventName    string `form:"event_name"`  // 兼容单数写法;与 event_names 任取其一
 	ProjectName  string `form:"project_name"`
 	CarTypes     string `form:"car_types"`
+	CarType      string `form:"car_type"`      // 兼容单数写法;与 car_types 任取其一
 	AnonymousIds string `form:"anonymous_ids"` // 车辆ID,多选逗号分隔
 	AnonymousId  string `form:"anonymous_id"`  // 兼容单数写法(前端旧参数);与 anonymous_ids 任取其一
 	Uuid         string `form:"uuid"`          // 链路UUID(有索引)
