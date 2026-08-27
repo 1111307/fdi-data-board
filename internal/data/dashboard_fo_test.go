@@ -245,6 +245,27 @@ func TestBuildRunningOverviewSQLUsesEventsAsAdsEventsAndRunningFilterNames(t *te
 	}
 }
 
+// 全局口径(未传 project_name)剔除 lianhuashan:该心跳链路匿名 ID 丢失、车辆维度不可信;
+// 显式选了 lianhuashan 则不加排除条件,如实返回由前端标注
+func TestBuildRunningOverviewSQLExcludesLianhuashanInGlobalScope(t *testing.T) {
+	globalSQL, _ := buildRunningOverviewSQL(&biz.FffRunningParam{
+		StartDt: "2026-06-01",
+		EndDt:   "2026-06-01",
+	})
+	if !strings.Contains(globalSQL, "project_name <> 'lianhuashan'") {
+		t.Fatalf("global scope sql %q should exclude lianhuashan", globalSQL)
+	}
+
+	explicitSQL, _ := buildRunningOverviewSQL(&biz.FffRunningParam{
+		StartDt:     "2026-06-01",
+		EndDt:       "2026-06-01",
+		ProjectName: "lianhuashan",
+	})
+	if strings.Contains(explicitSQL, "project_name <> 'lianhuashan'") {
+		t.Fatalf("explicit lianhuashan sql %q should not exclude the project", explicitSQL)
+	}
+}
+
 func TestBuildFffRunningTrendWhereForwardsResolvedFilterName(t *testing.T) {
 	where, args := buildFffRunningTrendWhere(&biz.FffRunningTrendParam{
 		FilterName:  "hotupdate_filter_operator_a",

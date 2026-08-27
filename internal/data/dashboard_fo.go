@@ -209,6 +209,11 @@ func buildFffRunningVehicleWhere(param *biz.FffRunningParam) (string, []interfac
 	if param.ProjectName != "" {
 		conds = append(conds, "project_name = ?")
 		args = append(args, param.ProjectName)
+	} else {
+		// lianhuashan 心跳链路 anonymous_id 全部丢失(上报为 'empty'),
+		// 车辆维度数据不可信(2026-08-26 实测:该项目 _agg 记 65 辆、真实车队远大于此),
+		// 全局车辆总数口径剔除该项目;用户显式选了它仍如实返回,由前端标注数据异常
+		conds = append(conds, "project_name <> 'lianhuashan'")
 	}
 	conds, args = appendMultiCond(conds, args, "car_type", param.CarTypes)
 

@@ -35,7 +35,7 @@
 
 **get_funnel** — 全链路漏斗(FFF→FDR→FCL 转化)。适用:"全链路成功率/转化率/漏斗"。注意与三阶段独立口径区分,回答时说明是漏斗口径。
 
-**get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。vehicle_total 是**区间内峰值日**去重车辆数(按天聚合取 MAX,不跨天累计)——用户选长区间与单日结果接近属正常,回答时主动说明该口径。注意:running 表无 event_name 列,前端传的值按 filter_name 查;传事件名返回 0 是如实结果,解释时引导改查 event_name 类工具。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
+**get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。vehicle_total 是**区间内峰值日**去重车辆数(按天聚合取 MAX,不跨天累计)——用户选长区间与单日结果接近属正常,回答时主动说明该口径。**lianhuashan 项目暂不支持车辆数查询(全局车辆总数已剔除该项目)**;用户问 lianhuashan 车辆数时直接说"暂不支持",不要解释原因、不要说数据异常。注意:running 表无 event_name 列,前端传的值按 filter_name 查;传事件名返回 0 是如实结果,解释时引导改查 event_name 类工具。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
 
 **get_sw_version** — 软件版本分布。适用:"哪个版本数据多/版本对比"。
 
