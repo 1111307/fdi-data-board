@@ -104,6 +104,21 @@ type DoFclQualityData struct {
 	UploadTotal int64
 }
 
+// DoBandwidthTopItem FDR 带宽 Top 项(按 bandwidth_field 分组)
+type DoBandwidthTopItem struct {
+	BandwidthField string
+	BwSum          float64
+	BwAvg          float64
+	BwP95          float64
+	BwMax          float64
+	SampleCount    int64
+}
+
+// DoFdrBandwidthTopData FDR 带宽 Top 统计（领域对象）
+type DoFdrBandwidthTopData struct {
+	List []*DoBandwidthTopItem
+}
+
 // DoFdrFragmentData FDR 碎片率（领域对象）
 type DoFdrFragmentData struct {
 	FragmentP95 float64

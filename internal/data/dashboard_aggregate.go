@@ -10,15 +10,16 @@ const (
 	// aggForeverLogValue forever_log 在 Doris 中是小写，且字符串比较大小写敏感
 	aggForeverLogValue = "forever_log"
 
-	tableStatusDailySummary      = "fdi.dwd_cfdi_status_monitor_analysis_daily_summary"
-	tableFffTriggerDailySummary  = "fdi.dwd_cfdi_basic_fff_trigger_daily_summary"
-	tableFffCloseDailySummary    = "fdi.dwd_cfdi_basic_fff_close_daily_summary"
-	tableFffRunningDailySummary  = "fdi.dwd_cfdi_basic_fff_running_daily_summary"
-	tableFclUploadDailySummary   = "fdi.dwd_cfdi_basic_fcl_uploadinfo_daily_summary"
-	tableFclTriggerDailySummary  = "fdi.dwd_cfdi_basic_fcl_trigger_daily_summary"
-	tableFdrTriggerDailySummary  = "fdi.dwd_basic_fdr_trigger_daily_summary"
-	tableFdrFragmentDailySummary = "fdi.dwd_cfdi_basic_fdr_fragment_daily_summary"
-	tableVehicleDailySummaryAgg  = "fdi.ads_cfdi_vehicle_daily_summary_agg"
+	tableStatusDailySummary       = "fdi.dwd_cfdi_status_monitor_analysis_daily_summary"
+	tableFffTriggerDailySummary   = "fdi.dwd_cfdi_basic_fff_trigger_daily_summary"
+	tableFffCloseDailySummary     = "fdi.dwd_cfdi_basic_fff_close_daily_summary"
+	tableFffRunningDailySummary   = "fdi.dwd_cfdi_basic_fff_running_daily_summary"
+	tableFclUploadDailySummary    = "fdi.dwd_cfdi_basic_fcl_uploadinfo_daily_summary"
+	tableFclTriggerDailySummary   = "fdi.dwd_cfdi_basic_fcl_trigger_daily_summary"
+	tableFdrTriggerDailySummary   = "fdi.dwd_basic_fdr_trigger_daily_summary"
+	tableFdrFragmentDailySummary  = "fdi.dwd_cfdi_basic_fdr_fragment_daily_summary"
+	tableFdrBandwidthDailySummary = "fdi.dwd_cfdi_basic_fdr_bandwidth_daily_summary"
+	tableVehicleDailySummaryAgg   = "fdi.ads_cfdi_vehicle_daily_summary_agg"
 )
 
 func buildAggEventCondition(eventNames []string) (string, []interface{}) {

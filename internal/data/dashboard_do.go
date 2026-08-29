@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -927,8 +928,25 @@ func (r *doDashboardRepo) GetDoFunnel(ctx context.Context, param *biz.DoCommonPa
 	}, nil
 }
 
+// fdrNormalDiscardTags 落盘"正常丢弃"原因:这三类事件不属于异常故障,
+// 在落盘成功率的总数中剔除(既不进分子也不进分母)
+var fdrNormalDiscardTags = []string{"event_not_recognized", "max_files_exceeded", "unauthorized"}
+
+// fdrNormalDiscardExpr 生成正常丢弃合计的子查询表达式(与主查询同 where,reason 粒度)
+func fdrNormalDiscardExpr() string {
+	quoted := make([]string, 0, len(fdrNormalDiscardTags))
+	for _, tag := range fdrNormalDiscardTags {
+		quoted = append(quoted, "'"+tag+"'")
+	}
+	return `(SELECT COALESCE(SUM(failed_count), 0)
+			FROM ` + tableFdrTriggerDailySummary + `%s
+			AND summary_grain = 'reason'
+			AND detail_tag IN (` + strings.Join(quoted, ",") + `))`
+}
+
 // GetFdrQuality FDR 质量 P95（TD 磁盘 / TM 内存 / 落盘耗时）
 // 查汇总表，P95 用 count 加权均值（不用 MAX，避免小样本脏桶放大离群值）
+// fdr_total 为剔除正常丢弃(event_not_recognized/max_files_exceeded/unauthorized)后的有效总数
 func (r *doDashboardRepo) GetFdrQuality(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFdrQualityData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
@@ -938,10 +956,12 @@ func (r *doDashboardRepo) GetFdrQuality(ctx context.Context, param *biz.DoCommon
 		ROUND(SUM(td_mb_p95 * td_mb_count) / NULLIF(SUM(td_mb_count), 0), 2) AS td_mb_p95,
 		ROUND(SUM(tm_mb_p95 * tm_mb_count) / NULLIF(SUM(tm_mb_count), 0), 2) AS tm_mb_p95,
 		ROUND(SUM(time_cost_ms_p95 * time_cost_ms_count) / NULLIF(SUM(time_cost_ms_count), 0), 2) AS time_cost_ms_p95,
-		SUM(event_count) AS fdr_total,
+		SUM(event_count) - ` + fmt.Sprintf(fdrNormalDiscardExpr(), where) + ` AS fdr_total,
 		SUM(success_count) AS fdr_success
 		FROM ` + tableFdrTriggerDailySummary + where + `
 		AND summary_grain = 'overview'`
+	// 子查询(SELECT 列表内)先于主查询(FROM 后)出现,占位符翻倍:参数需双份、顺序一致
+	args = append(append([]interface{}{}, args...), args...)
 
 	type scanRow struct {
 		TdMbP95       float64 `gorm:"column:td_mb_p95"`
@@ -1026,4 +1046,51 @@ func (r *doDashboardRepo) GetFdrFragment(ctx context.Context, param *biz.DoCommo
 		FragmentAvg: sr.FragmentAvg,
 		FragmentMax: sr.FragmentMax,
 	}, nil
+}
+
+// GetFdrBandwidthTop FDR 带宽 Top(按 bandwidth_field 分组,四指标榜单)
+// field 粒度:sum/avg 按 SUM 聚合精确;P95 用 count 加权均值(小样本脏桶不放大);max 取 MAX
+func (r *doDashboardRepo) GetFdrBandwidthTop(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFdrBandwidthTopData, error) {
+	db, cancel := r.dorisQuery(ctx)
+	defer cancel()
+	where, args := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+
+	sql := `SELECT
+		bandwidth_field,
+		SUM(bandwidth_value_sum) AS bw_sum,
+		ROUND(SUM(bandwidth_value_sum) / NULLIF(SUM(bandwidth_value_count), 0), 1) AS bw_avg,
+		ROUND(SUM(bandwidth_value_p95 * bandwidth_value_count) / NULLIF(SUM(bandwidth_value_count), 0), 1) AS bw_p95,
+		MAX(bandwidth_value_max) AS bw_max,
+		SUM(bandwidth_value_count) AS sample_count
+		FROM ` + tableFdrBandwidthDailySummary + where + `
+		AND summary_grain = 'field'
+		AND bandwidth_value_count > 0
+		GROUP BY bandwidth_field
+		ORDER BY bw_sum DESC`
+
+	type row struct {
+		BandwidthField string  `gorm:"column:bandwidth_field"`
+		BwSum          float64 `gorm:"column:bw_sum"`
+		BwAvg          float64 `gorm:"column:bw_avg"`
+		BwP95          float64 `gorm:"column:bw_p95"`
+		BwMax          float64 `gorm:"column:bw_max"`
+		SampleCount    int64   `gorm:"column:sample_count"`
+	}
+	var rows []*row
+	if err := db.Raw(sql, args...).Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	list := make([]*biz.DoBandwidthTopItem, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, &biz.DoBandwidthTopItem{
+			BandwidthField: row.BandwidthField,
+			BwSum:          row.BwSum,
+			BwAvg:          row.BwAvg,
+			BwP95:          row.BwP95,
+			BwMax:          row.BwMax,
+			SampleCount:    row.SampleCount,
+		})
+	}
+	return &biz.DoFdrBandwidthTopData{List: list}, nil
 }

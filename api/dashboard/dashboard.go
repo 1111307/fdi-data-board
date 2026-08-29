@@ -780,6 +780,22 @@ type DoFdrFragmentResponse struct {
 	FragmentMax float64 `json:"fragment_max"` // 碎片率最大值
 }
 
+// DoBandwidthTopItem FDR 带宽 Top 项(按带宽字段分组)
+type DoBandwidthTopItem struct {
+	BandwidthField string  `json:"bandwidth_field"` // 带宽字段名
+	BwSum          float64 `json:"bw_sum"`          // 带宽总和
+	BwAvg          float64 `json:"bw_avg"`          // 带宽均值
+	BwP95          float64 `json:"bw_p95"`          // 带宽 P95
+	BwMax          float64 `json:"bw_max"`          // 带宽最大值
+	SampleCount    int64   `json:"sample_count"`    // 有效样本数
+}
+
+// DoFdrBandwidthTopResponse FDR 带宽 Top 统计响应
+type DoFdrBandwidthTopResponse struct {
+	BaseResponse
+	List []*DoBandwidthTopItem `json:"list"`
+}
+
 // FoRunningOverviewResponse 筛选器运行健康概览响应
 type FoRunningOverviewResponse struct {
 	BaseResponse

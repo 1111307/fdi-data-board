@@ -29,6 +29,7 @@ type DoDashboardRepo interface {
 	GetFdrQuality(ctx context.Context, param *DoCommonParam) (*DoFdrQualityData, error)
 	GetFclQuality(ctx context.Context, param *DoCommonParam) (*DoFclQualityData, error)
 	GetFdrFragment(ctx context.Context, param *DoCommonParam) (*DoFdrFragmentData, error)
+	GetFdrBandwidthTop(ctx context.Context, param *DoCommonParam) (*DoFdrBandwidthTopData, error)
 }
 
 // DoVehicleParam 车辆维度分析通用查询参数
@@ -581,7 +582,45 @@ func (uc *DoDashboardUseCase) GetFdrFragment(ctx context.Context, req *dashboard
 	}, nil
 }
 
+func (uc *DoDashboardUseCase) GetFdrBandwidthTop(ctx context.Context, req *dashboard_api.DoCoolTopRequest) (*dashboard_api.DoFdrBandwidthTopResponse, error) {
+	startDt, endDt, err := normalizeDateRange(req.StartDt, req.EndDt)
+	if err != nil {
+		return nil, err
+	}
+	param := &DoCommonParam{
+		FilterName:  req.FilterName,
+		EventNames:  splitEventNames(req.EventNames),
+		ProjectName: req.ProjectName,
+		CarTypes:    splitEventNames(req.CarTypes),
+		StartDt:     startDt,
+		EndDt:       endDt,
+	}
+	data, err := uc.repo.GetFdrBandwidthTop(ctx, param)
+	if err != nil {
+		return nil, err
+	}
+	return &dashboard_api.DoFdrBandwidthTopResponse{
+		BaseResponse: dashboard_api.BaseResponse{Code: 0, Message: "OK"},
+		List:         toApiDoBandwidthTopItems(data.List),
+	}, nil
+}
+
 // ---------- biz domain → api DTO 映射函数 ----------
+
+func toApiDoBandwidthTopItems(list []*DoBandwidthTopItem) []*dashboard_api.DoBandwidthTopItem {
+	out := make([]*dashboard_api.DoBandwidthTopItem, 0, len(list))
+	for _, v := range list {
+		out = append(out, &dashboard_api.DoBandwidthTopItem{
+			BandwidthField: v.BandwidthField,
+			BwSum:          v.BwSum,
+			BwAvg:          v.BwAvg,
+			BwP95:          v.BwP95,
+			BwMax:          v.BwMax,
+			SampleCount:    v.SampleCount,
+		})
+	}
+	return out
+}
 
 func toApiDoOverviewItems(list []*DoOverviewItem) []*dashboard_api.DoOverviewItem {
 	out := make([]*dashboard_api.DoOverviewItem, 0, len(list))

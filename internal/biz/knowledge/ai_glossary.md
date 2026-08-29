@@ -9,6 +9,7 @@
 - FFF 运行(筛选器每 5 分钟心跳上报,含开关状态)→ dwd_cfdi_basic_fff_running_daily_summary
 - FFF 关闭(筛选器被关闭的原因)→ dwd_cfdi_basic_fff_close_daily_summary
 - FDR 落盘(录制数据写盘)→ dwd_basic_fdr_trigger_daily_summary
+- FDR 带宽(各传感器/数据组带宽,field 粒度按 bandwidth_field 分组,**数值单位为字节**)→ dwd_cfdi_basic_fdr_bandwidth_daily_summary
 - FCL 上传(数据包上传云端)→ fcl_trigger / fcl_uploadinfo_daily_summary
 - 全链路漏斗(按 uuid 追踪三阶段)→ dwd_cfdi_status_monitor_analysis_daily_summary
 - 去重车辆数(唯一可跨维度用车数的表,**后缀 _agg**)→ ads_cfdi_vehicle_daily_summary_agg
@@ -58,3 +59,5 @@
 6. **数据延迟**:当日/近两日可能不全,判断"无数据"前先考虑时间窗是否太近。
 7. **字符串数字**:td_mb/tm_mb 是字符串型,数值比较需转换。
 8. **lianhuashan 不支持车辆数查询**(背景:心跳链路 anonymous_id 全部丢失,车辆维度数据不可信——明细表查它车辆数恒为 1,_agg 表只记几十辆,真实车队远大于此;全局车辆总数口径已剔除该项目)。用户问 lianhuashan 车辆数时,**对外统一口径:"该项目暂不支持车辆数查询"**——不解释原因、不说数据异常。
+9. **"正常丢弃/有效拦截"不计入成功率,且与真失败分开展示**:落盘 detail_tag 为 `event_not_recognized`/`max_files_exceeded`/`unauthorized`(正常丢弃)、上传 detail_tag 为 `event_in_blacklist`/`quota_exceeded`/`unexpected_bag_upload_query`/`reach_upload_limit`(有效拦截)的,都是策略性丢弃(事件黑名单、配额超限等,非故障),计算对应阶段成功率时既不进分子也不进分母——fdr_quality 的 fdr_total 已剔除,成功率=fdr_success÷fdr_total 即有效口径;解释时单独归类为"正常丢弃/有效拦截",不与真失败混排。**FFF 阶段全部为"有效拦截"**(cooldown 等防抖行为,触发没有"失败"语义,禁止说"触发成功率")。注意:funnel 数据源(ads_do_cfdi_daily)存白话原文(如 `Exceeds the maximum number of files`),fdr/fcl 汇总表存规范名,两套命名勿混用。
+10. **未终态事件(进行中)**:FDR 阶段存在 waiting/dumping 等未终态事件,既非成功也非失败——总数 = 成功 + 正常丢弃 + 失败 + 进行中;差额不是漏统计,解释时说明"进行中"。当日/近两日进行中占比较高属正常(数据还在写入),历史日期仍大量进行中的多为车端断电等死账。
