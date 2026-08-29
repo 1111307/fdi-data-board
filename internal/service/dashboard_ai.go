@@ -32,7 +32,7 @@ func NewAiDashboardService(uc *biz.AiDashboardUseCase) *AiDashboardService {
 //	@Param		car_types		query		string	false	"车型，多选逗号分隔"
 //	@Param		start_dt		query		string	false	"开始日期 YYYY-MM-DD"
 //	@Param		end_dt			query		string	false	"结束日期 YYYY-MM-DD"
-//	@Success	200				{string}	string	"text/event-stream, delta/done/error 事件"
+//	@Success	200				{string}	string	"text/event-stream, thinking/delta/done/error 事件"
 //	@Router		/dashboard/v1/ai/summary [GET]
 func (s *AiDashboardService) StreamSummary(c *gin.Context) {
 	var req dashboard_api.AiSummaryRequest
@@ -48,8 +48,11 @@ func (s *AiDashboardService) StreamSummary(c *gin.Context) {
 	c.Writer.WriteHeader(http.StatusOK)
 	flushWriter(c.Writer)
 
-	err := s.uc.StreamSummary(c.Request.Context(), &req, func(delta string) error {
-		return writeSseDelta(c.Writer, delta)
+	err := s.uc.StreamSummary(c.Request.Context(), &req, func(kind, text string) error {
+		if kind == "thinking" {
+			return writeSseEvent(c.Writer, "thinking", text)
+		}
+		return writeSseDelta(c.Writer, text)
 	})
 	if err != nil {
 		log.Errorf("StreamSummary error: %v, req: %+v", err, req)
@@ -115,6 +118,20 @@ func (s *AiDashboardService) StreamChat(c *gin.Context) {
 }
 
 // ---------- SSE 帧写入 ----------
+
+// writeSseEvent 写自定义事件的 {"text": ...} 帧(thinking 等与 chat 同构的简单文本事件)
+func writeSseEvent(w http.ResponseWriter, event, text string) error {
+	payload, err := json.Marshal(map[string]string{"text": text})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, payload)
+	if err != nil {
+		return err
+	}
+	flushWriter(w)
+	return nil
+}
 
 func writeSseDelta(w http.ResponseWriter, text string) error {
 	payload, err := json.Marshal(map[string]string{"text": text})

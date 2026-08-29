@@ -27,6 +27,7 @@ type aiToolRegistry struct {
 }
 
 const aiClarifyToolName = "clarify"
+
 //go:embed knowledge/ai_glossary.md
 var aiGlossaryFS embed.FS
 
@@ -178,7 +179,7 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 			res, err := fo.ListUuidDetail(ctx, &dashboard_api.UuidDetailRequest{
 				EventNames: eventStr, ProjectName: project, CarTypes: carStr,
 				StartDt: start, EndDt: end, Page: 1, PageSize: limit, AnonymousIds: anonStr,
-				Uuid: argString(args, "uuid"),
+				Uuid:      argString(args, "uuid"),
 				FffStatus: argString(args, "fff_status"),
 				FdrStatus: argString(args, "fdr_status"),
 				FclStatus: argString(args, "fcl_status"),
@@ -304,6 +305,12 @@ func newAiToolRegistry(fo *FoDashboardUseCase, do *DoDashboardUseCase) *aiToolRe
 		Description: param.NewOpt("查询 FDR 碎片率(原始值为千分比)。适用:碎片率/存储碎片情况。"),
 		InputSchema: aiSchema(common()),
 	}, execStageQuery(fo, do, "fragment"))
+
+	add(anthropic.ToolParam{
+		Name:        "get_fdr_bandwidth_top",
+		Description: param.NewOpt("查询 FDR 带宽 Top 榜单:按带宽字段(传感器/数据组,如 sensor_lidar_ml_multi_scan)分组,返回带宽总和/均值/P95/最大值(单位均为字节,回答时换算 MB/GB)+有效样本数,按总和降序。P95 为样本数加权口径。适用:哪个传感器/数据组带宽最大/带宽排行/带宽分布。"),
+		InputSchema: aiSchema(common()),
+	}, execStageQuery(fo, do, "fdr_bandwidth_top"))
 
 	add(anthropic.ToolParam{
 		Name:        "get_net_speed",
@@ -465,11 +472,11 @@ func argStringSlice(args map[string]any, key string) []string {
 // 不依赖 system prompt 背字典——知识在使用点出现)
 var enumNotes = map[string]string{
 	// FFF 失败原因
-	"cooldown":         "冷却丢弃(短时重复触发被系统主动丢弃,非故障)",
-	"acquire_data":     "采集数据失败",
-	"trigger_maximum":  "触发次数达上限",
-	"drm_quota":        "DRM 配额限制",
-	"switch_off":       "筛选器被关闭",
+	"cooldown":        "冷却丢弃(短时重复触发被系统主动丢弃,非故障)",
+	"acquire_data":    "采集数据失败",
+	"trigger_maximum": "触发次数达上限",
+	"drm_quota":       "DRM 配额限制",
+	"switch_off":      "筛选器被关闭",
 	// FDR 失败原因
 	"max_files_exceeded":   "文件数超限",
 	"mem_pool_water_line":  "内存池水位过高",
@@ -479,14 +486,14 @@ var enumNotes = map[string]string{
 	"disk_overrun":         "磁盘超限",
 	"unauthorized":         "未授权",
 	// FCL 失败原因
-	"quota_exceeded":             "云盘配额超限",
+	"quota_exceeded":              "云盘配额超限",
 	"unexpected_bag_upload_query": "异常上传查询",
-	"bag_not_exist":              "数据包不存在",
-	"tls_error":                  "TLS 连接错误",
-	"meta_file_lost":             "元数据丢失",
-	"create_socket_failed":       "建连失败",
-	"event_in_blacklist":         "事件被拉黑",
-	"http_request_failed":        "HTTP 请求失败",
+	"bag_not_exist":               "数据包不存在",
+	"tls_error":                   "TLS 连接错误",
+	"meta_file_lost":              "元数据丢失",
+	"create_socket_failed":        "建连失败",
+	"event_in_blacklist":          "事件被拉黑",
+	"http_request_failed":         "HTTP 请求失败",
 	// 通用
 	"success": "成功", "failed": "失败", "discard": "丢弃", "other": "其他",
 	// 关闭原因
@@ -717,6 +724,15 @@ func execStageQuery(fo *FoDashboardUseCase, do *DoDashboardUseCase, kind string)
 				return "", err
 			}
 			return marshalToolResult(res)
+		case "fdr_bandwidth_top":
+			res, err := do.GetFdrBandwidthTop(ctx, doReq)
+			if err != nil {
+				return "", err
+			}
+			return marshalToolResult(map[string]any{
+				"list": truncateItems(res.List, 20),
+				"note": "按带宽总和降序;bw_sum/bw_avg/bw_p95/bw_max 单位为字节(÷1024²=MB);p95 为样本数加权口径;共返回 Top20",
+			})
 		case "net_speed":
 			res, err := do.GetNetSpeed(ctx, doReq)
 			if err != nil {
@@ -796,9 +812,9 @@ func buildTrendDerived(dates []string, series []*dashboard_api.StageTrendSeries)
 
 	// 各系列合计与占比(占全部系列总和)
 	type seriesTotal struct {
-		Name string   `json:"name"`
-		Total int64   `json:"total"`
-		Pct  *float64 `json:"pct_of_all"`
+		Name  string   `json:"name"`
+		Total int64    `json:"total"`
+		Pct   *float64 `json:"pct_of_all"`
 	}
 	var grand int64
 	totals := make([]seriesTotal, 0, len(series))
@@ -835,8 +851,6 @@ func seriesNotes(series []*dashboard_api.StageTrendSeries) map[string]string {
 	}
 	return sn
 }
-
-
 
 func aiSchema(props map[string]any, required ...string) anthropic.ToolInputSchemaParam {
 	req := []string{}

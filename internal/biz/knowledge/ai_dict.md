@@ -19,9 +19,9 @@
 
 **get_dimensions** — 可选值枚举。传 project_name 时车型联动过滤为该项目可选值。返回 {event_names, projects, car_types, filters}。适用:"有哪些项目/车型/事件可选"、"BGANS 下有哪些车型"、clarify 前要候选列表。
 
-**get_overview** — 三阶段总览。返回 {fff_overview:{trigger_total/trigger_success/trigger_failed/trigger_success_rate}, fdr_quality:{fdr_total/fdr_success/时间P95}, fcl_quality:{upload_total}}。适用:"整体怎么样/成功率多少/健康吗"。单步首选。
+**get_overview** — 三阶段总览。返回 {fff_overview:{trigger_total/trigger_success/trigger_failed/trigger_success_rate}, fdr_quality:{fdr_total/fdr_success/时间P95}, fcl_quality:{upload_total}}。适用:"整体怎么样/成功率多少/健康吗"。单步首选。**口径纪律**:触发阶段**没有"成功率"语义**——FFF 丢弃是筛选器防抖的有效拦截,不是失败,禁止输出"触发成功率";fdr_total 已剔除正常丢弃。
 
-**get_fail_reason(stage)** — 某阶段失败原因分布。stage 必填 fff/fdr/fcl。返回 {list:[{name:"FFF-cooldown",value:58}...], enum_notes:{cooldown:"冷却丢弃(...)"}}。适用:"为什么失败/失败原因/失败分布"。enum_notes 里有所的原因白话,回答时直接用。
+**get_fail_reason(stage)** — 某阶段失败原因分布。stage 必填 fff/fdr/fcl。返回 {list:[{name:"FFF-cooldown",value:58}...], enum_notes:{cooldown:"冷却丢弃(...)"}}。适用:"为什么失败/失败原因/失败分布"。enum_notes 里有所的原因白话,回答时直接用。**口径纪律**:FFF 阶段的都是**有效拦截**(cooldown 等防抖行为,不是故障——对外不叫"失败",叫"有效拦截");FDR 的 `event_not_recognized`/`max_files_exceeded`/`unauthorized` 是**正常丢弃**、FCL 的 `event_in_blacklist`/`quota_exceeded`/`unexpected_bag_upload_query`/`reach_upload_limit` 是**有效拦截**——这七类不是故障,解释时单独归类说明,不与真失败混排。
 
 **get_stage_trend(stage)** — 某阶段每日趋势。返回 {dates, series:[{name:"success",data:[...]}], series_notes, daily_total, daily_total_pct_change(环比算好), series_totals(各系列合计+占比), grand_total}。适用:"趋势/每日变化/环比"。**派生数字全在返回里,禁止手算**。
 
@@ -31,9 +31,9 @@
 
 **get_quality(stage)** — 质量指标。stage: fdr(落盘耗时P95/磁盘P95/内存P95)/fcl(Bag大小P95/上传量)。适用:"耗时/磁盘内存/Bag大小"。
 
-**get_fdr_fragment** — FDR 碎片率(原始值千分比)。**get_fcl_bw** — 上传带宽。**get_net_speed** — 网络速率。
+**get_fdr_fragment** — FDR 碎片率(原始值千分比)。**get_fcl_bw** — 上传带宽。**get_net_speed** — 网络速率。**get_fdr_bandwidth_top** — FDR 带宽 Top 榜(按传感器/数据组字段分组,返回总和/均值/P95/最大值+样本数,按总和降序,取 Top20;**数值单位是字节**,回答时必须换算 MB/GB;P95 为样本数加权口径)。适用:"哪个传感器带宽最大/带宽排行"。
 
-**get_funnel** — 全链路漏斗(FFF→FDR→FCL 转化)。适用:"全链路成功率/转化率/漏斗"。注意与三阶段独立口径区分,回答时说明是漏斗口径。
+**get_funnel** — 全链路漏斗(FFF→FDR→FCL 转化)。适用:"全链路成功率/转化率/漏斗"。注意与三阶段独立口径区分,回答时说明是漏斗口径。**数采成功率口径 = 落盘成功率×上传成功率**(两段各自的有效口径:落盘分母剔除正常丢弃、上传分母只含已终态事件),回答时按乘积口径解释并可给出两段分解。
 
 **get_running_overview** — 筛选器运行概览(运行数/车辆数/开关次数)。vehicle_total 是**区间内峰值日**去重车辆数(按天聚合取 MAX,不跨天累计)——用户选长区间与单日结果接近属正常,回答时主动说明该口径。**lianhuashan 项目暂不支持车辆数查询(全局车辆总数已剔除该项目)**;用户问 lianhuashan 车辆数时直接说"暂不支持",不要解释原因、不要说数据异常。注意:running 表无 event_name 列,前端传的值按 filter_name 查;传事件名返回 0 是如实结果,解释时引导改查 event_name 类工具。**get_running_trend(filter_name 必填)** — 某筛选器活跃趋势。
 

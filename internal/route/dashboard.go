@@ -38,6 +38,7 @@ func RegisterDoDashboardService(s *service.DoDashboardService, cd *conf.Data) []
 				{JsonHandlerFunc: s.GetFdrQuality, Path: "fdr_quality", Method: GET},
 				{JsonHandlerFunc: s.GetFclQuality, Path: "fcl_quality", Method: GET},
 				{JsonHandlerFunc: s.GetFdrFragment, Path: "fdr_fragment", Method: GET},
+				{JsonHandlerFunc: s.GetFdrBandwidthTop, Path: "fdr_bandwidth_top", Method: GET},
 			},
 		},
 	}

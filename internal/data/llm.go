@@ -51,15 +51,17 @@ func (r *LlmRepo) MaxTokens() int64 {
 	return 16384
 }
 
-// ChatStream 发起流式对话,每收到一段增量文本调用一次 onDelta
-func (r *LlmRepo) ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string)) error {
+// ChatStream 发起流式对话,每收到一段正文/思考增量各回调一次。
+// glm 等强制思考的模型,思考阶段可能长达数分钟,onThinking 把思考增量透传出去,
+// 避免正文迟迟不出导致连接上长时间无数据(前端白屏、代理空闲掐断)。
+func (r *LlmRepo) ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string), onThinking func(string)) error {
 	if !r.Enabled() {
 		return fmt.Errorf("llm repo disabled")
 	}
 
 	stream := r.newStream(ctx, systemPrompt, userPrompt)
 	defer stream.Close()
-	return drainStream(stream, onDelta)
+	return drainStream(stream, onDelta, onThinking)
 }
 
 // ChatStreamEx 完整参数流式对话(带 tools/多轮历史),onEvent 逐事件回调,
@@ -185,14 +187,19 @@ func (a *messageAggregator) message() *anthropic.Message {
 	return a.msg
 }
 
-func drainStream(stream *ssestream.Stream[anthropic.MessageStreamEventUnion], onDelta func(string)) error {
+func drainStream(stream *ssestream.Stream[anthropic.MessageStreamEventUnion], onDelta func(string), onThinking func(string)) error {
 	for stream.Next() {
 		event := stream.Current()
 		if event.Type != "content_block_delta" {
 			continue
 		}
-		if text := event.AsContentBlockDelta().Delta.AsTextDelta().Text; text != "" {
-			onDelta(text)
+		delta := event.AsContentBlockDelta().Delta
+		if text := delta.AsTextDelta().Text; text != "" {
+			if onDelta != nil {
+				onDelta(text)
+			}
+		} else if th := delta.AsThinkingDelta().Thinking; th != "" && onThinking != nil {
+			onThinking(th)
 		}
 	}
 	if err := stream.Err(); err != nil {

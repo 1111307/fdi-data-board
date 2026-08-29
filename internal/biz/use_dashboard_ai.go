@@ -19,7 +19,9 @@ type LlmRepo interface {
 	Model() string
 	// MaxTokens 单次输出上限(来自 data.llm.max_tokens,未配置默认 16384)
 	MaxTokens() int64
-	ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string)) error
+	// ChatStream 流式对话:onDelta 正文增量,onThinking 思考增量(模型不思考时不会被调,
+	// 可传 nil)。glm 等强制思考模型思考阶段长达数分钟,思考增量必须透传给前端保活
+	ChatStream(ctx context.Context, systemPrompt, userPrompt string, onDelta func(string), onThinking func(string)) error
 	// ChatStreamEx 完整参数流式对话(带 tools/多轮历史),onEvent 逐事件回调,
 	// 返回聚合完成的最终 Message(含 content blocks 与 stop_reason)
 	ChatStreamEx(ctx context.Context, params anthropic.MessageNewParams, onEvent func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error)
@@ -143,8 +145,11 @@ func (uc *AiDashboardUseCase) buildSnapshot(ctx context.Context, req *dashboard_
 	return snap
 }
 
-// StreamSummary 生成流式总结:emit 被逐段调用(LLM 增量或本地分段),返回错误表示整体失败
-func (uc *AiDashboardUseCase) StreamSummary(ctx context.Context, req *dashboard_api.AiSummaryRequest, emit func(string) error) error {
+// StreamSummary 生成流式总结:emit 被逐段调用(kind=delta 正文增量 / thinking 思考增量),
+// 返回错误表示整体失败。
+// emit 首个错误即短路(客户端断连后不再继续烧 token——与 chat 的 safeEmit 同语义);
+// 此时 ctx 通常也会被 gin 取消,LLM 流随之中断。
+func (uc *AiDashboardUseCase) StreamSummary(ctx context.Context, req *dashboard_api.AiSummaryRequest, emit func(kind, text string) error) error {
 	snap := uc.buildSnapshot(ctx, req)
 
 	if uc.llm.Enabled() {
@@ -152,14 +157,26 @@ func (uc *AiDashboardUseCase) StreamSummary(ctx context.Context, req *dashboard_
 		if err != nil {
 			return err
 		}
-		return uc.llm.ChatStream(ctx, AiSystemPrompt, userPrompt, func(delta string) {
-			_ = emit(delta)
-		})
+		var emitErr error
+		emitSafe := func(kind, text string) {
+			if emitErr != nil || text == "" {
+				return
+			}
+			emitErr = emit(kind, text)
+		}
+		err = uc.llm.ChatStream(ctx, AiSystemPrompt, userPrompt,
+			func(delta string) { emitSafe("delta", delta) },
+			func(th string) { emitSafe("thinking", th) },
+		)
+		if emitErr != nil {
+			return emitErr
+		}
+		return err
 	}
 
 	// 本地统计模式:未配置 LLM 网关,输出确定性统计摘要(内容与页面口径一致)
 	for _, chunk := range strings.SplitAfter(localSummary(snap), "\n") {
-		if err := emit(chunk); err != nil {
+		if err := emit("delta", chunk); err != nil {
 			return err
 		}
 		time.Sleep(15 * time.Millisecond) // 轻微节流,前端有流式体验

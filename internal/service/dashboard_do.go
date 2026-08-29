@@ -795,3 +795,42 @@ func (s *DoDashboardService) GetFdrFragment(ctx *gin.Context) (api.HttpResponse,
 	}
 	return result, nil
 }
+
+// GetFdrBandwidthTop godoc
+//
+//	@Summary	DO FDR 带宽 Top（按带宽字段分组的总和/均值/P95/最大值榜单）
+//	@Tags		DoDashboard
+//	@Produce	json
+//	@Security	OAuth2Password
+//	@Param		event_names		query		string	false	"事件名，多选逗号分隔"
+//	@Param		project_name	query		string	false	"项目名称"
+//	@Param		car_types		query		string	false	"车型，多选逗号分隔"
+//	@Param		start_dt		query		string	false	"开始日期，不传默认近7天"
+//	@Param		end_dt			query		string	false	"结束日期"
+//	@Success	200				{object}	dashboard_api.DoFdrBandwidthTopResponse
+//	@Router		/dashboard/v1/do/fdr_bandwidth_top [GET]
+func (s *DoDashboardService) GetFdrBandwidthTop(ctx *gin.Context) (api.HttpResponse, error) {
+	resp := &dashboard_api.DoFdrBandwidthTopResponse{}
+	resp.Code = int32(gcode.CodeOK.Code())
+	resp.Message = gcode.CodeOK.Message()
+
+	var req dashboard_api.DoCoolTopRequest
+	if err := ctx.ShouldBindQuery(&req); err != nil {
+		resp.Code = int32(gcode.CodeInvalidParameter.Code())
+		resp.Message = err.Error()
+		return resp, nil
+	}
+	result, err := s.uc.GetFdrBandwidthTop(ctx, &req)
+	if err != nil {
+		if errors.Is(err, biz.ErrInvalidDateRange) {
+			resp.Code = int32(gcode.CodeInvalidParameter.Code())
+			resp.Message = err.Error()
+			return resp, nil
+		}
+		log.Errorf("DoGetFdrBandwidthTop error: %v", err)
+		resp.Code = int32(gcode.CodeInternalError.Code())
+		resp.Message = "internal server error"
+		return resp, nil
+	}
+	return result, nil
+}
