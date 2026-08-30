@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>AI 问答时序图 - 用户输入"fff"到最终结果</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f0f2f5;
+    padding: 24px;
+    color: #303133;
+  }
+  .toolbar {
+    max-width: 1180px; margin: 0 auto 16px;
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  h1 { font-size: 18px; font-weight: 600; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #606266; margin-left: auto; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .controls { display: flex; gap: 8px; }
+  button {
+    padding: 6px 14px; border: 1px solid #dcdfe6; background: #fff;
+    border-radius: 4px; cursor: pointer; font-size: 13px; color: #606266;
+  }
+  button:hover { border-color: #409eff; color: #409eff; }
+  button.active { background: #409eff; border-color: #409eff; color: #fff; }
+
+  .stage-wrap { max-width: 1180px; margin: 0 auto 20px; }
+  .stage-title {
+    font-size: 14px; font-weight: 600; margin: 18px 0 8px;
+    padding-left: 10px; border-left: 3px solid #409eff; color: #303133;
+  }
+  .stage-title small { font-weight: 400; color: #909399; margin-left: 8px; }
+
+  .seq {
+    position: relative; background: #fff; border: 1px solid #e4e7ed;
+    border-radius: 8px; overflow-x: auto; padding: 0 0 16px;
+  }
+  .seq-inner { position: relative; min-width: 1060px; padding: 0 20px; }
+  .lifeline-head {
+    display: flex; justify-content: space-between;
+    padding: 14px 30px 10px;
+  }
+  .actor {
+    width: 200px; text-align: center; font-size: 14px; font-weight: 600;
+    padding: 8px 4px; border-radius: 6px; color: #fff; position: relative; z-index: 2;
+  }
+  .a-user  { background: #e6a23c; }
+  .a-fe    { background: #409eff; }
+  .a-be    { background: #67c23a; }
+  .a-llm   { background: #9a6fe0; }
+
+  .lifelines { position: absolute; top: 0; bottom: 0; left: 20px; right: 20px; pointer-events: none; }
+  .lifeline {
+    position: absolute; top: 46px; bottom: 8px; width: 0;
+    border-left: 2px dashed #dcdfe6;
+  }
+  .msg {
+    position: relative; margin: 14px 0;
+    height: 34px; z-index: 2;
+  }
+  .msg .arrow {
+    position: absolute; top: 16px; height: 2px; background: #909399;
+  }
+  .msg .arrow::after {
+    content: ""; position: absolute; right: -1px; top: -5px;
+    border: 6px solid transparent; border-left-color: #909399;
+  }
+  .msg.right .arrow::after { right: -1px; border-left-color: #909399; transform: none; }
+  .msg.left  .arrow::after {
+    right: auto; left: -1px; border-left-color: transparent; border-right-color: #909399;
+  }
+  .msg.self .arrow { display: none; }
+  .msg .label {
+    position: absolute; top: -4px; transform: translateX(-50%);
+    background: #f5f7fa; border: 1px solid #e4e7ed; border-radius: 4px;
+    font-size: 12px; padding: 2px 8px; white-space: nowrap; color: #606266;
+    max-width: 520px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .msg.dashed .arrow { background: repeating-linear-gradient(90deg,#909399 0 6px,transparent 6px 10px); }
+
+  .msg.data   .arrow { background: #409eff; } .msg.data  .arrow::after { border-left-color: #409eff; }
+  .msg.data.left .arrow::after { border-right-color: #409eff; }
+  .msg.data .label { border-color: #b3d8ff; background: #ecf5ff; color: #1d64b8; }
+
+  .msg.sse   .arrow { background: #67c23a; } .msg.sse  .arrow::after { border-left-color: #67c23a; }
+  .msg.sse.left .arrow::after { border-right-color: #67c23a; }
+  .msg.sse .label { border-color: #c2e7b0; background: #f0f9eb; color: #4e8c33; }
+
+  .msg.llm   .arrow { background: #9a6fe0; } .msg.llm  .arrow::after { border-left-color: #9a6fe0; }
+  .msg.llm.left .arrow::after { border-right-color: #9a6fe0; }
+  .msg.llm .label { border-color: #d3c2f5; background: #f5f0ff; color: #6b46c0; }
+
+  .msg.usermsg .arrow { background: #e6a23c; } .msg.usermsg .arrow::after { border-left-color: #e6a23c; }
+  .msg.usermsg .label { border-color: #f5dab1; background: #fdf6ec; color: #b88230; }
+
+  .note {
+    position: relative; margin: 6px 0 6px; padding: 6px 12px;
+    background: #fdf6ec; border: 1px solid #f3d19e; border-radius: 6px;
+    font-size: 12px; color: #b88230; width: fit-content; max-width: 640px;
+    z-index: 2;
+  }
+  .note.blue   { background: #ecf5ff; border-color: #b3d8ff; color: #1d64b8; }
+  .note.green  { background: #f0f9eb; border-color: #c2e7b0; color: #4e8c33; }
+  .note.purple { background: #f5f0ff; border-color: #d3c2f5; color: #6b46c0; }
+
+  .pause {
+    position: relative; margin: 10px 0; padding: 8px 14px; border-radius: 6px;
+    background: #fef0f0; border: 1px dashed #f56c6c; color: #c45656;
+    font-size: 12px; width: fit-content; z-index: 2;
+  }
+
+  .phase-band { position: absolute; left: 0; right: 0; font-size: 11px; color: #c0c4cc; padding-left: 26px; }
+
+  /* 位置:四条生命线横坐标按 200px 宽度分布 */
+  .pos-user { left: 120px; } .pos-fe { left: 400px; } .pos-be { left: 680px; } .pos-llm { left: 960px; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h1>AI 问答完整交互时序 — 用户输入"fff" → 反复确认 → 最终结果</h1>
+  <div class="legend">
+    <span><i class="dot" style="background:#e6a23c"></i>用户</span>
+    <span><i class="dot" style="background:#409eff"></i>前端</span>
+    <span><i class="dot" style="background:#67c23a"></i>后端 board</span>
+    <span><i class="dot" style="background:#9a6fe0"></i>Anthropic 网关(kimi-k3)</span>
+  </div>
+  <div class="controls">
+    <button onclick="toggleNotes()" id="btn-note">隐藏说明</button>
+  </div>
+</div>
+
+<!-- ═══════════ 阶段一 ═══════════ -->
+<div class="stage-wrap">
+<div class="stage-title">① 第一次请求:信息不足,模型发起第一次确认 <small>POST /ai/chat + clarify</small></div>
+<div class="seq"><div class="seq-inner">
+  <div class="lifelines">
+    <div class="lifeline pos-user"></div><div class="lifeline pos-fe"></div>
+    <div class="lifeline pos-be"></div><div class="lifeline pos-llm"></div>
+  </div>
+  <div class="lifeline-head">
+    <div class="actor a-user">用户</div><div class="actor a-fe">前端 AiChatPanel</div>
+    <div class="actor a-be">后端 board 服务</div><div class="actor a-llm">Anthropic 网关</div>
+  </div>
+
+  <div class="msg usermsg">
+    <div class="arrow" style="left:120px;width:280px"></div>
+    <div class="label" style="left:260px">输入 "fff" / 点击发送</div>
+  </div>
+  <div class="msg data">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">POST /ai/chat {question:"fff", messages:[]}</div>
+  </div>
+  <div class="note green" style="margin-left:680px">keycloak 鉴权 → 重建消息(空历史+新问题)→ backfill 兜底</div>
+  <div class="msg llm">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">POST /v1/messages (stream)</div>
+  </div>
+  <div class="note purple" style="margin-left:680px">system = 数仓字典(ai_dict.md)<br>tools = 7 个工具 schema(clarify + 6 数据工具)</div>
+  <div class="msg llm left dashed">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">text 增量 + tool_use: clarify</div>
+  </div>
+  <div class="note blue note-n" style="margin-left:400px">字典纪律:意图歧义必须 clarify 严禁猜<br>模型:"fff 只确定了 stage,没说要查什么"</div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: delta(过渡文本)</div>
+  </div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: clarify {kind:ambiguous_tool, options:[3个候选]}</div>
+  </div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: done {stop:"clarify"}</div>
+  </div>
+  <div class="pause" style="margin-left:400px">⏸ 流正常结束(暂停点) — 后端不挂连接等用户,状态在前端历史里</div>
+  <div class="note blue note-n" style="margin-left:400px">渲染琥珀色确认卡:失败原因 / 趋势 / 概览 三个候选</div>
+</div></div>
+</div>
+
+<!-- ═══════════ 阶段二 ═══════════ -->
+<div class="stage-wrap">
+<div class="stage-title">② 第一次确认:选择"查失败原因" → 但日期口径仍有歧义 → 第二次确认 <small>tool_result 回执 + 二次 clarify</small></div>
+<div class="seq"><div class="seq-inner">
+  <div class="lifelines">
+    <div class="lifeline pos-user"></div><div class="lifeline pos-fe"></div>
+    <div class="lifeline pos-be"></div><div class="lifeline pos-llm"></div>
+  </div>
+  <div class="lifeline-head">
+    <div class="actor a-user">用户</div><div class="actor a-fe">前端 AiChatPanel</div>
+    <div class="actor a-be">后端 board 服务</div><div class="actor a-llm">Anthropic 网关</div>
+  </div>
+
+  <div class="msg usermsg left">
+    <div class="arrow" style="left:120px;width:280px"></div>
+    <div class="label" style="left:260px">点击候选卡「get_fail_reason 查失败原因分布」</div>
+  </div>
+  <div class="note blue note-n" style="margin-left:400px">历史追加:assistant(tool_use:clarify) + user(tool_result:用户选择)<br>确认卡收起,显示绿色 ✓ 回执</div>
+  <div class="msg data">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">POST /ai/chat {question:"", messages:3条} ← 纯续跑</div>
+  </div>
+  <div class="msg llm">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">POST /v1/messages</div>
+  </div>
+  <div class="msg llm left dashed">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">tool_use: clarify(kind=missing_param, param=date_range)</div>
+  </div>
+  <div class="note purple note-n" style="margin-left:680px">模型:"用户要失败原因了,但没说时间范围<br>(此为示意;若模型判断'近7天'可默认则直接跳到阶段③)"</div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: clarify {param:"时间范围", candidates:[近7天/昨天/上周]} → done</div>
+  </div>
+  <div class="pause" style="margin-left:400px">⏸ 第二个暂停点(确认可以嵌套多次,每轮推进一层确定性,上限 6 轮)</div>
+</div></div>
+</div>
+
+<!-- ═══════════ 阶段三 ═══════════ -->
+<div class="stage-wrap">
+<div class="stage-title">③ 参数齐全:真正调用数据工具(后端进程内执行 → Doris) <small>tool_call / tool_result / 数据回填</small></div>
+<div class="seq"><div class="seq-inner">
+  <div class="lifelines">
+    <div class="lifeline pos-user"></div><div class="lifeline pos-fe"></div>
+    <div class="lifeline pos-be"></div><div class="lifeline pos-llm"></div>
+  </div>
+  <div class="lifeline-head">
+    <div class="actor a-user">用户</div><div class="actor a-fe">前端 AiChatPanel</div>
+    <div class="actor a-be">后端 board 服务</div><div class="actor a-llm">Anthropic 网关</div>
+  </div>
+
+  <div class="msg usermsg left">
+    <div class="arrow" style="left:120px;width:280px"></div>
+    <div class="label" style="left:260px">点击「近 7 天」</div>
+  </div>
+  <div class="msg data">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">POST /ai/chat {question:"", messages:5条}</div>
+  </div>
+  <div class="msg llm">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">POST /v1/messages</div>
+  </div>
+  <div class="msg llm left dashed">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">tool_use: get_fail_reason {stage:"fff", 近7天}</div>
+  </div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: tool_call {name:"get_fail_reason", args:{stage:"fff"}}</div>
+  </div>
+  <div class="msg self" style="height:52px">
+    <div class="label" style="left:680px;transform:none;background:#f0f9eb;border-color:#c2e7b0;color:#4e8c33">
+      ⚙ 进程内执行 FoDashboardUseCase.GetFffFailReason<br>→ Doris dwd_cfdi_basic_fff_trigger_daily_summary(reason粒度)
+    </div>
+  </div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: tool_result {summary, data:{list:[FFF-cooldown:185,…]}}</div>
+  </div>
+  <div class="note blue note-n" style="margin-left:400px">工具卡✅ + 自动渲染 ECharts 饼图(cooldown 39.5%…)</div>
+  <div class="msg llm">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">POST /v1/messages(messages 已回填 tool_result)</div>
+  </div>
+</div></div>
+</div>
+
+<!-- ═══════════ 阶段四 ═══════════ -->
+<div class="stage-wrap">
+<div class="stage-title">④ 最终回答:结论文本流式输出 <small>delta → done(end_turn)</small></div>
+<div class="seq"><div class="seq-inner">
+  <div class="lifelines">
+    <div class="lifeline pos-user"></div><div class="lifeline pos-fe"></div>
+    <div class="lifeline pos-be"></div><div class="lifeline pos-llm"></div>
+  </div>
+  <div class="lifeline-head">
+    <div class="actor a-user">用户</div><div class="actor a-fe">前端 AiChatPanel</div>
+    <div class="actor a-be">后端 board 服务</div><div class="actor a-llm">Anthropic 网关</div>
+  </div>
+
+  <div class="msg llm left dashed">
+    <div class="arrow" style="left:680px;width:280px"></div>
+    <div class="label" style="left:820px">结论文本流(thinking 块被后端过滤)</div>
+  </div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: delta ×N("近7天 FFF 失败共 468 次,cooldown 占比最高,系冷却丢弃非故障…")</div>
+  </div>
+  <div class="msg sse left">
+    <div class="arrow" style="left:400px;width:280px"></div>
+    <div class="label" style="left:540px">SSE: done {stop:"end_turn"}</div>
+  </div>
+  <div class="msg self">
+    <div class="label" style="left:400px;transform:none;background:#ecf5ff;border-color:#b3d8ff;color:#1d64b8">
+      flushToolResults():本轮工具结果落隐形消息(供后续追问引用,与 tool_use 配对)
+    </div>
+  </div>
+  <div class="msg usermsg left dashed">
+    <div class="arrow" style="left:120px;width:280px"></div>
+    <div class="label" style="left:260px">看到结论(结论+饼图+工具卡溯源)</div>
+  </div>
+  <div class="note" style="margin-left:120px;background:#f0f9eb;border-color:#c2e7b0;color:#4e8c33">
+    ✅ 完整闭环:2 次确认 + 1 次工具执行 + 1 次结论输出,全程数字均来自工具结果
+  </div>
+</div></div>
+</div>
+
+<script>
+  function toggleNotes() {
+    const notes = document.querySelectorAll('.note-n, .note');
+    const btn = document.getElementById('btn-note');
+    const hidden = btn.classList.toggle('active');
+    notes.forEach(n => n.style.display = hidden ? 'none' : '');
+    btn.textContent = hidden ? '显示说明' : '隐藏说明';
+  }
+</script>
+</body>
+</html>
