@@ -3,11 +3,11 @@ package data
 import (
 	"context"
 	"fmt"
-	"time"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -16,7 +16,7 @@ import (
 )
 
 // newMockAnthropicGateway 模拟 Anthropic Messages 流式网关:
-// 依次下发 thinking 块(应被过滤)与 text 块(应逐段回调),夹杂 ping 事件
+// 依次下发 thinking 增量(应路由到 onThinking)与 text 增量(应路由到 onDelta),夹杂 ping 事件
 func newMockAnthropicGateway(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +64,7 @@ func newTestLlmRepo(serverURL string) *LlmRepo {
 	}}
 }
 
-func TestLlmRepoChatStreamParsesTextDeltaAndSkipsThinking(t *testing.T) {
+func TestLlmRepoChatStreamRoutesThinkingAndTextSeparately(t *testing.T) {
 	server := newMockAnthropicGateway(t)
 	defer server.Close()
 
@@ -73,21 +73,38 @@ func TestLlmRepoChatStreamParsesTextDeltaAndSkipsThinking(t *testing.T) {
 		t.Fatal("Enabled() = false, want true")
 	}
 
-	var got []string
-	if err := repo.ChatStream(context.Background(), "system", "user", func(text string) {
-		got = append(got, text)
-	}); err != nil {
+	var texts []string
+	var thoughts []string
+	if err := repo.ChatStream(context.Background(), "system", "user",
+		func(text string) { texts = append(texts, text) },
+		func(th string) { thoughts = append(thoughts, th) },
+	); err != nil {
 		t.Fatalf("ChatStream error: %v", err)
 	}
 
 	want := strings.Join([]string{"你好", ",", "看板"}, "")
-	if strings.Join(got, "") != want {
-		t.Fatalf("deltas = %q, want joined %q", got, want)
+	if strings.Join(texts, "") != want {
+		t.Fatalf("deltas = %q, want joined %q", texts, want)
 	}
-	for _, d := range got {
+	for _, d := range texts {
 		if strings.Contains(d, "内心推理") {
-			t.Fatalf("thinking delta leaked: %q", d)
+			t.Fatalf("thinking delta leaked into onDelta: %q", d)
 		}
+	}
+	// 思考增量必须走独立回调:强制思考模型的思考阶段靠它给前端保活
+	if strings.Join(thoughts, "") != "内心推理,不应下发" {
+		t.Fatalf("thoughts = %q, want thinking delta routed to onThinking", thoughts)
+	}
+
+	// onThinking 传 nil 时 thinking 直接丢弃(旧行为兼容),正文不受影响
+	var onlyText []string
+	if err := repo.ChatStream(context.Background(), "system", "user",
+		func(text string) { onlyText = append(onlyText, text) }, nil,
+	); err != nil {
+		t.Fatalf("ChatStream error: %v", err)
+	}
+	if strings.Join(onlyText, "") != want {
+		t.Fatalf("nil-onThinking deltas = %q, want %q", onlyText, want)
 	}
 }
 
@@ -96,7 +113,7 @@ func TestLlmRepoDisabledWhenClientMissing(t *testing.T) {
 	if repo.Enabled() {
 		t.Fatal("Enabled() = true, want false when llmClient is nil")
 	}
-	if err := repo.ChatStream(context.Background(), "s", "u", func(string) {}); err == nil {
+	if err := repo.ChatStream(context.Background(), "s", "u", func(string) {}, nil); err == nil {
 		t.Fatal("ChatStream should error when disabled")
 	}
 }

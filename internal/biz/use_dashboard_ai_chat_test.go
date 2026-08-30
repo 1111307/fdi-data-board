@@ -36,7 +36,7 @@ func mustMessage(raw string) *anthropic.Message {
 func (f *chatLlmFake) Enabled() bool    { return true }
 func (f *chatLlmFake) Model() string    { return "kimi-k3-test" }
 func (f *chatLlmFake) MaxTokens() int64 { return 16384 }
-func (f *chatLlmFake) ChatStream(ctx context.Context, s1, s2 string, cb func(string)) error {
+func (f *chatLlmFake) ChatStream(context.Context, string, string, func(string), func(string)) error {
 	return fmt.Errorf("unused")
 }
 
@@ -480,7 +480,7 @@ func TestToolsRegistryCoversAllBiz(t *testing.T) {
 		"get_fail_reason", "get_stage_trend", "get_overview", "get_top", "get_quality",
 		"get_funnel", "get_running_overview", "get_running_trend", "get_sw_version",
 		"get_project_car", "get_project_event", "get_overview_events", "get_trend",
-		"get_fdr_fragment", "get_net_speed", "get_fcl_bw", "get_top_vehicles",
+		"get_fdr_fragment", "get_fdr_bandwidth_top", "get_net_speed", "get_fcl_bw", "get_top_vehicles",
 		"get_anomaly_vehicles", "get_active_trend", "get_cool_top",
 		"get_detail", "get_dimensions",
 	}

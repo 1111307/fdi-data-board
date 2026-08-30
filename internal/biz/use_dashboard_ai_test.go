@@ -65,9 +65,10 @@ func (fakeDoRepo) GetFclQuality(context.Context, *DoCommonParam) (*DoFclQualityD
 	return &DoFclQualityData{UploadTotal: 13800, BagSizeP95: 3.2 * 1024 * 1024 * 1024}, nil
 }
 
-// fakeLlmRepo 按序吐出预设增量
+// fakeLlmRepo 按序吐出预设增量(正文与思考分通道)
 type fakeLlmRepo struct {
-	deltas []string
+	deltas   []string
+	thoughts []string
 }
 
 func (f *fakeLlmRepo) Enabled() bool { return true }
@@ -79,9 +80,14 @@ func (f *fakeLlmRepo) ChatStreamEx(_ context.Context, params anthropic.MessageNe
 	return nil, fmt.Errorf("not implemented in summary fake")
 }
 
-func (f *fakeLlmRepo) ChatStream(_ context.Context, _, _ string, onDelta func(string)) error {
+func (f *fakeLlmRepo) ChatStream(_ context.Context, _, _ string, onDelta func(string), onThinking func(string)) error {
 	for _, d := range f.deltas {
 		onDelta(d)
+	}
+	if onThinking != nil {
+		for _, th := range f.thoughts {
+			onThinking(th)
+		}
 	}
 	return nil
 }
@@ -91,7 +97,7 @@ type disabledLlmRepo struct{}
 func (disabledLlmRepo) Enabled() bool    { return false }
 func (disabledLlmRepo) Model() string    { return "" }
 func (disabledLlmRepo) MaxTokens() int64 { return 16384 }
-func (disabledLlmRepo) ChatStream(context.Context, string, string, func(string)) error {
+func (disabledLlmRepo) ChatStream(context.Context, string, string, func(string), func(string)) error {
 	return nil
 }
 func (disabledLlmRepo) ChatStreamEx(context.Context, anthropic.MessageNewParams, func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error) {
@@ -103,13 +109,21 @@ func newAiUcForTest(llm LlmRepo) *AiDashboardUseCase {
 }
 
 func TestStreamSummaryLlmModeForwardsDeltasInOrder(t *testing.T) {
-	uc := newAiUcForTest(&fakeLlmRepo{deltas: []string{"## 总体概览", "\n", "触发总数 14,578"}})
+	uc := newAiUcForTest(&fakeLlmRepo{
+		thoughts: []string{"先算总量"},
+		deltas:   []string{"## 总体概览", "\n", "触发总数 14,578"},
+	})
 
 	var got []string
+	var gotThinking []string
 	err := uc.StreamSummary(context.Background(), &dashboard_api.AiSummaryRequest{
 		StartDt: "2026-07-22", EndDt: "2026-07-28",
-	}, func(delta string) error {
-		got = append(got, delta)
+	}, func(kind, text string) error {
+		if kind == "thinking" {
+			gotThinking = append(gotThinking, text)
+			return nil
+		}
+		got = append(got, text)
 		return nil
 	})
 	if err != nil {
@@ -117,6 +131,10 @@ func TestStreamSummaryLlmModeForwardsDeltasInOrder(t *testing.T) {
 	}
 	if strings.Join(got, "") != "## 总体概览\n触发总数 14,578" {
 		t.Fatalf("deltas = %q", got)
+	}
+	// 思考增量以独立 kind 透传,供前端渲染"思考中"并给连接保活
+	if strings.Join(gotThinking, "") != "先算总量" {
+		t.Fatalf("thinking = %q", gotThinking)
 	}
 }
 
@@ -126,8 +144,11 @@ func TestStreamSummaryLocalModeGeneratesDeterministicSummary(t *testing.T) {
 	var sb strings.Builder
 	err := uc.StreamSummary(context.Background(), &dashboard_api.AiSummaryRequest{
 		StartDt: "2026-07-22", EndDt: "2026-07-28", EventNames: "hard_brake",
-	}, func(delta string) error {
-		sb.WriteString(delta)
+	}, func(kind, text string) error {
+		if kind != "delta" {
+			t.Fatalf("local mode should only emit delta, got kind %q", kind)
+		}
+		sb.WriteString(text)
 		return nil
 	})
 	if err != nil {
