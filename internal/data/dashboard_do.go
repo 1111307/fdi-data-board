@@ -946,7 +946,17 @@ func fdrNormalDiscardExpr() string {
 
 // GetFdrQuality FDR 质量 P95（TD 磁盘 / TM 内存 / 落盘耗时）
 // 查汇总表，P95 用 count 加权均值（不用 MAX，避免小样本脏桶放大离群值）
-// fdr_total 为剔除正常丢弃(event_not_recognized/max_files_exceeded/unauthorized)后的有效总数
+// 计数口径(2026-08 定,与链路看板 funnel 严格同数):
+//
+//	fdr_total   = fff 触发成功数(=进入落盘的 uuid 数,fff 汇总表,fff 明细 uuid 一行故准确)
+//	              再剔除正常丢弃;
+//	fdr_success = ads_do_cfdi_daily 的 fdr_status='success' OR fcl_status!=''
+//	              (落盘成功或有上传事实)。fdr 汇总表自身 success_count 不可用:
+//	              fdr 状态消费流丢终态消息(实测约 25% uuid 状态停在 waiting/dumping
+//	              却已实际上传),系统性低估;
+//	fdr 汇总表 event_count 亦不可用(状态快照行聚合,虚高约 2 倍)。
+//
+// 中间态由前端用 总数-成功-失败 推导。
 func (r *doDashboardRepo) GetFdrQuality(ctx context.Context, param *biz.DoCommonParam) (*biz.DoFdrQualityData, error) {
 	db, cancel := r.dorisQuery(ctx)
 	defer cancel()
@@ -956,30 +966,47 @@ func (r *doDashboardRepo) GetFdrQuality(ctx context.Context, param *biz.DoCommon
 		ROUND(SUM(td_mb_p95 * td_mb_count) / NULLIF(SUM(td_mb_count), 0), 2) AS td_mb_p95,
 		ROUND(SUM(tm_mb_p95 * tm_mb_count) / NULLIF(SUM(tm_mb_count), 0), 2) AS tm_mb_p95,
 		ROUND(SUM(time_cost_ms_p95 * time_cost_ms_count) / NULLIF(SUM(time_cost_ms_count), 0), 2) AS time_cost_ms_p95,
-		SUM(event_count) - ` + fmt.Sprintf(fdrNormalDiscardExpr(), where) + ` AS fdr_total,
-		SUM(success_count) AS fdr_success
+		SUM(success_count) AS fdr_success_sum,
+		(SELECT COALESCE(SUM(success_count), 0)
+			FROM ` + tableFffTriggerDailySummary + where + `
+			AND summary_grain = 'overview') - ` + fmt.Sprintf(fdrNormalDiscardExpr(), where) + ` AS fdr_total
 		FROM ` + tableFdrTriggerDailySummary + where + `
 		AND summary_grain = 'overview'`
-	// 子查询(SELECT 列表内)先于主查询(FROM 后)出现,占位符翻倍:参数需双份、顺序一致
-	args = append(append([]interface{}{}, args...), args...)
+	// 两个子查询/主查询按出现顺序复用同一 where(fff 成功数→正常丢弃→主查询):参数三份
+	args = append(append(append([]interface{}{}, args...), args...), args...)
 
 	type scanRow struct {
 		TdMbP95       float64 `gorm:"column:td_mb_p95"`
 		TmMbP95       float64 `gorm:"column:tm_mb_p95"`
 		TimeCostMsP95 float64 `gorm:"column:time_cost_ms_p95"`
+		FdrSuccessSum int64   `gorm:"column:fdr_success_sum"`
 		FdrTotal      int64   `gorm:"column:fdr_total"`
-		FdrSuccess    int64   `gorm:"column:fdr_success"`
 	}
 	var sr scanRow
 	if err := db.Raw(sql, args...).Scan(&sr).Error; err != nil {
 		return nil, err
 	}
+
+	// 落盘成功走 ads 口径(fdr=success OR 有上传事实);ads 的 where 与汇总表同构
+	adsWhere, adsArgs := buildDoCommonWhere("", param.EventNames, param.ProjectName, param.CarTypes, param.StartDt, param.EndDt)
+	adsSQL := `SELECT COALESCE(SUM(CASE WHEN fff_status != 'discard' AND (fdr_status = 'success' OR fcl_status != '') THEN cnt ELSE 0 END), 0) AS fdr_success
+		FROM ads_do_cfdi_daily` + adsWhere + `
+		AND event_name != 'Forever_log'`
+	var fdrSuccess int64
+	if err := db.Raw(adsSQL, adsArgs...).Scan(&fdrSuccess).Error; err != nil {
+		return nil, err
+	}
+	// ads 无该筛选维度数据时兜底回 fdr 汇总表 success(如按 filter_name 深查)
+	if fdrSuccess == 0 && sr.FdrSuccessSum > 0 {
+		fdrSuccess = sr.FdrSuccessSum
+	}
+
 	return &biz.DoFdrQualityData{
 		TdMbP95:       sr.TdMbP95,
 		TmMbP95:       sr.TmMbP95,
 		TimeCostMsP95: sr.TimeCostMsP95,
 		FdrTotal:      sr.FdrTotal,
-		FdrSuccess:    sr.FdrSuccess,
+		FdrSuccess:    fdrSuccess,
 	}, nil
 }
 

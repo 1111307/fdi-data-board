@@ -1337,9 +1337,50 @@ func (r *foDashboardRepo) GetFunnel(ctx context.Context, param *biz.FunnelParam)
 		return nil, f3
 	}
 
+	// funnelFdrNormalDiscardTags / funnelFclInterceptTags:
+	// 数采成功率乘积口径的剔除清单(白话原文,匹配 ads_do_cfdi_daily 的 detail_tag)
+	var funnelFdrNormalDiscardTags = []string{"event_not_recognized", "Exceeds the maximum number of files", "unauthorized"}
+	var funnelFclInterceptTags = []string{
+		"query cloud DISCARD, detail:EventName is in blacklist",
+		"query cloud DISCARD, detail:Filter quota exceeded",
+		"unexpected bag_upload_query cause",
+		"reach upload limit",
+	}
+
+	// sumFunnelReasons 按白话 tag 汇总失败明细计数
+	sumFunnelReasons := func(rows []*detailRow, tags []string) int64 {
+		total := int64(0)
+		for _, r := range rows {
+			for _, tag := range tags {
+				if r.Name == tag {
+					total += r.Cnt
+					break
+				}
+			}
+		}
+		return total
+	}
+
+	maxInt64 := func(a, b int64) int64 {
+		if a > b {
+			return a
+		}
+		return b
+	}
+
+	// 数采成功率 = 落盘成功率 × 上传成功率(与前端链路看板严格同口径):
+	// 落盘分母剔除正常丢弃、上传分母只含已终态事件(成功+真失败)。
+	// 注意 funnel 的失败明细来自 ads(存白话原文),tag 匹配须用白话值,
+	// 与 fdr/fcl 汇总表的规范名是两套命名
+	fdrNormalDiscard := sumFunnelReasons(fdrFail, funnelFdrNormalDiscardTags)
+	fclIntercept := sumFunnelReasons(fclFail, funnelFclInterceptTags)
 	cfdiRate := 0.0
-	if stat.FffTotal > 0 {
-		cfdiRate = math.Round(float64(stat.FclSuccess)/float64(stat.FffTotal)*1000) / 10
+	effFdrTotal := stat.FffAllow - fdrNormalDiscard
+	effFclTotal := stat.FclSuccess + maxInt64(stat.FclFail-fclIntercept, 0)
+	if effFdrTotal > 0 && effFclTotal > 0 {
+		fdrRate := float64(stat.FdrSuccess) / float64(effFdrTotal)
+		fclRate := float64(stat.FclSuccess) / float64(effFclTotal)
+		cfdiRate = math.Round(fdrRate*fclRate*1000) / 10
 	}
 
 	toReasons := func(rows []*detailRow) []*biz.FunnelFailReason {

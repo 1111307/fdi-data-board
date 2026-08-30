@@ -19,7 +19,7 @@
 
 **get_dimensions** — 可选值枚举。传 project_name 时车型联动过滤为该项目可选值。返回 {event_names, projects, car_types, filters}。适用:"有哪些项目/车型/事件可选"、"BGANS 下有哪些车型"、clarify 前要候选列表。
 
-**get_overview** — 三阶段总览。返回 {fff_overview:{trigger_total/trigger_success/trigger_failed/trigger_success_rate}, fdr_quality:{fdr_total/fdr_success/时间P95}, fcl_quality:{upload_total}}。适用:"整体怎么样/成功率多少/健康吗"。单步首选。**口径纪律**:触发阶段**没有"成功率"语义**——FFF 丢弃是筛选器防抖的有效拦截,不是失败,禁止输出"触发成功率";fdr_total 已剔除正常丢弃。
+**get_overview** — 三阶段总览。返回 {fff_overview:{trigger_total/trigger_success/trigger_failed/trigger_success_rate}, fdr_quality:{fdr_total/fdr_success/时间P95}, fcl_quality:{upload_total}}。适用:"整体怎么样/成功率多少/健康吗"。单步首选。**口径纪律**:触发阶段**没有"成功率"语义**——FFF 丢弃是筛选器防抖的有效拦截,不是失败,禁止输出"触发成功率";fdr_total=进入落盘数(fff 触发成功)已剔除正常丢弃;**fdr_success 是"以结果为准"口径**(落盘状态成功 或 数据已实际上传,含落盘状态消息丢失的补偿),不要解释成"落盘明细里 status=success 的行数"。
 
 **get_fail_reason(stage)** — 某阶段失败原因分布。stage 必填 fff/fdr/fcl。返回 {list:[{name:"FFF-cooldown",value:58}...], enum_notes:{cooldown:"冷却丢弃(...)"}}。适用:"为什么失败/失败原因/失败分布"。enum_notes 里有所的原因白话,回答时直接用。**口径纪律**:FFF 阶段的都是**有效拦截**(cooldown 等防抖行为,不是故障——对外不叫"失败",叫"有效拦截");FDR 的 `event_not_recognized`/`max_files_exceeded`/`unauthorized` 是**正常丢弃**、FCL 的 `event_in_blacklist`/`quota_exceeded`/`unexpected_bag_upload_query`/`reach_upload_limit` 是**有效拦截**——这七类不是故障,解释时单独归类说明,不与真失败混排。
 
