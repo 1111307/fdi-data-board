@@ -108,6 +108,11 @@ func (s *AiDashboardService) StreamChat(c *gin.Context) {
 			return err
 		}
 		flushWriter(c.Writer)
+		// done 帧落一行观测日志:grep "ai_chat_done" 统计调用量/P95 延迟/轮次与 token 成本分布
+		if ev.Type == "done" {
+			log.Infof("ai_chat_done stop=%s rounds=%d duration_ms=%d input_tokens=%d output_tokens=%d question=%q",
+				ev.Stop, ev.Rounds, ev.DurationMs, ev.InputTokens, ev.OutputTokens, req.Question)
+		}
 		return nil
 	})
 	if err != nil {

@@ -74,8 +74,11 @@ func TestLlmRepoChatStreamParsesTextDeltaAndSkipsThinking(t *testing.T) {
 	}
 
 	var got []string
+	var thinking []string
 	if err := repo.ChatStream(context.Background(), "system", "user", func(text string) {
 		got = append(got, text)
+	}, func(text string) {
+		thinking = append(thinking, text)
 	}); err != nil {
 		t.Fatalf("ChatStream error: %v", err)
 	}
@@ -89,6 +92,9 @@ func TestLlmRepoChatStreamParsesTextDeltaAndSkipsThinking(t *testing.T) {
 			t.Fatalf("thinking delta leaked: %q", d)
 		}
 	}
+	if len(thinking) == 0 {
+		t.Fatal("onThinking not invoked, want thinking deltas routed to callback")
+	}
 }
 
 func TestLlmRepoDisabledWhenClientMissing(t *testing.T) {
@@ -96,7 +102,7 @@ func TestLlmRepoDisabledWhenClientMissing(t *testing.T) {
 	if repo.Enabled() {
 		t.Fatal("Enabled() = true, want false when llmClient is nil")
 	}
-	if err := repo.ChatStream(context.Background(), "s", "u", func(string) {}); err == nil {
+	if err := repo.ChatStream(context.Background(), "s", "u", func(string) {}, func(string) {}); err == nil {
 		t.Fatal("ChatStream should error when disabled")
 	}
 }

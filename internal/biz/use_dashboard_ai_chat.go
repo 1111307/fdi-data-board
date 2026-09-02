@@ -31,6 +31,11 @@ type ChatEvent struct {
 	Data    interface{}    `json:"data,omitempty"` // tool_result 的完整内容(JSON 或纯文本,前端按需解析)
 	Stop    string         `json:"stop,omitempty"` // done 帧的结束原因: end_turn / clarify / plan / max_rounds
 	Error   string         `json:"error,omitempty"`
+	// 观测指标(仅 done 帧):轮数/耗时/token 用量——前端可展示,日志留档用于统计
+	Rounds       int64 `json:"rounds,omitempty"`        // agent 循环实际轮数
+	DurationMs   int64 `json:"duration_ms,omitempty"`   // 全程墙钟耗时
+	InputTokens  int64 `json:"input_tokens,omitempty"`  // 累计输入 token(多轮求和)
+	OutputTokens int64 `json:"output_tokens,omitempty"` // 累计输出 token(多轮求和)
 }
 
 // AiChatHistoryMessage 前端回传的会话历史(轻量结构,后端重建为 Anthropic content blocks)
@@ -71,10 +76,15 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 		return err
 	}
 
+	// 观测指标:全程耗时 / 实际轮数 / 累计 token(每轮 msg.Usage 求和)
+	startAt := time.Now()
+	var totalRounds, inputTokens, outputTokens int64
+
 	for round := 0; round < aiMaxRounds; round++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
+		totalRounds = int64(round + 1)
 		params := anthropic.MessageNewParams{
 			Model:     anthropic.Model(uc.llmModel()),
 			MaxTokens: uc.llmMaxTokens(), // 输出上限,走 data.llm.max_tokens 配置(默认16384)
@@ -119,6 +129,9 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 		if msg == nil {
 			return fmt.Errorf("llm stream: empty message")
 		}
+		// 累计本轮 token 用量(网关在 message_delta 里给的是全流累计值)
+		inputTokens += msg.Usage.InputTokens
+		outputTokens += msg.Usage.OutputTokens
 		for _, block := range msg.Content {
 			if tu := block.AsToolUse(); tu.Name != "" {
 				toolUses = append(toolUses, tu)
@@ -127,7 +140,7 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 
 		// 无工具调用或 end_turn:结束
 		if len(toolUses) == 0 || msg.StopReason != anthropic.StopReasonToolUse {
-			return emit(ChatEvent{Type: "done", Stop: "end_turn"})
+			return emit(doneEvent("end_turn", totalRounds, time.Since(startAt), inputTokens, outputTokens))
 		}
 
 		// 重建 assistant 消息(文本 + tool_use blocks)追加进上下文
@@ -191,18 +204,28 @@ func (uc *AiDashboardUseCase) StreamChat(ctx context.Context, question string, h
 
 		if planPaused {
 			// 计划暂停点:前端确认/拒绝后,assistant(tool_use) + user(tool_result:用户意见) 带回历史续跑
-			return emit(ChatEvent{Type: "done", Stop: "plan"})
+			return emit(doneEvent("plan", totalRounds, time.Since(startAt), inputTokens, outputTokens))
 		}
 		if clarifyPaused {
 			// 暂停点:前端确认后,把 assistant(tool_use) + user(tool_result) 带回历史重新请求
-			return emit(ChatEvent{Type: "done", Stop: "clarify"})
+			return emit(doneEvent("clarify", totalRounds, time.Since(startAt), inputTokens, outputTokens))
 		}
 		if len(resultBlocks) > 0 {
 			msgs = append(msgs, anthropic.MessageParam{Role: anthropic.MessageParamRoleUser, Content: resultBlocks})
 		}
 	}
 
-	return emit(ChatEvent{Type: "done", Stop: "max_rounds"})
+	return emit(doneEvent("max_rounds", totalRounds, time.Since(startAt), inputTokens, outputTokens))
+}
+
+// doneEvent 构造带观测指标的 done 帧(轮数/耗时/token);
+// service 层发送 done 时打一行 ai_chat_done 日志,grep 即可统计调用量/P95/成本分布
+func doneEvent(stop string, rounds int64, dur time.Duration, inTok, outTok int64) ChatEvent {
+	return ChatEvent{
+		Type: "done", Stop: stop,
+		Rounds: rounds, DurationMs: dur.Milliseconds(),
+		InputTokens: inTok, OutputTokens: outTok,
+	}
 }
 
 // buildAnthropicMessages 校验并重建历史 + 当前提问

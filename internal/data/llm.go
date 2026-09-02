@@ -120,6 +120,7 @@ type messageAggregator struct {
 	toolUses  map[int64]*anthropic.ToolUseBlock
 	inputJSON map[int64]*strings.Builder
 	order     []int64
+	usage     *anthropic.MessageDeltaUsage // message_delta 携带的累计 token 用量
 }
 
 func newMessageAggregator() *messageAggregator {
@@ -163,7 +164,14 @@ func (a *messageAggregator) feed(ev anthropic.MessageStreamEventUnion) {
 		if md.Delta.StopReason != "" {
 			a.msg.StopReason = md.Delta.StopReason
 		}
+		// 累计 token 用量(message_delta 的 usage 是全流累计,直接覆盖)
+		a.usage = &md.Usage
 	}
+}
+
+// Usage 返回本次流式调用的 token 用量(输入/输出),供观测指标使用
+func (a *messageAggregator) Usage() *anthropic.MessageDeltaUsage {
+	return a.usage
 }
 
 func (a *messageAggregator) message() *anthropic.Message {

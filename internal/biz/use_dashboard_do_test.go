@@ -97,6 +97,10 @@ func (r *fakeDoDashboardRepo) GetFdrFragment(context.Context, *DoCommonParam) (*
 	return nil, nil
 }
 
+func (r *fakeDoDashboardRepo) GetFdrBandwidthTop(context.Context, *DoCommonParam) (*DoFdrBandwidthTopData, error) {
+	return nil, nil
+}
+
 func TestDoDashboardUseCaseGetCloseTopForwardsFilterName(t *testing.T) {
 	repo := &fakeDoDashboardRepo{}
 	uc := NewDoDashboardUseCase(repo)

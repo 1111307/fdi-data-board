@@ -67,7 +67,8 @@ func (fakeDoRepo) GetFclQuality(context.Context, *DoCommonParam) (*DoFclQualityD
 
 // fakeLlmRepo 按序吐出预设增量
 type fakeLlmRepo struct {
-	deltas []string
+	deltas   []string
+	thoughts []string
 }
 
 func (f *fakeLlmRepo) Enabled() bool { return true }
@@ -79,9 +80,14 @@ func (f *fakeLlmRepo) ChatStreamEx(_ context.Context, params anthropic.MessageNe
 	return nil, fmt.Errorf("not implemented in summary fake")
 }
 
-func (f *fakeLlmRepo) ChatStream(_ context.Context, _, _ string, onDelta func(string)) error {
+func (f *fakeLlmRepo) ChatStream(_ context.Context, _, _ string, onDelta func(string), onThinking func(string)) error {
 	for _, d := range f.deltas {
 		onDelta(d)
+	}
+	if onThinking != nil {
+		for _, th := range f.thoughts {
+			onThinking(th)
+		}
 	}
 	return nil
 }
@@ -91,7 +97,7 @@ type disabledLlmRepo struct{}
 func (disabledLlmRepo) Enabled() bool    { return false }
 func (disabledLlmRepo) Model() string    { return "" }
 func (disabledLlmRepo) MaxTokens() int64 { return 16384 }
-func (disabledLlmRepo) ChatStream(context.Context, string, string, func(string)) error {
+func (disabledLlmRepo) ChatStream(context.Context, string, string, func(string), func(string)) error {
 	return nil
 }
 func (disabledLlmRepo) ChatStreamEx(context.Context, anthropic.MessageNewParams, func(anthropic.MessageStreamEventUnion)) (*anthropic.Message, error) {
@@ -108,8 +114,10 @@ func TestStreamSummaryLlmModeForwardsDeltasInOrder(t *testing.T) {
 	var got []string
 	err := uc.StreamSummary(context.Background(), &dashboard_api.AiSummaryRequest{
 		StartDt: "2026-07-22", EndDt: "2026-07-28",
-	}, func(delta string) error {
-		got = append(got, delta)
+	}, func(kind, text string) error {
+		if kind == "delta" {
+			got = append(got, text)
+		}
 		return nil
 	})
 	if err != nil {
@@ -126,8 +134,10 @@ func TestStreamSummaryLocalModeGeneratesDeterministicSummary(t *testing.T) {
 	var sb strings.Builder
 	err := uc.StreamSummary(context.Background(), &dashboard_api.AiSummaryRequest{
 		StartDt: "2026-07-22", EndDt: "2026-07-28", EventNames: "hard_brake",
-	}, func(delta string) error {
-		sb.WriteString(delta)
+	}, func(kind, text string) error {
+		if kind == "delta" {
+			sb.WriteString(text)
+		}
 		return nil
 	})
 	if err != nil {
